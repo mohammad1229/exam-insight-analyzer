@@ -130,7 +130,7 @@ const Dashboard = () => {
                     <SelectValue placeholder="جميع الصفوف" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">جميع الصفوف</SelectItem>
+                    <SelectItem value="all">جميع الصفوف</SelectItem>
                     {classesData.map(cls => (
                       <SelectItem key={cls.id} value={cls.id}>{cls.name}</SelectItem>
                     ))}

@@ -1,5 +1,4 @@
-
-import { School, Teacher, Class, Subject, Student, Test } from "../types";
+import { Student, Teacher, Class, Section, Subject, Question, TestResult, Test, School } from "@/types";
 
 export const schoolData: School = {
   id: "school1",
@@ -116,7 +115,7 @@ export const testsData: Test[] = [
         percentage: 60
       }
     ],
-    notes: "تم إجراء الاختبار بنجاح",
+    notes: "تم إجراء الاختبار ب��جاح",
     draft: false
   }
 ];
