@@ -43,6 +43,15 @@ interface TestFormProps {
   }) => void;
 }
 
+const TEST_QUESTION_TYPES = [
+  { id: "اختيار من متعدد", name: "اختيار من متعدد" },
+  { id: "صواب وخطأ", name: "صواب وخطأ" },
+  { id: "مقالي", name: "مقالي" },
+  { id: "تكميلي", name: "تكميلي" },
+  { id: "مطابقة", name: "مطابقة" },
+  { id: "custom", name: "سؤال مخصص" }
+];
+
 const TestForm: React.FC<TestFormProps> = ({ onFormDataChange }) => {
   const [name, setName] = useState("");
   const [type, setType] = useState("");
@@ -57,6 +66,7 @@ const TestForm: React.FC<TestFormProps> = ({ onFormDataChange }) => {
 
   // Question form state
   const [questionType, setQuestionType] = useState("");
+  const [customQuestionType, setCustomQuestionType] = useState("");
   const [maxScore, setMaxScore] = useState<number>(5);
 
   useEffect(() => {
@@ -87,23 +97,27 @@ const TestForm: React.FC<TestFormProps> = ({ onFormDataChange }) => {
   }, [name, type, subjectId, teacherId, classId, sectionId, date, questions, notes]);
 
   const addQuestion = () => {
-    if (!questionType) {
+    if ((!questionType) || (questionType === "custom" && !customQuestionType)) {
       toast({
         title: "خطأ",
-        description: "الرجاء تحديد نوع السؤال",
+        description: "الرجاء تحديد نوع السؤال أو إدخال نوع مخصص",
         variant: "destructive",
       });
       return;
     }
 
+    // Use custom type if "custom" is selected
+    const finalQuestionType = questionType === "custom" ? customQuestionType : questionType;
+
     const newQuestion: Question = {
       id: `q${questions.length + 1}`,
-      type: questionType,
+      type: finalQuestionType,
       maxScore,
     };
 
     setQuestions([...questions, newQuestion]);
     setQuestionType("");
+    setCustomQuestionType("");
     setMaxScore(5);
   };
 
@@ -242,14 +256,26 @@ const TestForm: React.FC<TestFormProps> = ({ onFormDataChange }) => {
                     <SelectValue placeholder="اختر نوع السؤال" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="اختيار من متعدد">اختيار من متعدد</SelectItem>
-                    <SelectItem value="صواب وخطأ">صواب وخطأ</SelectItem>
-                    <SelectItem value="مقالي">مقالي</SelectItem>
-                    <SelectItem value="تكميلي">تكميلي</SelectItem>
-                    <SelectItem value="مطابقة">مطابقة</SelectItem>
+                    {TEST_QUESTION_TYPES.map(type => (
+                      <SelectItem key={type.id} value={type.id}>
+                        {type.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
+
+              {questionType === "custom" && (
+                <div className="space-y-2">
+                  <Label htmlFor="customQuestionType">نوع السؤال المخصص</Label>
+                  <Input
+                    id="customQuestionType"
+                    value={customQuestionType}
+                    onChange={(e) => setCustomQuestionType(e.target.value)}
+                    placeholder="أدخل نوع السؤال المخصص"
+                  />
+                </div>
+              )}
 
               <div className="space-y-2">
                 <Label htmlFor="maxScore">العلامة القصوى</Label>

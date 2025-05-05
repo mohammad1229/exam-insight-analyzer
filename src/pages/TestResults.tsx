@@ -5,6 +5,7 @@ import Sidebar from "@/components/Sidebar";
 import TestForm from "@/components/TestForm";
 import StudentList from "@/components/StudentList";
 import QuestionAnalysis from "@/components/QuestionAnalysis";
+import ReportGenerator from "@/components/ReportGenerator"; 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -32,6 +33,12 @@ const TestResults = () => {
 
   // Student results state
   const [selectedStudents, setSelectedStudents] = useState<Record<string, { isAbsent: boolean, scores: Record<string, number> }>>({});
+  
+  // Current active tab
+  const [activeTab, setActiveTab] = useState("test-info");
+  
+  // Generate test ID
+  const testId = "test_" + Date.now();
 
   // Generate test results based on current state
   const generateTestResults = (): TestResult[] => {
@@ -53,7 +60,7 @@ const TestResults = () => {
       
       return {
         id: `result_${studentId}`,
-        testId: "new_test",
+        testId: testId,
         studentId,
         isAbsent,
         scores,
@@ -78,6 +85,20 @@ const TestResults = () => {
       return {
         ...prev,
         [studentId]: { ...student, isAbsent }
+      };
+    });
+  };
+
+  // Handle changing scores for a student
+  const handleScoreChange = (studentId: string, questionId: string, value: number) => {
+    setSelectedStudents(prev => {
+      const student = prev[studentId] || { isAbsent: false, scores: {} };
+      return {
+        ...prev,
+        [studentId]: {
+          ...student,
+          scores: { ...student.scores, [questionId]: value }
+        }
       };
     });
   };
@@ -108,13 +129,17 @@ const TestResults = () => {
     }
     
     const results = generateTestResults();
-    
-    // In a real app, you would save this to the database
-    console.log({
+
+    // Create test object
+    const testData = {
+      id: testId,
       ...testFormData,
       draft: asDraft,
       results,
-    });
+    };
+    
+    // In a real app, you would save this to the database
+    console.log(testData);
     
     toast({
       title: asDraft ? "تم حفظ المسودة" : "تم حفظ النتائج",
@@ -125,6 +150,14 @@ const TestResults = () => {
     
     // Navigate to dashboard after saving
     navigate("/dashboard");
+  };
+
+  // Mock test object for report preview
+  const mockTest = {
+    id: testId,
+    ...testFormData,
+    results: generateTestResults(),
+    draft: false
   };
 
   return (
@@ -138,8 +171,12 @@ const TestResults = () => {
             <p className="text-muted-foreground">إنشاء اختبار جديد وإدخال نتائج الطلاب</p>
           </div>
 
-          <Tabs defaultValue="test-info">
-            <TabsList className="grid grid-cols-3 mb-6">
+          <Tabs 
+            defaultValue="test-info" 
+            value={activeTab}
+            onValueChange={setActiveTab}
+          >
+            <TabsList className="grid grid-cols-4 mb-6">
               <TabsTrigger value="test-info">بيانات الاختبار</TabsTrigger>
               <TabsTrigger 
                 value="student-scores"
@@ -152,6 +189,12 @@ const TestResults = () => {
                 disabled={Object.keys(selectedStudents).length === 0}
               >
                 تحليل النتائج
+              </TabsTrigger>
+              <TabsTrigger 
+                value="report-preview"
+                disabled={Object.keys(selectedStudents).length === 0}
+              >
+                معاينة التقرير
               </TabsTrigger>
             </TabsList>
             
@@ -172,6 +215,13 @@ const TestResults = () => {
                   >
                     حفظ كمسودة
                   </Button>
+                  <Button 
+                    className="mr-2"
+                    onClick={() => setActiveTab("student-scores")}
+                    disabled={!testFormData.classId || !testFormData.sectionId || testFormData.questions.length === 0}
+                  >
+                    التالي: درجات الطلاب
+                  </Button>
                 </div>
               </Card>
             </TabsContent>
@@ -190,13 +240,16 @@ const TestResults = () => {
                   <Button 
                     variant="secondary" 
                     className="mr-2"
+                    onClick={() => setActiveTab("test-info")}
                   >
                     رجوع
                   </Button>
                   <Button 
-                    onClick={() => handleSaveTest(false)}
+                    className="mr-2"
+                    onClick={() => setActiveTab("analysis")}
+                    disabled={Object.keys(selectedStudents).length === 0}
                   >
-                    حفظ النتائج
+                    التالي: تحليل النتائج
                   </Button>
                 </div>
               </Card>
@@ -213,6 +266,47 @@ const TestResults = () => {
                   <Button 
                     variant="secondary" 
                     className="mr-2"
+                    onClick={() => setActiveTab("student-scores")}
+                  >
+                    رجوع
+                  </Button>
+                  <Button 
+                    className="mr-2"
+                    onClick={() => setActiveTab("report-preview")}
+                  >
+                    معاينة التقرير
+                  </Button>
+                  <Button 
+                    onClick={() => handleSaveTest(false)}
+                  >
+                    حفظ النتائج
+                  </Button>
+                </div>
+              </Card>
+            </TabsContent>
+            
+            <TabsContent value="report-preview">
+              <Card className="p-6">
+                <h3 className="text-xl font-bold mb-4">معاينة التقرير</h3>
+                <p className="mb-4 text-muted-foreground">معاينة كيف سيظهر التقرير النهائي. يمكنك تنزيل التقرير أو العودة لتعديل البيانات.</p>
+                
+                <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                  <div className="lg:col-span-1">
+                    <ReportGenerator test={mockTest} />
+                  </div>
+                  <div className="lg:col-span-3">
+                    <Card className="border-dashed border-2 p-6 h-full flex flex-col items-center justify-center">
+                      <p className="text-center text-muted-foreground">معاينة التقرير ستظهر هنا بعد التنزيل</p>
+                      <p className="mt-2 text-sm text-center">سيحتوي التقرير على كافة البيانات الأساسية للاختبار، درجات الطلاب، والرسوم البيانية للتحليل</p>
+                    </Card>
+                  </div>
+                </div>
+                
+                <div className="flex justify-end mt-6">
+                  <Button 
+                    variant="secondary" 
+                    className="mr-2"
+                    onClick={() => setActiveTab("analysis")}
                   >
                     رجوع
                   </Button>

@@ -61,9 +61,19 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ test }) => {
 
     return {
       questionNumber: index + 1,
+      questionId,
       successRate: Math.round(successRate),
     };
   });
+
+  const generateExcel = () => {
+    // In a real app, you would implement Excel export here
+    // This is just a placeholder
+    toast({
+      title: "تم إنشاء ملف Excel",
+      description: "تم إنشاء ملف Excel بنجاح (وظيفة تحت التطوير)",
+    });
+  };
 
   const generatePDF = () => {
     try {
@@ -115,12 +125,25 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ test }) => {
         headStyles: { fillColor: [67, 97, 238], textColor: [255, 255, 255] },
         styles: { font: 'helvetica', halign: 'right' },
         margin: { top: 115 },
+        didDrawCell: (data) => {
+          // Highlight failed questions with red color
+          if (data.row.index >= 0 && !data.isHeaderRow && data.column.index === 1) {
+            const successRate = parseInt(questionData[data.row.index][1]);
+            if (successRate < 50) {
+              doc.setTextColor(255, 0, 0);
+            } else {
+              doc.setTextColor(0, 0, 0);
+            }
+          }
+        },
       });
       
+      // Get the Y position after the question stats table
+      const questionTableEndY = doc.autoTable.previous.finalY;
+      
       // Add results table
-      const resultsStartY = doc.lastAutoTable.finalY + 15;
       doc.setFontSize(14);
-      doc.text("نتائج الطلاب", doc.internal.pageSize.width / 2, resultsStartY, { align: 'center' });
+      doc.text("نتائج الطلاب", doc.internal.pageSize.width / 2, questionTableEndY + 15, { align: 'center' });
       
       // Prepare the table data for student results
       const resultsData = test.results.map(result => {
@@ -145,22 +168,40 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ test }) => {
       });
       
       doc.autoTable({
-        startY: resultsStartY + 5,
+        startY: questionTableEndY + 20,
         head: [headers],
         body: resultsData,
         headStyles: { fillColor: [67, 97, 238], textColor: [255, 255, 255] },
         styles: { font: 'helvetica', halign: 'right' },
-        margin: { top: resultsStartY + 10 },
+        margin: { top: questionTableEndY + 20 },
+        didDrawCell: (data) => {
+          // Highlight failed scores with red color
+          if (data.row.index >= 0 && !data.isHeaderRow && data.column.index >= 2) {
+            const scoreText = resultsData[data.row.index][data.column.index];
+            if (scoreText !== '-') {
+              const parts = scoreText.split('/');
+              const score = parseFloat(parts[0]);
+              const maxScore = parseFloat(parts[1]);
+              if (score / maxScore < 0.5) {
+                doc.setTextColor(255, 0, 0);
+              } else {
+                doc.setTextColor(0, 0, 0);
+              }
+            }
+          }
+        },
       });
+      
+      // Get the Y position after the results table
+      const resultsTableEndY = doc.autoTable.previous.finalY;
       
       // Add notes if available
       if (test.notes) {
-        const notesStartY = doc.lastAutoTable.finalY + 15;
         doc.setFontSize(14);
-        doc.text("ملاحظات", doc.internal.pageSize.width / 2, notesStartY, { align: 'center' });
+        doc.text("ملاحظات", doc.internal.pageSize.width / 2, resultsTableEndY + 15, { align: 'center' });
         
         doc.setFontSize(12);
-        doc.text(test.notes, 190, notesStartY + 10, { align: 'right', maxWidth: 180 });
+        doc.text(test.notes, 190, resultsTableEndY + 25, { align: 'right', maxWidth: 180 });
       }
       
       // Add footer
@@ -189,11 +230,16 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ test }) => {
     <Card className="p-4 flex flex-col items-center space-y-4 dir-rtl">
       <h3 className="text-lg font-medium">إنشاء تقرير النتائج</h3>
       <p className="text-sm text-muted-foreground">
-        قم بإنشاء تقرير PDF يحتوي على كافة بيانات النتائج والإحصائيات
+        قم بإنشاء تقارير تحتوي على كافة بيانات النتائج والإحصائيات
       </p>
-      <Button onClick={generatePDF} className="mt-2">
-        تنزيل تقرير PDF
-      </Button>
+      <div className="flex gap-2 w-full">
+        <Button onClick={generatePDF} className="flex-1">
+          تنزيل تقرير PDF
+        </Button>
+        <Button onClick={generateExcel} className="flex-1" variant="outline">
+          تنزيل تقرير Excel
+        </Button>
+      </div>
     </Card>
   );
 };
