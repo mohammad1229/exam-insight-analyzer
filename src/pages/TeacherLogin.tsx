@@ -57,27 +57,28 @@ const TeacherLogin = () => {
   };
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-b from-white to-green-50">
-      <div className="absolute top-0 left-0 right-0 h-16 bg-white shadow-sm flex items-center justify-center">
+    <div className="flex min-h-screen flex-col bg-gradient-to-b from-black via-white to-green-600">
+      <div className="absolute top-0 left-0 right-0 h-16 bg-black text-white shadow-sm flex items-center justify-center">
         <div className="container flex justify-between items-center">
           <h1 className="text-2xl font-bold">نظام إدارة اختبارات المدرسة</h1>
           <div className="space-x-2">
             <Button 
               variant="outline"
-              onClick={() => navigate("/admin")}
+              className="border-white text-white hover:bg-white hover:text-black"
+              onClick={() => navigate("/")}
             >
-              دخول المدير
+              الصفحة الرئيسية
             </Button>
           </div>
         </div>
       </div>
       
       <div className="flex-1 flex items-center justify-center w-full dir-rtl">
-        <Card className="w-[350px] border-2 border-green-500">
-          <CardHeader>
+        <Card className="w-[350px] border-2 border-[#ea384c]">
+          <CardHeader className="bg-black text-white">
             <CardTitle className="text-center text-2xl">تسجيل دخول المعلم</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-6 mt-2">
             <form onSubmit={(e) => {
               e.preventDefault();
               handleLogin();
@@ -105,7 +106,7 @@ const TeacherLogin = () => {
                 </div>
                 <Button 
                   type="submit" 
-                  className="mt-2 bg-green-600 hover:bg-green-700"
+                  className="mt-2 bg-[#ea384c] hover:bg-red-700 text-white"
                 >
                   تسجيل الدخول
                 </Button>

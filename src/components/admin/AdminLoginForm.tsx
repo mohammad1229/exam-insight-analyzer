@@ -23,8 +23,7 @@ const AdminLoginForm = () => {
         description: "مرحباً بك في لوحة تحكم مدير المدرسة",
       });
       
-      // Force page reload to trigger the isLoggedIn check
-      window.location.reload();
+      navigate("/admin-dashboard");
     } else {
       toast({
         title: "فشل تسجيل الدخول",
@@ -35,12 +34,12 @@ const AdminLoginForm = () => {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-white to-green-50 dir-rtl">
-      <Card className="w-[350px] border-2 border-green-500">
-        <CardHeader>
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-black via-white to-green-600 dir-rtl">
+      <Card className="w-[350px] border-2 border-[#ea384c]">
+        <CardHeader className="bg-black text-white">
           <CardTitle className="text-center text-2xl">تسجيل دخول مدير المدرسة</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-6 mt-2">
           <form onSubmit={(e) => {
             e.preventDefault();
             handleLogin();
@@ -68,7 +67,7 @@ const AdminLoginForm = () => {
               </div>
               <Button 
                 type="submit" 
-                className="mt-2 bg-green-600 hover:bg-green-700"
+                className="mt-2 bg-[#ea384c] hover:bg-red-700 text-white"
               >
                 تسجيل الدخول
               </Button>
