@@ -17,6 +17,8 @@ import {
 } from "@/data/mockData";
 import { jsPDF } from "jspdf";
 import 'jspdf-autotable';
+import * as XLSX from 'xlsx';
+import { FileExcel, FilePdf } from "lucide-react";
 
 // Add the type declaration for jspdf-autotable
 declare module 'jspdf' {
@@ -71,12 +73,82 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ test }) => {
   });
 
   const generateExcel = () => {
-    // In a real app, you would implement Excel export here
-    // This is just a placeholder
-    toast({
-      title: "تم إنشاء ملف Excel",
-      description: "تم إنشاء ملف Excel بنجاح (وظيفة تحت التطوير)",
-    });
+    try {
+      // Create workbook
+      const workbook = XLSX.utils.book_new();
+
+      // Create sheet with test info
+      const testInfoSheet = [
+        ["اسم المدرسة", schoolData.name],
+        ["اسم الاختبار", test.name],
+        ["المادة", subject?.name || ''],
+        ["المعلم", teacher?.name || ''],
+        ["الصف", `${classObj?.name || ''} ${section?.name || ''}`],
+        ["تاريخ الاختبار", test.date]
+      ];
+      
+      // Add statistics
+      const statsData = [
+        ["إحصائيات الاختبار"],
+        ["إجمالي الطلاب", totalStudents],
+        ["عدد الناجحين", passedStudents],
+        ["نسبة النجاح", `${passRate.toFixed(1)}%`],
+        ["متوسط العلامات", `${averageScore.toFixed(1)}%`]
+      ];
+      
+      // Add test info and statistics to one sheet
+      const testInfoWS = XLSX.utils.aoa_to_sheet([...testInfoSheet, [""], ...statsData]);
+      XLSX.utils.book_append_sheet(workbook, testInfoWS, "معلومات الاختبار");
+      
+      // Create question stats sheet
+      const questionHeaders = ["السؤال", "معدل النجاح"];
+      const questionData = questionStats.map(stat => [
+        `السؤال ${stat.questionNumber}`, 
+        `${stat.successRate}%`
+      ]);
+      
+      const questionWS = XLSX.utils.aoa_to_sheet([questionHeaders, ...questionData]);
+      XLSX.utils.book_append_sheet(workbook, questionWS, "تحليل الأسئلة");
+      
+      // Create student results sheet
+      const resultsHeaders = ["اسم الطالب", "النتيجة"];
+      test.questions.forEach((_, index) => {
+        resultsHeaders.push(`س${index + 1}`);
+      });
+      
+      const resultsData = test.results.map(result => {
+        const student = getStudentById(result.studentId);
+        const rowData = [
+          student?.name || '',
+          result.isAbsent ? 'غائب' : `${result.percentage}%`,
+        ];
+        
+        // Add scores for each question
+        test.questions.forEach(question => {
+          rowData.push(result.isAbsent ? '-' : `${result.scores[question.id] || 0}/${question.maxScore}`);
+        });
+        
+        return rowData;
+      });
+      
+      const resultsWS = XLSX.utils.aoa_to_sheet([resultsHeaders, ...resultsData]);
+      XLSX.utils.book_append_sheet(workbook, resultsWS, "نتائج الطلاب");
+      
+      // Save the Excel file
+      XLSX.writeFile(workbook, `تقرير_${test.name}_${test.date}.xlsx`);
+      
+      toast({
+        title: "تم إنشاء ملف Excel",
+        description: "تم إنشاء ملف Excel بنجاح وحفظه على جهازك",
+      });
+    } catch (error) {
+      console.error("Error generating Excel:", error);
+      toast({
+        title: "حدث خطأ",
+        description: "لم يتم إنشاء ملف Excel بنجاح",
+        variant: "destructive",
+      });
+    }
   };
 
   const generatePDF = () => {
@@ -230,19 +302,81 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ test }) => {
     }
   };
 
+  const handleFileImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    
+    try {
+      const reader = new FileReader();
+      
+      reader.onload = (e) => {
+        try {
+          const data = new Uint8Array(e.target?.result as ArrayBuffer);
+          const workbook = XLSX.read(data, { type: 'array' });
+          
+          // Get first sheet
+          const firstSheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[firstSheetName];
+          
+          // Convert to json
+          const importedData = XLSX.utils.sheet_to_json(worksheet);
+          
+          console.log('Imported data:', importedData);
+          
+          toast({
+            title: "تم استيراد البيانات",
+            description: `تم استيراد ${importedData.length} سجل من ملف Excel بنجاح`,
+          });
+          
+          // Reset input value so the same file can be imported again
+          event.target.value = '';
+        } catch (error) {
+          console.error('Error parsing Excel file:', error);
+          toast({
+            title: "حدث خطأ",
+            description: "تعذر قراءة ملف Excel. يرجى التأكد من صحة الملف",
+            variant: "destructive",
+          });
+        }
+      };
+      
+      reader.readAsArrayBuffer(file);
+    } catch (error) {
+      console.error('Error reading file:', error);
+      toast({
+        title: "حدث خطأ",
+        description: "فشلت عملية قراءة الملف",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <Card className="p-4 flex flex-col items-center space-y-4 dir-rtl">
       <h3 className="text-lg font-medium">إنشاء تقرير النتائج</h3>
       <p className="text-sm text-muted-foreground">
         قم بإنشاء تقارير تحتوي على كافة بيانات النتائج والإحصائيات
       </p>
-      <div className="flex gap-2 w-full">
-        <Button onClick={generatePDF} className="flex-1">
+      <div className="flex flex-col gap-2 w-full">
+        <Button onClick={generatePDF} className="flex-1 gap-2">
+          <FilePdf className="h-4 w-4" />
           تنزيل تقرير PDF
         </Button>
-        <Button onClick={generateExcel} className="flex-1" variant="outline">
+        <Button onClick={generateExcel} className="flex-1 gap-2" variant="outline">
+          <FileExcel className="h-4 w-4" />
           تنزيل تقرير Excel
         </Button>
+        
+        <label className="flex items-center justify-center gap-2 px-4 py-2 border rounded-md cursor-pointer hover:bg-gray-100 transition-colors text-center mt-2">
+          <input 
+            type="file" 
+            accept=".xlsx, .xls" 
+            className="hidden" 
+            onChange={handleFileImport} 
+          />
+          <FileExcel className="h-4 w-4" />
+          استيراد بيانات من ملف Excel
+        </label>
       </div>
     </Card>
   );
