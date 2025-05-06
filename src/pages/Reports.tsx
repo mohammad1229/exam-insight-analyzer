@@ -46,20 +46,20 @@ const Reports = () => {
   const teacher = selectedTest ? getTeacherById(selectedTest.teacherId) : null;
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen bg-gradient-to-b from-white to-green-50">
       <Sidebar />
       <div className="flex-1 flex flex-col">
         <Navbar />
         <main className="flex-1 container mx-auto p-6 dir-rtl">
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold">تقارير الاختبارات</h1>
+          <div className="mb-8 pb-4 border-b-2 border-red-500">
+            <h1 className="text-3xl font-bold text-black">تقارير الاختبارات</h1>
             <p className="text-muted-foreground">عرض وتحليل نتائج الاختبارات وإنشاء التقارير</p>
           </div>
 
           <div className="mb-8 flex items-center gap-4">
             <h2 className="text-lg font-semibold">اختر الاختبار:</h2>
             <Select value={selectedTestId} onValueChange={setSelectedTestId}>
-              <SelectTrigger className="w-72">
+              <SelectTrigger className="w-72 border-black">
                 <SelectValue placeholder="اختر الاختبار" />
               </SelectTrigger>
               <SelectContent>
@@ -74,11 +74,11 @@ const Reports = () => {
 
           {selectedTest ? (
             <div className="space-y-8">
-              <Card>
-                <CardHeader>
-                  <CardTitle>بيانات الاختبار</CardTitle>
+              <Card className="border-2 border-green-500 shadow-lg bg-white">
+                <CardHeader className="bg-gradient-to-r from-green-100 to-white border-b border-green-500">
+                  <CardTitle className="text-black">بيانات الاختبار</CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="pt-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     <div className="space-y-2">
                       <p className="text-sm text-muted-foreground">اسم الاختبار</p>
@@ -114,19 +114,19 @@ const Reports = () => {
                 </div>
                 
                 <div className="lg:col-span-3">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>نتائج الطلاب</CardTitle>
+                  <Card className="border-2 border-red-500 shadow-lg bg-white">
+                    <CardHeader className="bg-gradient-to-r from-red-100 to-white border-b border-red-500">
+                      <CardTitle className="text-black">نتائج الطلاب</CardTitle>
                     </CardHeader>
                     <CardContent>
                       <Table>
-                        <TableHeader>
+                        <TableHeader className="bg-black">
                           <TableRow>
-                            <TableHead className="text-right">اسم الطالب</TableHead>
-                            <TableHead className="text-right">الحالة</TableHead>
-                            <TableHead className="text-right">العلامة النهائية</TableHead>
-                            <TableHead className="text-right">النسبة المئوية</TableHead>
-                            <TableHead className="text-right">النتيجة</TableHead>
+                            <TableHead className="text-right text-white">اسم الطالب</TableHead>
+                            <TableHead className="text-right text-white">الحالة</TableHead>
+                            <TableHead className="text-right text-white">العلامة النهائية</TableHead>
+                            <TableHead className="text-right text-white">النسبة المئوية</TableHead>
+                            <TableHead className="text-right text-white">النتيجة</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -134,7 +134,7 @@ const Reports = () => {
                             const student = getStudentById(result.studentId);
                             
                             return (
-                              <TableRow key={result.id}>
+                              <TableRow key={result.id} className="hover:bg-green-50">
                                 <TableCell className="font-medium">{student?.name || ''}</TableCell>
                                 <TableCell>{result.isAbsent ? 'غائب' : 'حاضر'}</TableCell>
                                 <TableCell>
@@ -160,19 +160,59 @@ const Reports = () => {
                 </div>
               </div>
 
-              <Card>
+              <Card className="border-2 border-black shadow-lg bg-white">
+                <CardHeader className="bg-gradient-to-r from-gray-100 to-white border-b border-black">
+                  <CardTitle className="text-black">تحليل الأسئلة</CardTitle>
+                </CardHeader>
                 <CardContent className="pt-6">
                   <QuestionAnalysis 
                     results={selectedTest.results} 
                     questions={selectedTest.questions}
                   />
+                  
+                  <div className="mt-8 bg-green-50 p-4 rounded-lg border-2 border-green-500">
+                    <h3 className="text-lg font-bold mb-4 text-black">جدول تلخيص النتائج</h3>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                      <div className="bg-white p-4 rounded-lg shadow text-center border border-green-500">
+                        <p className="text-sm text-gray-600">إجمالي الطلاب</p>
+                        <p className="text-2xl font-bold text-black">
+                          {selectedTest.results.filter(r => !r.isAbsent).length}
+                        </p>
+                      </div>
+                      <div className="bg-white p-4 rounded-lg shadow text-center border border-green-500">
+                        <p className="text-sm text-gray-600">عدد الناجحين</p>
+                        <p className="text-2xl font-bold text-green-600">
+                          {selectedTest.results.filter(r => !r.isAbsent && r.percentage >= 50).length}
+                        </p>
+                      </div>
+                      <div className="bg-white p-4 rounded-lg shadow text-center border border-green-500">
+                        <p className="text-sm text-gray-600">عدد الراسبين</p>
+                        <p className="text-2xl font-bold text-red-600">
+                          {selectedTest.results.filter(r => !r.isAbsent && r.percentage < 50).length}
+                        </p>
+                      </div>
+                      <div className="bg-white p-4 rounded-lg shadow text-center border border-green-500">
+                        <p className="text-sm text-gray-600">نسبة النجاح</p>
+                        {(() => {
+                          const present = selectedTest.results.filter(r => !r.isAbsent).length;
+                          const passed = selectedTest.results.filter(r => !r.isAbsent && r.percentage >= 50).length;
+                          const rate = present > 0 ? Math.round((passed / present) * 100) : 0;
+                          return (
+                            <p className={`text-2xl font-bold ${rate >= 50 ? 'text-green-600' : 'text-red-600'}`}>
+                              {rate}%
+                            </p>
+                          );
+                        })()}
+                      </div>
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
 
               {selectedTest.notes && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle>ملاحظات</CardTitle>
+                <Card className="border-2 border-green-500 shadow-lg bg-white">
+                  <CardHeader className="bg-gradient-to-r from-green-100 to-white border-b border-green-500">
+                    <CardTitle className="text-black">ملاحظات</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <p>{selectedTest.notes}</p>
@@ -181,8 +221,8 @@ const Reports = () => {
               )}
             </div>
           ) : (
-            <div className="text-center py-12">
-              <h3 className="text-xl font-semibold mb-2">لا يوجد اختبار محدد</h3>
+            <div className="text-center py-12 bg-white p-8 rounded-lg border-2 border-green-500 shadow-lg">
+              <h3 className="text-xl font-semibold mb-2 text-black">لا يوجد اختبار محدد</h3>
               <p className="text-muted-foreground">الرجاء اختيار اختبار من القائمة</p>
             </div>
           )}
@@ -193,3 +233,4 @@ const Reports = () => {
 };
 
 export default Reports;
+
