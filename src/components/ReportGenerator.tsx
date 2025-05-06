@@ -21,7 +21,11 @@ import 'jspdf-autotable';
 // Add the type declaration for jspdf-autotable
 declare module 'jspdf' {
   interface jsPDF {
-    autoTable: (options: any) => jsPDF;
+    autoTable: (options: any) => jsPDF & {
+      previous: {
+        finalY: number;
+      };
+    };
   }
 }
 
@@ -139,7 +143,7 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ test }) => {
       });
       
       // Get the Y position after the question stats table
-      const questionTableEndY = doc.autoTable.previous.finalY;
+      const questionTableEndY = (doc.autoTable as any).previous.finalY;
       
       // Add results table
       doc.setFontSize(14);
@@ -193,7 +197,7 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ test }) => {
       });
       
       // Get the Y position after the results table
-      const resultsTableEndY = doc.autoTable.previous.finalY;
+      const resultsTableEndY = (doc.autoTable as any).previous.finalY;
       
       // Add notes if available
       if (test.notes) {
