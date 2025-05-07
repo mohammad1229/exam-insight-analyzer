@@ -93,7 +93,7 @@ const ReportsTab = ({ mockReports }: ReportsTabProps) => {
                   <SelectValue placeholder="اختر الصف" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">جميع الصفوف</SelectItem>
+                  <SelectItem value="all">جميع الصفوف</SelectItem>
                   {classesData.map(cls => (
                     <SelectItem key={cls.id} value={cls.name}>
                       {cls.name}
@@ -110,7 +110,7 @@ const ReportsTab = ({ mockReports }: ReportsTabProps) => {
                   <SelectValue placeholder="اختر المعلم" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">جميع المعلمين</SelectItem>
+                  <SelectItem value="all">جميع المعلمين</SelectItem>
                   {teachersData.map(teacher => (
                     <SelectItem key={teacher.id} value={teacher.name}>
                       {teacher.name}
@@ -127,7 +127,7 @@ const ReportsTab = ({ mockReports }: ReportsTabProps) => {
                   <SelectValue placeholder="اختر المادة" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">جميع المواد</SelectItem>
+                  <SelectItem value="all">جميع المواد</SelectItem>
                   {subjectsData.map(subject => (
                     <SelectItem key={subject.id} value={subject.name}>
                       {subject.name}

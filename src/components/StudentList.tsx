@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Student } from "@/types";
 import { getStudentsByClassAndSection } from "@/data/mockData";
