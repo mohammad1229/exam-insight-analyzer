@@ -50,23 +50,23 @@ interface ReportsTabProps {
 
 const ReportsTab = ({ mockReports }: ReportsTabProps) => {
   const navigate = useNavigate();
-  const [selectedClass, setSelectedClass] = useState("");
-  const [selectedTeacher, setSelectedTeacher] = useState("");
-  const [selectedSubject, setSelectedSubject] = useState("");
+  const [selectedClass, setSelectedClass] = useState("all");
+  const [selectedTeacher, setSelectedTeacher] = useState("all");
+  const [selectedSubject, setSelectedSubject] = useState("all");
 
   // Filter reports based on selections
   const filteredReports = mockReports.filter(report => {
     let matches = true;
     
-    if (selectedClass && report.className !== selectedClass) {
+    if (selectedClass && selectedClass !== "all" && report.className !== selectedClass) {
       matches = false;
     }
     
-    if (selectedTeacher && report.teacherName !== selectedTeacher) {
+    if (selectedTeacher && selectedTeacher !== "all" && report.teacherName !== selectedTeacher) {
       matches = false;
     }
     
-    if (selectedSubject && report.subjectName !== selectedSubject) {
+    if (selectedSubject && selectedSubject !== "all" && report.subjectName !== selectedSubject) {
       matches = false;
     }
     
