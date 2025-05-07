@@ -3,39 +3,91 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
-import { toast } from "@/hooks/use-toast";
+import { useToast } from "@/hooks/use-toast";
+import { isElectron } from "@/services/electronService";
+import electronService from "@/services/electronService";
 
 const Index = () => {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [trialDaysLeft, setTrialDaysLeft] = useState(10);
   const [isActivated, setIsActivated] = useState(false);
   const [activationKey, setActivationKey] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+  const [progress, setProgress] = useState(0);
+  const [showWelcome, setShowWelcome] = useState(true);
 
   useEffect(() => {
-    // Check if system is activated
-    const activationStatus = localStorage.getItem("systemActivated");
-    if (activationStatus === "true") {
-      setIsActivated(true);
-    } else {
-      // Calculate trial days left
-      const installDate = localStorage.getItem("installDate");
-      if (!installDate) {
-        // First time visiting the site
-        const today = new Date().toISOString();
-        localStorage.setItem("installDate", today);
-        localStorage.setItem("trialDaysLeft", "10");
-        setTrialDaysLeft(10);
-      } else {
-        // Calculate days since installation
-        const daysElapsed = Math.floor((Date.now() - new Date(installDate).getTime()) / (1000 * 60 * 60 * 24));
-        const daysLeft = Math.max(0, 10 - daysElapsed);
-        localStorage.setItem("trialDaysLeft", daysLeft.toString());
-        setTrialDaysLeft(daysLeft);
-      }
-    }
+    // Show welcome screen with progress bar
+    const interval = setInterval(() => {
+      setProgress((prevProgress) => {
+        if (prevProgress >= 100) {
+          clearInterval(interval);
+          setTimeout(() => {
+            setShowWelcome(false);
+            checkActivationStatus();
+          }, 500);
+          return 100;
+        }
+        return prevProgress + 5;
+      });
+    }, 100);
+
+    return () => clearInterval(interval);
   }, []);
 
-  const handleActivation = () => {
+  const checkActivationStatus = async () => {
+    try {
+      // Check if system is activated
+      let activationStatus;
+      let daysLeft;
+      
+      if (isElectron()) {
+        // Get settings from the electron backend
+        const settings = await electronService.getSystemSettings();
+        activationStatus = settings.systemActivated === "true";
+        
+        if (!activationStatus) {
+          // Calculate trial days left
+          const installDate = settings.installDate || new Date().toISOString();
+          const daysElapsed = Math.floor((Date.now() - new Date(installDate).getTime()) / (1000 * 60 * 60 * 24));
+          daysLeft = Math.max(0, 10 - daysElapsed);
+        }
+      } else {
+        // Web environment
+        activationStatus = localStorage.getItem("systemActivated") === "true";
+        
+        if (!activationStatus) {
+          // Calculate trial days left
+          const installDate = localStorage.getItem("installDate");
+          if (!installDate) {
+            // First time visiting the site
+            const today = new Date().toISOString();
+            localStorage.setItem("installDate", today);
+            localStorage.setItem("trialDaysLeft", "10");
+            daysLeft = 10;
+          } else {
+            // Calculate days since installation
+            const daysElapsed = Math.floor((Date.now() - new Date(installDate).getTime()) / (1000 * 60 * 60 * 24));
+            daysLeft = Math.max(0, 10 - daysElapsed);
+            localStorage.setItem("trialDaysLeft", daysLeft.toString());
+          }
+        }
+      }
+      
+      setIsActivated(activationStatus);
+      
+      if (!activationStatus && daysLeft !== undefined) {
+        setTrialDaysLeft(daysLeft);
+      }
+    } catch (error) {
+      console.error("Error checking activation status:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleActivation = async () => {
     if (!activationKey) {
       toast({
         title: "خطأ",
@@ -45,35 +97,100 @@ const Index = () => {
       return;
     }
 
-    // Get stored licenses
-    const licenses = JSON.parse(localStorage.getItem("licenseKeys") || "[]");
-    const license = licenses.find((l: any) => l.key === activationKey && !l.used);
-
-    if (license) {
-      // Activate the system
-      localStorage.setItem("systemActivated", "true");
-      localStorage.setItem("schoolName", license.schoolName);
-      localStorage.setItem("directorName", license.directorName);
-      localStorage.setItem("activationDate", new Date().toISOString());
-      localStorage.setItem("expiryDate", license.validUntil);
-
-      // Mark license as used
-      license.used = true;
-      localStorage.setItem("licenseKeys", JSON.stringify(licenses));
-
-      setIsActivated(true);
+    try {
+      let result;
+      
+      if (isElectron()) {
+        // Use the Electron service to activate the license
+        result = await electronService.activateLicense(activationKey);
+      } else {
+        // Web environment - get stored licenses from localStorage
+        const licenses = JSON.parse(localStorage.getItem("licenseKeys") || "[]");
+        const license = licenses.find((l: any) => l.key === activationKey && !l.used);
+        
+        if (license) {
+          // Activate the system
+          localStorage.setItem("systemActivated", "true");
+          localStorage.setItem("schoolName", license.schoolName);
+          localStorage.setItem("directorName", license.directorName);
+          localStorage.setItem("activationDate", new Date().toISOString());
+          localStorage.setItem("expiryDate", license.validUntil);
+          
+          // Mark license as used
+          license.used = true;
+          localStorage.setItem("licenseKeys", JSON.stringify(licenses));
+          
+          result = {
+            success: true,
+            message: `تم تنشيط النظام لـ ${license.schoolName} بنجاح`,
+            license
+          };
+        } else {
+          result = {
+            success: false,
+            message: "مفتاح التنشيط غير صالح أو مستخدم بالفعل"
+          };
+        }
+      }
+      
+      if (result.success) {
+        setIsActivated(true);
+        toast({
+          title: "تم التنشيط بنجاح",
+          description: result.message,
+        });
+      } else {
+        toast({
+          title: "فشل التنشيط",
+          description: result.message,
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Error activating license:", error);
       toast({
-        title: "تم التنشيط بنجاح",
-        description: `تم تنشيط النظام لـ ${license.schoolName} بنجاح`,
-      });
-    } else {
-      toast({
-        title: "فشل التنشيط",
-        description: "مفتاح التنشيط غير صالح أو مستخدم بالفعل",
+        title: "خطأ في تنشيط الترخيص",
+        description: "حدث خطأ أثناء محاولة تنشيط الترخيص",
         variant: "destructive",
       });
     }
   };
+
+  // Show welcome screen with loading bar
+  if (showWelcome) {
+    return (
+      <div 
+        className="min-h-screen flex flex-col items-center justify-center dir-rtl px-4 bg-black"
+      >
+        <div className="text-center space-y-6 max-w-2xl">
+          <h1 className="text-5xl md:text-7xl font-bold text-white mb-6">
+            نظام تحليل نتائج الاختبارات المدرسية
+          </h1>
+          
+          <div className="w-full max-w-md mx-auto bg-gray-900 h-4 rounded-full overflow-hidden">
+            <div 
+              className="h-full bg-gradient-to-r from-red-500 via-white to-green-500 transition-all duration-300"
+              style={{ width: `${progress}%` }}
+            ></div>
+          </div>
+          
+          <p className="text-green-400 text-xl">جاري تحميل النظام... {progress}%</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-4 border-t-green-600 border-green-600/30 mx-auto"></div>
+          <p className="mt-4 text-lg">جاري تحميل النظام...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div 

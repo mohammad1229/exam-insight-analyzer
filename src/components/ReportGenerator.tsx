@@ -21,19 +21,6 @@ declare module "jspdf" {
     lastAutoTable?: {
       finalY: number;
     };
-    internal: {
-      events: any;
-      scaleFactor: number;
-      pageSize: { 
-        width: number; 
-        getWidth: () => number; 
-        height: number; 
-        getHeight: () => number; 
-      };
-      pages: number[];
-      getNumberOfPages: () => number;
-      getEncryptor(objectId: number): (data: string) => string;
-    };
   }
 }
 
@@ -254,7 +241,7 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ test }) => {
     }
     
     // Footer with signature
-    const pageCount = doc.internal.getNumberOfPages();
+    const pageCount = doc.internal.pages.length;
     doc.setPage(pageCount);
     const finalY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 20 : 200;
     

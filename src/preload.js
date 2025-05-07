@@ -10,10 +10,20 @@ contextBridge.exposeInMainWorld('electron', {
   db: {
     getAll: (table) => ipcRenderer.invoke('db-get-all', table),
     getById: (table, id) => ipcRenderer.invoke('db-get-by-id', table, id),
+    query: (query, params) => ipcRenderer.invoke('db-query', query, params),
     insert: (table, data) => ipcRenderer.invoke('db-insert', table, data),
     update: (table, id, data) => ipcRenderer.invoke('db-update', table, id, data),
     delete: (table, id) => ipcRenderer.invoke('db-delete', table, id),
   },
+  
+  // License management
+  generateLicense: (schoolName, directorName) => 
+    ipcRenderer.invoke('generate-license', schoolName, directorName),
+  activateLicense: (licenseKey) => 
+    ipcRenderer.invoke('activate-license', licenseKey),
+  
+  // System settings
+  getSystemSettings: () => ipcRenderer.invoke('get-system-settings'),
   
   // Backup and restore
   backupDatabase: () => ipcRenderer.invoke('backup-database'),

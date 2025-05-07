@@ -28,5 +28,6 @@
     "target": ["AppImage", "deb"],
     "icon": "resources/icons",
     "category": "Education"
-  }
+  },
+  "publish": null
 }
