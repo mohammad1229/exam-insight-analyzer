@@ -1,0 +1,32 @@
+
+{
+  "appId": "com.schoolexams.app",
+  "productName": "نظام تحليل نتائج الاختبارات المدرسية",
+  "files": ["dist/**/*", "src/electronMain.js", "src/preload.js"],
+  "directories": {
+    "buildResources": "resources",
+    "output": "release"
+  },
+  "asar": true,
+  "win": {
+    "target": ["nsis"],
+    "icon": "resources/icon.ico"
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "shortcutName": "نظام تحليل نتائج الاختبارات المدرسية",
+    "artifactName": "${productName}-Setup-${version}.${ext}"
+  },
+  "mac": {
+    "target": ["dmg"],
+    "icon": "resources/icon.icns"
+  },
+  "linux": {
+    "target": ["AppImage", "deb"],
+    "icon": "resources/icons",
+    "category": "Education"
+  }
+}

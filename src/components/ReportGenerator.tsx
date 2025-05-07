@@ -21,7 +21,19 @@ declare module "jspdf" {
     lastAutoTable?: {
       finalY: number;
     };
-    internal: any;
+    internal: {
+      events: any;
+      scaleFactor: number;
+      pageSize: { 
+        width: number; 
+        getWidth: () => number; 
+        height: number; 
+        getHeight: () => number; 
+      };
+      pages: number[];
+      getNumberOfPages: () => number;
+      getEncryptor(objectId: number): (data: string) => string;
+    };
   }
 }
 

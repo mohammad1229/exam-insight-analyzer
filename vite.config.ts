@@ -20,14 +20,18 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
-  // Configuration that would be useful for Electron integration
+  // Configuration for Electron integration
   build: {
     outDir: "dist",
-    // Electron-specific settings (commented out until Electron is added)
-    // rollupOptions: {
-    //   input: {
-    //     main: path.resolve(__dirname, "index.html"),
-    //   },
-    // },
+    emptyOutDir: true,
+    sourcemap: true,
+    // Electron-specific settings to work with both web and desktop
+    rollupOptions: {
+      input: {
+        main: path.resolve(__dirname, "index.html"),
+      },
+    },
   },
+  // Allows use of Node.js APIs in renderer process when running in Electron
+  base: mode === 'production' ? './' : '/',
 }));
