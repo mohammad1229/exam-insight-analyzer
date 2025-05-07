@@ -92,7 +92,7 @@ const StudentList: React.FC<StudentListProps> = ({
       toast({
         title: "تنبيه",
         description: `لا يمكن أن تتجاوز العلامة ${maxScore}`,
-        variant: "warning",
+        variant: "destructive",
       });
     }
 

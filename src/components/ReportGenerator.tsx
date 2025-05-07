@@ -18,6 +18,10 @@ import { Download, FileText } from "lucide-react";
 declare module "jspdf" {
   interface jsPDF {
     autoTable: (options: any) => jsPDF;
+    lastAutoTable?: {
+      finalY: number;
+    };
+    internal: any;
   }
 }
 
@@ -188,10 +192,17 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ test }) => {
     // Questions analysis
     if (reportType === "all" || reportType === "analysis") {
       // Add new page if needed
+      let startY = 110;
+      
       if (doc.lastAutoTable && doc.lastAutoTable.finalY > 220) {
         doc.addPage();
+        startY = 20;
+      } else if (reportType === "all" && doc.lastAutoTable) {
+        doc.text("تحليل الأسئلة", doc.internal.pageSize.width / 2, doc.lastAutoTable.finalY + 20, { align: "center" });
+        startY = doc.lastAutoTable.finalY + 30;
       } else if (reportType === "all") {
-        doc.text("تحليل الأسئلة", doc.internal.pageSize.width / 2, doc.lastAutoTable ? doc.lastAutoTable.finalY + 20 : 150, { align: "center" });
+        doc.text("تحليل الأسئلة", doc.internal.pageSize.width / 2, 150, { align: "center" });
+        startY = 160;
       } else {
         doc.text("تحليل الأسئلة", doc.internal.pageSize.width / 2, 100, { align: "center" });
       }
@@ -221,7 +232,7 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ test }) => {
       });
       
       doc.autoTable({
-        startY: doc.lastAutoTable ? doc.lastAutoTable.finalY + 30 : 110,
+        startY: startY,
         head: [["رقم السؤال", "نوع السؤال", "العلامة القصوى", "متوسط العلامة", "نسبة الإجابة الصحيحة"]],
         body: questionsData,
         theme: 'grid',

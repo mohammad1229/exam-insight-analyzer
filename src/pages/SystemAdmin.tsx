@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -63,12 +62,19 @@ const SystemAdmin = () => {
       if (i < 3) key += "-";
     }
     
+    // Get values from inputs
+    const schoolNameInput = document.getElementById("schoolName") as HTMLInputElement;
+    const directorNameInput = document.getElementById("directorName") as HTMLInputElement;
+    
+    const schoolName = schoolNameInput?.value || "";
+    const directorName = directorNameInput?.value || "";
+    
     // Store in localStorage with expiry (1 year)
     const licenses = JSON.parse(localStorage.getItem("licenseKeys") || "[]");
     const newLicense = {
       key,
-      schoolName: document.getElementById("schoolName")?.value || "",
-      directorName: document.getElementById("directorName")?.value || "",
+      schoolName,
+      directorName,
       createdAt: new Date().toISOString(),
       validUntil: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
       used: false
@@ -100,7 +106,7 @@ const SystemAdmin = () => {
             }}>
               <div className="grid gap-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="username">اسم المستخدم</Label>
+                  <Label htmlFor="username">اسم المستخد��</Label>
                   <Input
                     id="username"
                     type="text"
