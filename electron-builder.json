@@ -29,5 +29,11 @@
     "icon": "resources/icons",
     "category": "Education"
   },
-  "publish": null
+  "publish": null,
+  "extraResources": [
+    {
+      "from": "resources",
+      "to": "resources"
+    }
+  ]
 }

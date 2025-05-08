@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { isElectron } from "@/services/electronService";
 import electronService from "@/services/electronService";
+import { Input } from "@/components/ui/input";
 
 const Index = () => {
   const navigate = useNavigate();
@@ -169,12 +170,12 @@ const Index = () => {
           
           <div className="w-full max-w-md mx-auto bg-gray-900 h-4 rounded-full overflow-hidden">
             <div 
-              className="h-full bg-gradient-to-r from-red-500 via-white to-green-500 transition-all duration-300"
+              className="h-full bg-gradient-to-r from-[#E84C3D] via-white to-[#34A853] transition-all duration-300"
               style={{ width: `${progress}%` }}
             ></div>
           </div>
           
-          <p className="text-green-400 text-xl">جاري تحميل النظام... {progress}%</p>
+          <p className="text-[#34A853] text-xl">جاري تحميل النظام... {progress}%</p>
         </div>
       </div>
     );
@@ -185,7 +186,7 @@ const Index = () => {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-4 border-t-green-600 border-green-600/30 mx-auto"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-4 border-t-[#E84C3D] border-[#E84C3D]/30 mx-auto"></div>
           <p className="mt-4 text-lg">جاري تحميل النظام...</p>
         </div>
       </div>
@@ -194,10 +195,7 @@ const Index = () => {
 
   return (
     <div 
-      className="min-h-screen flex flex-col items-center justify-center dir-rtl px-4"
-      style={{
-        background: "linear-gradient(to bottom, #000000 0%, #ffffff 50%, #34A853 100%)"
-      }}
+      className="min-h-screen flex flex-col items-center justify-center dir-rtl px-4 palestine-gradient"
     >
       <div className="space-y-8 text-center max-w-3xl relative z-10">
         <div className="mb-8">
@@ -211,7 +209,7 @@ const Index = () => {
         </div>
 
         {!isActivated && trialDaysLeft > 0 && (
-          <Card className="bg-white/90 backdrop-blur-sm border-2 border-[#E84c3d] max-w-md mx-auto">
+          <Card className="palestine-card max-w-md mx-auto">
             <CardContent className="pt-6 pb-6">
               <div className="space-y-4">
                 <h2 className="text-xl font-bold text-black">الفترة التجريبية</h2>
@@ -220,7 +218,7 @@ const Index = () => {
                 </p>
                 
                 <div className="flex items-center gap-2">
-                  <input 
+                  <Input 
                     type="text"
                     placeholder="أدخل مفتاح التنشيط"
                     className="flex-1 px-3 py-2 border border-gray-300 rounded text-sm"
@@ -228,7 +226,7 @@ const Index = () => {
                     onChange={(e) => setActivationKey(e.target.value)}
                   />
                   <Button 
-                    className="bg-[#E84c3d] hover:bg-red-700 text-white"
+                    className="palestine-button-primary"
                     onClick={handleActivation}
                   >
                     تنشيط
@@ -240,7 +238,7 @@ const Index = () => {
         )}
 
         {!isActivated && trialDaysLeft <= 0 && (
-          <Card className="bg-white/90 backdrop-blur-sm border-2 border-red-600 max-w-md mx-auto">
+          <Card className="border-2 border-red-600 max-w-md mx-auto bg-white/90 backdrop-blur-sm">
             <CardContent className="pt-6 pb-6">
               <div className="space-y-4">
                 <h2 className="text-xl font-bold text-red-600">انتهت الفترة التجريبية</h2>
@@ -249,7 +247,7 @@ const Index = () => {
                 </p>
                 
                 <div className="flex items-center gap-2">
-                  <input 
+                  <Input 
                     type="text"
                     placeholder="أدخل مفتاح التنشيط"
                     className="flex-1 px-3 py-2 border border-gray-300 rounded text-sm"
@@ -257,7 +255,7 @@ const Index = () => {
                     onChange={(e) => setActivationKey(e.target.value)}
                   />
                   <Button 
-                    className="bg-[#E84c3d] hover:bg-red-700 text-white"
+                    className="palestine-button-primary"
                     onClick={handleActivation}
                   >
                     تنشيط
@@ -271,7 +269,7 @@ const Index = () => {
         <div className="pt-6 flex flex-col sm:flex-row justify-center gap-4">
           <Button 
             size="lg" 
-            className="bg-black text-white hover:bg-gray-800"
+            className="palestine-button-secondary"
             onClick={() => navigate("/teacher-login")}
             disabled={!isActivated && trialDaysLeft <= 0}
           >
@@ -291,7 +289,7 @@ const Index = () => {
           <Button 
             variant="outline" 
             size="lg"
-            className="border-green-600 text-green-600 hover:bg-green-600 hover:text-white"
+            className="border-[#34A853] text-[#34A853] hover:bg-[#34A853] hover:text-white"
             onClick={() => navigate("/system-admin")}
           >
             مسؤول النظام

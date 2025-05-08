@@ -21,9 +21,11 @@ contextBridge.exposeInMainWorld('electron', {
     ipcRenderer.invoke('generate-license', schoolName, directorName),
   activateLicense: (licenseKey) => 
     ipcRenderer.invoke('activate-license', licenseKey),
+  getLicenseKeys: () => ipcRenderer.invoke('get-license-keys'),
   
   // System settings
   getSystemSettings: () => ipcRenderer.invoke('get-system-settings'),
+  updateSystemSettings: (settings) => ipcRenderer.invoke('update-system-settings', settings),
   
   // Backup and restore
   backupDatabase: () => ipcRenderer.invoke('backup-database'),

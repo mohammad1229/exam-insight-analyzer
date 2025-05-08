@@ -14,7 +14,9 @@ interface ElectronAPI {
     Promise<{key: string, schoolName: string, directorName: string, createdAt: string, validUntil: string, used: number}>;
   activateLicense: (licenseKey: string) => 
     Promise<{success: boolean, message: string, license?: any}>;
+  getLicenseKeys: () => Promise<any[]>;
   getSystemSettings: () => Promise<Record<string, string>>;
+  updateSystemSettings: (settings: Record<string, string>) => Promise<boolean>;
   backupDatabase: () => Promise<string>;
   restoreDatabase: (backupPath: string) => Promise<boolean>;
   appInfo: {
@@ -147,6 +149,15 @@ const electronService = {
     return license;
   },
   
+  getLicenseKeys: async (): Promise<any[]> => {
+    if (isElectron()) {
+      return await window.electron!.getLicenseKeys();
+    }
+    
+    // Fallback to localStorage
+    return JSON.parse(localStorage.getItem("licenseKeys") || "[]");
+  },
+  
   activateLicense: async (licenseKey: string): Promise<{success: boolean, message: string, license?: any}> => {
     if (isElectron()) {
       return await window.electron!.activateLicense(licenseKey);
@@ -202,6 +213,19 @@ const electronService = {
     });
     
     return settings;
+  },
+
+  updateSystemSettings: async (settings: Record<string, string>): Promise<boolean> => {
+    if (isElectron()) {
+      return await window.electron!.updateSystemSettings(settings);
+    }
+    
+    // Fallback to localStorage
+    Object.entries(settings).forEach(([key, value]) => {
+      localStorage.setItem(key, value);
+    });
+    
+    return true;
   },
   
   // Backup and restore

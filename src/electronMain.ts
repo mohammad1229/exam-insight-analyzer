@@ -1,4 +1,3 @@
-
 import { app, BrowserWindow, dialog, ipcMain } from 'electron';
 import path from 'path';
 import fs from 'fs';
@@ -120,8 +119,11 @@ function createTables() {
     db.run(`CREATE TABLE IF NOT EXISTS teachers (
       id TEXT PRIMARY KEY,
       name TEXT,
-      subjectId TEXT,
-      FOREIGN KEY (subjectId) REFERENCES subjects(id)
+      username TEXT,
+      password TEXT,
+      subjects TEXT,
+      assignedSubjects TEXT,
+      assignedClasses TEXT
     )`);
     
     // Tests table
@@ -182,9 +184,29 @@ function createTables() {
       used INTEGER
     )`);
     
+    // Settings table
+    db.run(`CREATE TABLE IF NOT EXISTS settings (
+      key TEXT PRIMARY KEY,
+      value TEXT
+    )`);
+    
     // Add default admin user
     db.run(`INSERT OR IGNORE INTO users (username, password, role, name)
       VALUES ('mohammad', '12345', 'admin', 'مدير النظام')`);
+    
+    // Add default settings
+    const defaultSettings = [
+      { key: 'installDate', value: new Date().toISOString() },
+      { key: 'systemActivated', value: 'false' },
+      { key: 'schoolName', value: 'مدرسة النجاح الثانوية' },
+      { key: 'academicYear', value: '2023-2024' }
+    ];
+    
+    const settingsStmt = db.prepare("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)");
+    defaultSettings.forEach(setting => {
+      settingsStmt.run(setting.key, setting.value);
+    });
+    settingsStmt.finalize();
   });
 }
 
@@ -211,23 +233,61 @@ ipcMain.handle('db-get-all', async (event, table) => {
   return new Promise((resolve, reject) => {
     db.all(`SELECT * FROM ${table}`, (err, rows) => {
       if (err) reject(err);
-      resolve(rows);
+      else {
+        // Parse JSON fields if they exist
+        const parsedRows = rows.map((row: any) => {
+          const newRow: any = { ...row };
+          ['subjects', 'assignedSubjects', 'assignedClasses'].forEach(field => {
+            if (newRow[field] && typeof newRow[field] === 'string') {
+              try {
+                newRow[field] = JSON.parse(newRow[field]);
+              } catch (e) {
+                // Keep as string if parsing fails
+              }
+            }
+          });
+          return newRow;
+        });
+        resolve(parsedRows);
+      }
     });
   });
 });
 
 ipcMain.handle('db-get-by-id', async (event, table, id) => {
   return new Promise((resolve, reject) => {
-    db.get(`SELECT * FROM ${table} WHERE id = ?`, [id], (err, row) => {
+    db.get(`SELECT * FROM ${table} WHERE id = ?`, [id], (err, row: any) => {
       if (err) reject(err);
-      resolve(row);
+      else {
+        // Parse JSON fields if they exist
+        if (row) {
+          ['subjects', 'assignedSubjects', 'assignedClasses'].forEach(field => {
+            if (row[field] && typeof row[field] === 'string') {
+              try {
+                row[field] = JSON.parse(row[field]);
+              } catch (e) {
+                // Keep as string if parsing fails
+              }
+            }
+          });
+        }
+        resolve(row);
+      }
     });
   });
 });
 
 ipcMain.handle('db-insert', async (event, table, data) => {
-  const keys = Object.keys(data);
-  const values = Object.values(data);
+  // Convert arrays to JSON strings
+  const processedData = { ...data };
+  Object.keys(processedData).forEach(key => {
+    if (Array.isArray(processedData[key])) {
+      processedData[key] = JSON.stringify(processedData[key]);
+    }
+  });
+  
+  const keys = Object.keys(processedData);
+  const values = Object.values(processedData);
   const placeholders = keys.map(() => '?').join(',');
   
   return new Promise((resolve, reject) => {
@@ -236,15 +296,23 @@ ipcMain.handle('db-insert', async (event, table, data) => {
       values,
       function(err) {
         if (err) reject(err);
-        resolve(this.lastID);
+        else resolve(this.lastID);
       }
     );
   });
 });
 
 ipcMain.handle('db-update', async (event, table, id, data) => {
-  const keys = Object.keys(data);
-  const values = Object.values(data);
+  // Convert arrays to JSON strings
+  const processedData = { ...data };
+  Object.keys(processedData).forEach(key => {
+    if (Array.isArray(processedData[key])) {
+      processedData[key] = JSON.stringify(processedData[key]);
+    }
+  });
+  
+  const keys = Object.keys(processedData);
+  const values = Object.values(processedData);
   const setClause = keys.map(key => `${key} = ?`).join(',');
   
   return new Promise((resolve, reject) => {
@@ -253,7 +321,7 @@ ipcMain.handle('db-update', async (event, table, id, data) => {
       [...values, id],
       function(err) {
         if (err) reject(err);
-        resolve(this.changes);
+        else resolve(this.changes);
       }
     );
   });
@@ -263,7 +331,163 @@ ipcMain.handle('db-delete', async (event, table, id) => {
   return new Promise((resolve, reject) => {
     db.run(`DELETE FROM ${table} WHERE id = ?`, [id], function(err) {
       if (err) reject(err);
-      resolve(this.changes);
+      else resolve(this.changes);
+    });
+  });
+});
+
+ipcMain.handle('db-query', async (event, query, params = []) => {
+  return new Promise((resolve, reject) => {
+    db.all(query, params, (err, rows) => {
+      if (err) reject(err);
+      else resolve(rows);
+    });
+  });
+});
+
+// License management
+ipcMain.handle('generate-license', async (event, schoolName, directorName) => {
+  // Generate license key
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  let key = "";
+  
+  // Format: XXXX-XXXX-XXXX-XXXX
+  for (let i = 0; i < 4; i++) {
+    for (let j = 0; j < 4; j++) {
+      key += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    if (i < 3) key += "-";
+  }
+  
+  // Create license object
+  const license = {
+    key,
+    schoolName,
+    directorName,
+    createdAt: new Date().toISOString(),
+    validUntil: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+    used: 0
+  };
+  
+  // Store in database
+  return new Promise((resolve, reject) => {
+    db.run(
+      `INSERT INTO licenses (key, schoolName, directorName, createdAt, validUntil, used)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [license.key, license.schoolName, license.directorName, license.createdAt, license.validUntil, license.used],
+      function(err) {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(license);
+        }
+      }
+    );
+  });
+});
+
+ipcMain.handle('get-license-keys', async () => {
+  return new Promise((resolve, reject) => {
+    db.all(`SELECT * FROM licenses`, (err, rows) => {
+      if (err) reject(err);
+      else resolve(rows);
+    });
+  });
+});
+
+ipcMain.handle('activate-license', async (event, licenseKey) => {
+  return new Promise((resolve, reject) => {
+    // Find the license
+    db.get(
+      `SELECT * FROM licenses WHERE key = ? AND used = 0`,
+      [licenseKey],
+      (err, license) => {
+        if (err) {
+          reject(err);
+          return;
+        }
+        
+        if (!license) {
+          resolve({
+            success: false,
+            message: "مفتاح الترخيص غير صالح أو مستخدم بالفعل"
+          });
+          return;
+        }
+        
+        // Mark as used
+        db.run(
+          `UPDATE licenses SET used = 1 WHERE key = ?`,
+          [licenseKey],
+          (updateErr) => {
+            if (updateErr) {
+              reject(updateErr);
+              return;
+            }
+            
+            // Update system settings
+            const settings = [
+              { key: 'systemActivated', value: 'true' },
+              { key: 'schoolName', value: license.schoolName },
+              { key: 'directorName', value: license.directorName },
+              { key: 'activationDate', value: new Date().toISOString() },
+              { key: 'expiryDate', value: license.validUntil }
+            ];
+            
+            const updateSettings = db.prepare(
+              `INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)`
+            );
+            
+            settings.forEach(setting => {
+              updateSettings.run([setting.key, setting.value]);
+            });
+            
+            updateSettings.finalize();
+            
+            resolve({
+              success: true,
+              message: `تم تنشيط النظام لـ ${license.schoolName} بنجاح`,
+              license
+            });
+          }
+        );
+      }
+    );
+  });
+});
+
+// System settings
+ipcMain.handle('get-system-settings', async () => {
+  return new Promise((resolve, reject) => {
+    db.all(`SELECT key, value FROM settings`, (err, rows) => {
+      if (err) {
+        reject(err);
+        return;
+      }
+      
+      const settings: Record<string, string> = {};
+      rows.forEach((row: any) => {
+        settings[row.key] = row.value;
+      });
+      
+      resolve(settings);
+    });
+  });
+});
+
+ipcMain.handle('update-system-settings', async (event, settings) => {
+  return new Promise((resolve, reject) => {
+    const stmt = db.prepare(
+      `INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)`
+    );
+    
+    Object.entries(settings).forEach(([key, value]) => {
+      stmt.run(key, value);
+    });
+    
+    stmt.finalize((err) => {
+      if (err) reject(err);
+      else resolve(true);
     });
   });
 });

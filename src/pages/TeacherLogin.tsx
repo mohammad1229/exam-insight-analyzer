@@ -6,6 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { isElectron } from "@/services/electronService";
+import electronService from "@/services/electronService";
 
 const TeacherLogin = () => {
   const { toast } = useToast();
@@ -17,22 +19,44 @@ const TeacherLogin = () => {
   const [activationKey, setActivationKey] = useState("");
 
   useEffect(() => {
-    // Check if system is activated
-    const activationStatus = localStorage.getItem("systemActivated");
-    if (activationStatus === "true") {
-      setIsActivated(true);
-    } else {
-      // Calculate trial days left
-      const installDate = localStorage.getItem("installDate");
-      if (installDate) {
-        const daysElapsed = Math.floor((Date.now() - new Date(installDate).getTime()) / (1000 * 60 * 60 * 24));
-        const daysLeft = Math.max(0, 10 - daysElapsed);
-        setTrialDaysLeft(daysLeft);
-      }
-    }
+    // Check activation status
+    checkActivationStatus();
   }, []);
 
-  const handleActivation = () => {
+  const checkActivationStatus = async () => {
+    try {
+      if (isElectron()) {
+        const settings = await electronService.getSystemSettings();
+        const activated = settings.systemActivated === "true";
+        setIsActivated(activated);
+        
+        if (!activated) {
+          const installDate = settings.installDate || new Date().toISOString();
+          const daysElapsed = Math.floor((Date.now() - new Date(installDate).getTime()) / (1000 * 60 * 60 * 24));
+          setTrialDaysLeft(Math.max(0, 10 - daysElapsed));
+        }
+      } else {
+        const activated = localStorage.getItem("systemActivated") === "true";
+        setIsActivated(activated);
+        
+        if (!activated) {
+          const installDate = localStorage.getItem("installDate");
+          if (installDate) {
+            const daysElapsed = Math.floor((Date.now() - new Date(installDate).getTime()) / (1000 * 60 * 60 * 24));
+            setTrialDaysLeft(Math.max(0, 10 - daysElapsed));
+          } else {
+            // First time using the app
+            localStorage.setItem("installDate", new Date().toISOString());
+            localStorage.setItem("trialDaysLeft", "10");
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error checking activation status:", error);
+    }
+  };
+
+  const handleActivation = async () => {
     if (!activationKey) {
       toast({
         title: "خطأ",
@@ -42,37 +66,65 @@ const TeacherLogin = () => {
       return;
     }
 
-    // Get stored licenses
-    const licenses = JSON.parse(localStorage.getItem("licenseKeys") || "[]");
-    const license = licenses.find((l: any) => l.key === activationKey && !l.used);
+    try {
+      let result;
+      
+      if (isElectron()) {
+        result = await electronService.activateLicense(activationKey);
+      } else {
+        // Web environment
+        const licenses = JSON.parse(localStorage.getItem("licenseKeys") || "[]");
+        const license = licenses.find((l: any) => l.key === activationKey && !l.used);
 
-    if (license) {
-      // Activate the system
-      localStorage.setItem("systemActivated", "true");
-      localStorage.setItem("schoolName", license.schoolName);
-      localStorage.setItem("directorName", license.directorName);
-      localStorage.setItem("activationDate", new Date().toISOString());
-      localStorage.setItem("expiryDate", license.validUntil);
+        if (license) {
+          // Activate the system
+          localStorage.setItem("systemActivated", "true");
+          localStorage.setItem("schoolName", license.schoolName);
+          localStorage.setItem("directorName", license.directorName);
+          localStorage.setItem("activationDate", new Date().toISOString());
+          localStorage.setItem("expiryDate", license.validUntil);
 
-      // Mark license as used
-      license.used = true;
-      localStorage.setItem("licenseKeys", JSON.stringify(licenses));
+          // Mark license as used
+          license.used = true;
+          localStorage.setItem("licenseKeys", JSON.stringify(licenses));
 
-      setIsActivated(true);
+          result = {
+            success: true,
+            message: `تم تنشيط النظام لـ ${license.schoolName} بنجاح`,
+            license
+          };
+        } else {
+          result = {
+            success: false,
+            message: "مفتاح التنشيط غير صالح أو مستخدم بالفعل"
+          };
+        }
+      }
+
+      if (result.success) {
+        setIsActivated(true);
+        toast({
+          title: "تم التنشيط بنجاح",
+          description: result.message,
+        });
+      } else {
+        toast({
+          title: "فشل التنشيط",
+          description: result.message,
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Error during activation:", error);
       toast({
-        title: "تم التنشيط بنجاح",
-        description: `تم تنشيط النظام لـ ${license.schoolName} بنجاح`,
-      });
-    } else {
-      toast({
-        title: "فشل التنشيط",
-        description: "مفتاح التنشيط غير صالح أو مستخدم بالفعل",
+        title: "خطأ في التنشيط",
+        description: "حدث خطأ أثناء محاولة تنشيط النظام",
         variant: "destructive",
       });
     }
   };
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     // First check if system is activated or still in trial period
     if (!isActivated && trialDaysLeft <= 0) {
       toast({
@@ -83,43 +135,58 @@ const TeacherLogin = () => {
       return;
     }
 
-    // Get teachers with credentials from localStorage
-    const teachersString = localStorage.getItem("teachersWithCredentials");
-    
-    if (!teachersString) {
-      toast({
-        title: "خطأ في النظام",
-        description: "لم يتم العثور على بيانات المعلمين",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    const teachers = JSON.parse(teachersString);
-    const teacher = teachers.find(
-      (t: any) => t.username === username && t.password === password
-    );
-    
-    if (teacher) {
-      // Store teacher info in localStorage for session management
-      localStorage.setItem("loggedInTeacher", JSON.stringify({
-        id: teacher.id,
-        name: teacher.name,
-        assignedClasses: teacher.assignedClasses,
-        assignedSubjects: teacher.assignedSubjects
-      }));
+    try {
+      let teachers = [];
       
-      toast({
-        title: "تم تسجيل الدخول بنجاح",
-        description: `مرحباً بك ${teacher.name}`,
-      });
+      if (isElectron()) {
+        teachers = await electronService.db.getAll("teachers");
+      } else {
+        // Get teachers with credentials from localStorage
+        const teachersString = localStorage.getItem("teachersWithCredentials");
+        if (!teachersString) {
+          toast({
+            title: "خطأ في النظام",
+            description: "لم يتم العثور على بيانات المعلمين",
+            variant: "destructive",
+          });
+          return;
+        }
+        
+        teachers = JSON.parse(teachersString);
+      }
       
-      // Redirect to dashboard
-      navigate("/dashboard");
-    } else {
+      const teacher = teachers.find(
+        (t: any) => t.username === username && t.password === password
+      );
+      
+      if (teacher) {
+        // Store teacher info in localStorage for session management
+        localStorage.setItem("loggedInTeacher", JSON.stringify({
+          id: teacher.id,
+          name: teacher.name,
+          assignedClasses: teacher.assignedClasses,
+          assignedSubjects: teacher.assignedSubjects
+        }));
+        
+        toast({
+          title: "تم تسجيل الدخول بنجاح",
+          description: `مرحباً بك ${teacher.name}`,
+        });
+        
+        // Redirect to dashboard
+        navigate("/dashboard");
+      } else {
+        toast({
+          title: "فشل تسجيل الدخول",
+          description: "اسم المستخدم أو كلمة المرور غير صحيحة",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Error during login:", error);
       toast({
-        title: "فشل تسجيل الدخول",
-        description: "اسم المستخدم أو كلمة المرور غير صحيحة",
+        title: "خطأ في تسجيل الدخول",
+        description: "حدث خطأ أثناء محاولة تسجيل الدخول",
         variant: "destructive",
       });
     }
@@ -129,10 +196,7 @@ const TeacherLogin = () => {
   if (!isActivated && trialDaysLeft <= 0) {
     return (
       <div 
-        className="flex min-h-screen flex-col bg-gradient-to-b from-black via-white to-green-600"
-        style={{ 
-          background: "linear-gradient(180deg, #000000 0%, #ffffff 50%, #34A853 100%)"
-        }}
+        className="flex min-h-screen flex-col palestine-gradient"
       >
         <div className="absolute top-0 left-0 right-0 h-16 bg-black text-white shadow-sm flex items-center justify-center">
           <div className="container flex justify-between items-center">
@@ -150,7 +214,7 @@ const TeacherLogin = () => {
         </div>
         
         <div className="flex-1 flex items-center justify-center w-full dir-rtl">
-          <Card className="w-[450px] border-2 border-[#E84c3d]">
+          <Card className="palestine-card w-[450px]">
             <CardHeader className="bg-black text-white">
               <CardTitle className="text-center text-2xl">انتهت الفترة التجريبية</CardTitle>
             </CardHeader>
@@ -174,7 +238,7 @@ const TeacherLogin = () => {
                 
                 <Button 
                   onClick={handleActivation}
-                  className="w-full mt-2 bg-[#E84c3d] hover:bg-red-700 text-white"
+                  className="palestine-button-primary w-full mt-2"
                 >
                   تنشيط النظام
                 </Button>
@@ -193,10 +257,7 @@ const TeacherLogin = () => {
   // Normal login view
   return (
     <div 
-      className="flex min-h-screen flex-col bg-gradient-to-b from-black via-white to-green-600"
-      style={{ 
-        background: "linear-gradient(180deg, #000000 0%, #ffffff 50%, #34A853 100%)"
-      }}
+      className="flex min-h-screen flex-col palestine-gradient"
     >
       <div className="absolute top-0 left-0 right-0 h-16 bg-black text-white shadow-sm flex items-center justify-center">
         <div className="container flex justify-between items-center">
@@ -214,7 +275,7 @@ const TeacherLogin = () => {
       </div>
       
       <div className="flex-1 flex items-center justify-center w-full dir-rtl">
-        <Card className="w-[450px] border-2 border-[#E84c3d]">
+        <Card className="palestine-card w-[450px]">
           <CardHeader className="bg-black text-white">
             <CardTitle className="text-center text-2xl">تسجيل دخول المعلم</CardTitle>
           </CardHeader>
@@ -254,7 +315,7 @@ const TeacherLogin = () => {
                 </div>
                 <Button 
                   type="submit" 
-                  className="mt-2 bg-[#E84c3d] hover:bg-red-700 text-white"
+                  className="palestine-button-primary mt-2"
                 >
                   تسجيل الدخول
                 </Button>
