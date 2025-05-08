@@ -1,3 +1,4 @@
+
 import { app, BrowserWindow, dialog, ipcMain } from 'electron';
 import path from 'path';
 import fs from 'fs';
@@ -359,8 +360,15 @@ ipcMain.handle('generate-license', async (event, schoolName, directorName) => {
     if (i < 3) key += "-";
   }
   
-  // Create license object
-  const license = {
+  // Create license object with properly typed properties
+  const license: {
+    key: string;
+    schoolName: string;
+    directorName: string;
+    createdAt: string;
+    validUntil: string;
+    used: number;
+  } = {
     key,
     schoolName,
     directorName,
@@ -401,7 +409,7 @@ ipcMain.handle('activate-license', async (event, licenseKey) => {
     db.get(
       `SELECT * FROM licenses WHERE key = ? AND used = 0`,
       [licenseKey],
-      (err, license) => {
+      (err, license: any) => {
         if (err) {
           reject(err);
           return;
@@ -414,6 +422,14 @@ ipcMain.handle('activate-license', async (event, licenseKey) => {
           });
           return;
         }
+        
+        // Type assertion to ensure properties exist
+        const typedLicense = license as {
+          key: string;
+          schoolName: string;
+          directorName: string;
+          validUntil: string;
+        };
         
         // Mark as used
         db.run(
@@ -428,10 +444,10 @@ ipcMain.handle('activate-license', async (event, licenseKey) => {
             // Update system settings
             const settings = [
               { key: 'systemActivated', value: 'true' },
-              { key: 'schoolName', value: license.schoolName },
-              { key: 'directorName', value: license.directorName },
+              { key: 'schoolName', value: typedLicense.schoolName },
+              { key: 'directorName', value: typedLicense.directorName },
               { key: 'activationDate', value: new Date().toISOString() },
-              { key: 'expiryDate', value: license.validUntil }
+              { key: 'expiryDate', value: typedLicense.validUntil }
             ];
             
             const updateSettings = db.prepare(
@@ -446,8 +462,8 @@ ipcMain.handle('activate-license', async (event, licenseKey) => {
             
             resolve({
               success: true,
-              message: `تم تنشيط النظام لـ ${license.schoolName} بنجاح`,
-              license
+              message: `تم تنشيط النظام لـ ${typedLicense.schoolName} بنجاح`,
+              license: typedLicense
             });
           }
         );
