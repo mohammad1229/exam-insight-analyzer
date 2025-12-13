@@ -1,11 +1,9 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { teachersData } from "@/data/mockData";
 
 // Import custom components
 import AdminLoginForm from "@/components/admin/AdminLoginForm";
@@ -13,18 +11,13 @@ import ReportsTab from "@/components/admin/ReportsTab";
 import StatisticsTab from "@/components/admin/StatisticsTab";
 import TeachersTab from "@/components/admin/TeachersTab";
 import SettingsTab from "@/components/admin/SettingsTab";
+import ClassesTab from "@/components/admin/ClassesTab";
+import SubjectsTab from "@/components/admin/SubjectsTab";
+import StudentsTab from "@/components/admin/StudentsTab";
 
 // Import utility functions
 import { prepareMockReports, prepareChartData, Report } from "@/utils/reportUtils";
-import { Teacher } from "@/types";
-
-// Custom teacher type with credentials
-interface TeacherWithCredentials extends Teacher {
-  username: string;
-  password: string;
-  assignedClasses: string[];
-  assignedSubjects: string[];
-}
+import { getTeachers, saveTeachers, TeacherWithCredentials } from "@/services/dataService";
 
 const AdminDashboard = () => {
   const { toast } = useToast();
@@ -39,23 +32,9 @@ const AdminDashboard = () => {
   // Teachers management
   const [teachers, setTeachers] = useState<TeacherWithCredentials[]>([]);
   
-  // Initialize teachers from localStorage or teachersData
+  // Initialize teachers from dataService
   useEffect(() => {
-    const storedTeachers = localStorage.getItem("teachersWithCredentials");
-    if (storedTeachers) {
-      setTeachers(JSON.parse(storedTeachers));
-    } else {
-      // Initialize with mock data
-      const initialTeachers = teachersData.map(teacher => ({
-        ...teacher,
-        username: teacher.name.split(' ')[0].toLowerCase(),
-        password: "12345",
-        assignedClasses: [teachersData[0]?.subjects[0] || ""],
-        assignedSubjects: teacher.subjects
-      }));
-      setTeachers(initialTeachers);
-      localStorage.setItem("teachersWithCredentials", JSON.stringify(initialTeachers));
-    }
+    setTeachers(getTeachers());
   }, []);
   
   // Initialize reports data
@@ -99,7 +78,7 @@ const AdminDashboard = () => {
         <div className="flex justify-between items-center mb-8 pb-4 border-b-2 border-red-500">
           <div>
             <h1 className="text-3xl font-bold text-black">لوحة تحكم مدير المدرسة</h1>
-            <p className="text-muted-foreground">مراجعة تقارير المعلمين ونتائج الاختبارات</p>
+            <p className="text-muted-foreground">إدارة كاملة للمعلمين والطلاب والصفوف والمواد</p>
           </div>
           <Button 
             onClick={handleLogout}
@@ -110,13 +89,35 @@ const AdminDashboard = () => {
           </Button>
         </div>
 
-        <Tabs defaultValue="reports" className="space-y-6">
-          <TabsList className="grid grid-cols-4 w-[500px] mb-6">
-            <TabsTrigger value="reports">تقارير الاختبارات</TabsTrigger>
-            <TabsTrigger value="statistics">إحصائيات</TabsTrigger>
-            <TabsTrigger value="teachers">إدارة المعلمين</TabsTrigger>
+        <Tabs defaultValue="teachers" className="space-y-6">
+          <TabsList className="grid grid-cols-7 w-full mb-6">
+            <TabsTrigger value="teachers">المعلمين</TabsTrigger>
+            <TabsTrigger value="students">الطلاب</TabsTrigger>
+            <TabsTrigger value="classes">الصفوف</TabsTrigger>
+            <TabsTrigger value="subjects">المواد</TabsTrigger>
+            <TabsTrigger value="reports">التقارير</TabsTrigger>
+            <TabsTrigger value="statistics">الإحصائيات</TabsTrigger>
             <TabsTrigger value="settings">الإعدادات</TabsTrigger>
           </TabsList>
+          
+          <TabsContent value="teachers">
+            <TeachersTab 
+              teachers={teachers}
+              setTeachers={setTeachers}
+            />
+          </TabsContent>
+
+          <TabsContent value="students">
+            <StudentsTab />
+          </TabsContent>
+
+          <TabsContent value="classes">
+            <ClassesTab />
+          </TabsContent>
+
+          <TabsContent value="subjects">
+            <SubjectsTab />
+          </TabsContent>
           
           <TabsContent value="reports">
             <ReportsTab mockReports={mockReports} />
@@ -129,13 +130,6 @@ const AdminDashboard = () => {
               teachersCount={teachers.length}
               selectedClass={selectedClass}
               chartData={chartData}
-            />
-          </TabsContent>
-          
-          <TabsContent value="teachers">
-            <TeachersTab 
-              teachers={teachers}
-              setTeachers={setTeachers}
             />
           </TabsContent>
           
