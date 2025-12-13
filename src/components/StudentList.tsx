@@ -1,7 +1,6 @@
-
 import { useState, useEffect, useMemo } from "react";
 import { Student } from "@/types";
-import { getStudentsByClassAndSection } from "@/data/mockData";
+import { getStudentsByClassAndSection } from "@/services/dataService";
 import { 
   Table,
   TableBody,
@@ -32,6 +31,7 @@ interface StudentListProps {
   onStudentSelect: (studentId: string, isAbsent: boolean) => void;
   selectedStudents?: Record<string, { isAbsent: boolean, scores: Record<string, number> }>;
   questions: { id: string; type: string; maxScore: number }[];
+  onScoreChange?: (studentId: string, questionId: string, value: number) => void;
 }
 
 const StudentList: React.FC<StudentListProps> = ({ 
@@ -39,7 +39,8 @@ const StudentList: React.FC<StudentListProps> = ({
   sectionId, 
   onStudentSelect,
   selectedStudents = {},
-  questions = []
+  questions = [],
+  onScoreChange
 }) => {
   const { toast } = useToast();
   const [students, setStudents] = useState<Student[]>([]);
@@ -47,12 +48,23 @@ const StudentList: React.FC<StudentListProps> = ({
   const [currentStudentIndex, setCurrentStudentIndex] = useState(0);
   const [viewMode, setViewMode] = useState<"list" | "single">("list");
   
+  // Local scores for immediate UI updates
+  const [localScores, setLocalScores] = useState<Record<string, Record<string, number>>>({});
+  
   useEffect(() => {
     if (classId && sectionId) {
       const filteredStudents = getStudentsByClassAndSection(classId, sectionId);
       setStudents(filteredStudents);
+      
+      // Initialize local scores for all students
+      const initialScores: Record<string, Record<string, number>> = {};
+      filteredStudents.forEach(student => {
+        initialScores[student.id] = selectedStudents[student.id]?.scores || {};
+      });
+      setLocalScores(initialScores);
     } else {
       setStudents([]);
+      setLocalScores({});
     }
   }, [classId, sectionId]);
 
@@ -67,10 +79,11 @@ const StudentList: React.FC<StudentListProps> = ({
 
   // Calculate student's total score from individual question scores
   const calculateTotalScore = (studentId: string): number => {
-    const student = selectedStudents[studentId];
-    if (!student || student.isAbsent || !student.scores) return 0;
+    const scores = localScores[studentId] || {};
+    const studentData = selectedStudents[studentId];
+    if (studentData?.isAbsent) return 0;
     
-    return Object.values(student.scores).reduce((sum, score) => sum + (score || 0), 0);
+    return Object.values(scores).reduce((sum, score) => sum + (score || 0), 0);
   };
 
   // Calculate percentage score
@@ -96,18 +109,38 @@ const StudentList: React.FC<StudentListProps> = ({
       });
     }
 
-    const student = selectedStudents[studentId] || { isAbsent: false, scores: {} };
-    const updatedStudent = {
-      ...student,
-      scores: { ...(student.scores || {}), [questionId]: validScore }
-    };
+    // Update local scores immediately for responsive UI
+    setLocalScores(prev => ({
+      ...prev,
+      [studentId]: {
+        ...(prev[studentId] || {}),
+        [questionId]: validScore
+      }
+    }));
 
-    onStudentSelect(studentId, updatedStudent.isAbsent);
+    // Call parent callback if provided
+    if (onScoreChange) {
+      onScoreChange(studentId, questionId, validScore);
+    }
+    
+    // Also ensure student is initialized in selectedStudents
+    const studentData = selectedStudents[studentId];
+    if (!studentData) {
+      onStudentSelect(studentId, false);
+    }
   };
 
   const toggleAbsent = (studentId: string) => {
     const student = selectedStudents[studentId] || { isAbsent: false, scores: {} };
     const isAbsent = !student.isAbsent;
+    
+    // Clear scores if marking as absent
+    if (isAbsent) {
+      setLocalScores(prev => ({
+        ...prev,
+        [studentId]: {}
+      }));
+    }
     
     onStudentSelect(studentId, isAbsent);
   };
@@ -136,6 +169,7 @@ const StudentList: React.FC<StudentListProps> = ({
 
     const student = filteredStudents[currentStudentIndex];
     const studentData = selectedStudents[student.id] || { isAbsent: false, scores: {} };
+    const studentScores = localScores[student.id] || {};
     const totalScore = calculateTotalScore(student.id);
     const percentage = calculatePercentage(student.id);
 
@@ -176,7 +210,7 @@ const StudentList: React.FC<StudentListProps> = ({
                       type="number"
                       min={0}
                       max={question.maxScore}
-                      value={studentData.scores?.[question.id] || ""}
+                      value={studentScores[question.id] ?? ""}
                       onChange={(e) => handleScoreChange(student.id, question.id, e.target.value)}
                       className="text-center"
                     />
@@ -265,6 +299,7 @@ const StudentList: React.FC<StudentListProps> = ({
             {filteredStudents.length > 0 ? (
               filteredStudents.map((student) => {
                 const studentData = selectedStudents[student.id] || { isAbsent: false, scores: {} };
+                const studentScores = localScores[student.id] || {};
                 const totalScore = calculateTotalScore(student.id);
                 const percentage = calculatePercentage(student.id);
                 
@@ -283,7 +318,7 @@ const StudentList: React.FC<StudentListProps> = ({
                           type="number"
                           min={0}
                           max={question.maxScore}
-                          value={studentData.scores?.[question.id] || ""}
+                          value={studentScores[question.id] ?? ""}
                           onChange={(e) => handleScoreChange(student.id, question.id, e.target.value)}
                           disabled={studentData.isAbsent}
                           className="w-16 mx-auto text-center"

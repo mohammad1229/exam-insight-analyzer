@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -21,13 +20,16 @@ import {
   TableRow 
 } from "@/components/ui/table";
 import { Plus, Trash2 } from "lucide-react";
-import { 
-  classesData, 
-  subjectsData, 
-  teachersData 
-} from "@/data/mockData";
 import { Class, Question, Section } from "@/types";
 import { toast } from "@/hooks/use-toast";
+import { 
+  getClasses, 
+  getSubjects, 
+  getTeachers,
+  getCurrentTeacher,
+  getTeacherClasses,
+  getTeacherSubjects
+} from "@/services/dataService";
 
 interface TestFormProps {
   onFormDataChange: (data: {
@@ -64,14 +66,38 @@ const TestForm: React.FC<TestFormProps> = ({ onFormDataChange }) => {
   const [notes, setNotes] = useState("");
   const [sections, setSections] = useState<Section[]>([]);
 
+  // Data from service
+  const [availableClasses, setAvailableClasses] = useState<Class[]>([]);
+  const [availableSubjects, setAvailableSubjects] = useState<{ id: string; name: string }[]>([]);
+  const [availableTeachers, setAvailableTeachers] = useState<{ id: string; name: string }[]>([]);
+
   // Question form state
   const [questionType, setQuestionType] = useState("");
   const [customQuestionType, setCustomQuestionType] = useState("");
   const [maxScore, setMaxScore] = useState<number>(5);
 
   useEffect(() => {
+    // Check if there's a logged in teacher
+    const currentTeacher = getCurrentTeacher();
+    
+    if (currentTeacher) {
+      // Teacher is logged in - show only their assigned classes and subjects
+      setTeacherId(currentTeacher.id);
+      setAvailableClasses(getTeacherClasses(currentTeacher.id));
+      setAvailableSubjects(getTeacherSubjects(currentTeacher.id));
+      setAvailableTeachers([{ id: currentTeacher.id, name: currentTeacher.name }]);
+    } else {
+      // Admin mode - show all
+      setAvailableClasses(getClasses());
+      setAvailableSubjects(getSubjects());
+      const teachers = getTeachers();
+      setAvailableTeachers(teachers.map(t => ({ id: t.id, name: t.name })));
+    }
+  }, []);
+
+  useEffect(() => {
     if (classId) {
-      const selectedClass = classesData.find(c => c.id === classId);
+      const selectedClass = availableClasses.find(c => c.id === classId);
       if (selectedClass) {
         setSections(selectedClass.sections);
       } else {
@@ -80,7 +106,7 @@ const TestForm: React.FC<TestFormProps> = ({ onFormDataChange }) => {
     } else {
       setSections([]);
     }
-  }, [classId]);
+  }, [classId, availableClasses]);
 
   useEffect(() => {
     onFormDataChange({
@@ -163,11 +189,15 @@ const TestForm: React.FC<TestFormProps> = ({ onFormDataChange }) => {
                 <SelectValue placeholder="اختر المادة" />
               </SelectTrigger>
               <SelectContent>
-                {subjectsData.map((subject) => (
-                  <SelectItem key={subject.id} value={subject.id}>
-                    {subject.name}
-                  </SelectItem>
-                ))}
+                {availableSubjects.length > 0 ? (
+                  availableSubjects.map((subject) => (
+                    <SelectItem key={subject.id} value={subject.id}>
+                      {subject.name}
+                    </SelectItem>
+                  ))
+                ) : (
+                  <SelectItem value="none" disabled>لا توجد مواد مخصصة لك</SelectItem>
+                )}
               </SelectContent>
             </Select>
           </div>
@@ -179,7 +209,7 @@ const TestForm: React.FC<TestFormProps> = ({ onFormDataChange }) => {
                 <SelectValue placeholder="اختر المعلم" />
               </SelectTrigger>
               <SelectContent>
-                {teachersData.map((teacher) => (
+                {availableTeachers.map((teacher) => (
                   <SelectItem key={teacher.id} value={teacher.id}>
                     {teacher.name}
                   </SelectItem>
@@ -203,11 +233,15 @@ const TestForm: React.FC<TestFormProps> = ({ onFormDataChange }) => {
                 <SelectValue placeholder="اختر الصف" />
               </SelectTrigger>
               <SelectContent>
-                {classesData.map((cls) => (
-                  <SelectItem key={cls.id} value={cls.id}>
-                    {cls.name}
-                  </SelectItem>
-                ))}
+                {availableClasses.length > 0 ? (
+                  availableClasses.map((cls) => (
+                    <SelectItem key={cls.id} value={cls.id}>
+                      {cls.name}
+                    </SelectItem>
+                  ))
+                ) : (
+                  <SelectItem value="none" disabled>لا توجد صفوف مخصصة لك</SelectItem>
+                )}
               </SelectContent>
             </Select>
           </div>

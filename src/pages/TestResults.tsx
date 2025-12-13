@@ -234,6 +234,7 @@ const TestResults = () => {
                   onStudentSelect={handleStudentSelect}
                   selectedStudents={selectedStudents}
                   questions={testFormData.questions}
+                  onScoreChange={handleScoreChange}
                 />
                 
                 <div className="flex justify-end mt-6">
