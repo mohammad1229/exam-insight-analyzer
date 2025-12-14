@@ -141,18 +141,9 @@ const TeacherLogin = () => {
       if (isElectron()) {
         teachers = await electronService.db.getAll("teachers");
       } else {
-        // Get teachers with credentials from localStorage
-        const teachersString = localStorage.getItem("teachersWithCredentials");
-        if (!teachersString) {
-          toast({
-            title: "خطأ في النظام",
-            description: "لم يتم العثور على بيانات المعلمين",
-            variant: "destructive",
-          });
-          return;
-        }
-        
-        teachers = JSON.parse(teachersString);
+        // Get teachers from dataService (which uses localStorage)
+        const { getTeachers } = await import("@/services/dataService");
+        teachers = getTeachers();
       }
       
       const teacher = teachers.find(
@@ -167,6 +158,8 @@ const TeacherLogin = () => {
           assignedClasses: teacher.assignedClasses,
           assignedSubjects: teacher.assignedSubjects
         }));
+        // Also set currentTeacherId for dataService compatibility
+        localStorage.setItem("currentTeacherId", teacher.id);
         
         toast({
           title: "تم تسجيل الدخول بنجاح",

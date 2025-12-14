@@ -239,7 +239,26 @@ export const saveSchool = (school: School): void => {
 
 // Get current logged in teacher
 export const getCurrentTeacher = (): TeacherWithCredentials | null => {
-  const teacherId = localStorage.getItem("currentTeacherId");
+  // First try currentTeacherId
+  let teacherId = localStorage.getItem("currentTeacherId");
+  
+  // Fallback to loggedInTeacher for backward compatibility
+  if (!teacherId) {
+    const loggedInTeacher = localStorage.getItem("loggedInTeacher");
+    if (loggedInTeacher) {
+      try {
+        const parsed = JSON.parse(loggedInTeacher);
+        teacherId = parsed.id;
+        // Also set currentTeacherId for future use
+        if (teacherId) {
+          localStorage.setItem("currentTeacherId", teacherId);
+        }
+      } catch (e) {
+        console.error("Error parsing loggedInTeacher:", e);
+      }
+    }
+  }
+  
   if (teacherId) {
     return getTeacherById(teacherId) || null;
   }
