@@ -1,10 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import Navbar from "@/components/Navbar";
 import Sidebar from "@/components/Sidebar";
 import QuestionAnalysis from "@/components/QuestionAnalysis";
 import ReportGenerator from "@/components/ReportGenerator";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { 
   Select, 
@@ -21,28 +20,54 @@ import {
   TableHeader, 
   TableRow 
 } from "@/components/ui/table";
+import { Test } from "@/types";
 import { 
-  testsData, 
-  classesData, 
-  subjectsData,
-  getClassById,
-  getSectionById,
-  getSubjectById,
-  getTeacherById,
-  getStudentById
-} from "@/data/mockData";
+  getTests, 
+  getClassById, 
+  getSectionById, 
+  getSubjectById, 
+  getTeacherById, 
+  getStudentById,
+  getCurrentTeacher
+} from "@/services/dataService";
 
 const Reports = () => {
   const { testId } = useParams();
-  const [selectedTestId, setSelectedTestId] = useState(testId || testsData[0]?.id || "");
+  const [tests, setTests] = useState<Test[]>([]);
+  const [selectedTestId, setSelectedTestId] = useState("");
   
-  const selectedTest = testsData.find(test => test.id === selectedTestId);
+  useEffect(() => {
+    const currentTeacher = getCurrentTeacher();
+    const allTests = getTests();
+    
+    // Filter by teacher if logged in
+    const filteredTests = currentTeacher 
+      ? allTests.filter(t => t.teacherId === currentTeacher.id)
+      : allTests;
+    
+    setTests(filteredTests);
+    
+    // Set initial selected test
+    if (testId && filteredTests.find(t => t.id === testId)) {
+      setSelectedTestId(testId);
+    } else if (filteredTests.length > 0) {
+      setSelectedTestId(filteredTests[0].id);
+    }
+  }, [testId]);
+  
+  const selectedTest = tests.find(test => test.id === selectedTestId);
   
   // Extract related data
   const classObj = selectedTest ? getClassById(selectedTest.classId) : null;
   const section = selectedTest ? getSectionById(selectedTest.classId, selectedTest.sectionId) : null;
   const subject = selectedTest ? getSubjectById(selectedTest.subjectId) : null;
   const teacher = selectedTest ? getTeacherById(selectedTest.teacherId) : null;
+
+  const getStudentName = (studentId: string, studentName?: string): string => {
+    if (studentName) return studentName;
+    const student = getStudentById(studentId);
+    return student?.name || studentId;
+  };
 
   return (
     <div className="flex min-h-screen bg-gradient-to-b from-white to-green-50">
@@ -62,7 +87,7 @@ const Reports = () => {
                 <SelectValue placeholder="اختر الاختبار" />
               </SelectTrigger>
               <SelectContent>
-                {testsData.map(test => (
+                {tests.map(test => (
                   <SelectItem key={test.id} value={test.id}>
                     {test.name} - {getSubjectById(test.subjectId)?.name || ''}
                   </SelectItem>
@@ -130,11 +155,11 @@ const Reports = () => {
                         </TableHeader>
                         <TableBody>
                           {selectedTest.results.map(result => {
-                            const student = getStudentById(result.studentId);
+                            const studentName = getStudentName(result.studentId, (result as any).studentName);
                             
                             return (
                               <TableRow key={result.id} className="hover:bg-green-50">
-                                <TableCell className="font-medium">{student?.name || ''}</TableCell>
+                                <TableCell className="font-medium">{studentName}</TableCell>
                                 <TableCell>{result.isAbsent ? 'غائب' : 'حاضر'}</TableCell>
                                 <TableCell>
                                   {result.isAbsent ? '-' : result.totalScore}

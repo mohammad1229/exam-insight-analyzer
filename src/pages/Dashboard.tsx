@@ -12,7 +12,6 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { 
   Table, 
   TableBody, 
@@ -22,27 +21,49 @@ import {
   TableRow 
 } from "@/components/ui/table";
 import { useNavigate } from "react-router-dom";
+import { Test } from "@/types";
 import { 
-  testsData, 
-  classesData, 
-  subjectsData,
-  getClassById,
-  getSectionById,
+  getTests, 
+  getClasses, 
+  getClassById, 
+  getSectionById, 
+  getSubjectById, 
   getTeacherById,
-  getSubjectById
-} from "@/data/mockData";
+  getCurrentTeacher,
+  getTeacherClasses
+} from "@/services/dataService";
 
 const Dashboard = () => {
   const navigate = useNavigate();
   const [selectedClassId, setSelectedClassId] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
+  const [tests, setTests] = useState<Test[]>([]);
+  const [availableClasses, setAvailableClasses] = useState<{ id: string; name: string }[]>([]);
+  const currentTeacher = getCurrentTeacher();
 
-  const filteredTests = testsData.filter(test => {
-    const matchesClass = !selectedClassId || test.classId === selectedClassId;
+  useEffect(() => {
+    // Load tests from dataService
+    const allTests = getTests();
+    
+    // Filter tests by current teacher if logged in
+    if (currentTeacher) {
+      const teacherTests = allTests.filter(t => t.teacherId === currentTeacher.id);
+      setTests(teacherTests);
+      setAvailableClasses(getTeacherClasses(currentTeacher.id));
+    } else {
+      setTests(allTests);
+      setAvailableClasses(getClasses());
+    }
+  }, []);
+
+  const filteredTests = tests.filter(test => {
+    const matchesClass = !selectedClassId || selectedClassId === "all" || test.classId === selectedClassId;
+    const subject = getSubjectById(test.subjectId);
+    const teacher = getTeacherById(test.teacherId);
     const matchesSearch = !searchTerm || 
       test.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      getSubjectById(test.subjectId)?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      getTeacherById(test.teacherId)?.name.toLowerCase().includes(searchTerm.toLowerCase());
+      subject?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      teacher?.name.toLowerCase().includes(searchTerm.toLowerCase());
     
     return matchesClass && matchesSearch;
   });
@@ -67,22 +88,22 @@ const Dashboard = () => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">مجموع الاختبارات</CardTitle>
+            <Card className="border-2 border-black">
+              <CardHeader className="pb-2 bg-black text-white">
+                <CardTitle className="text-sm font-medium">مجموع الاختبارات</CardTitle>
               </CardHeader>
-              <CardContent>
-                <p className="text-2xl font-bold">{testsData.length}</p>
+              <CardContent className="pt-4">
+                <p className="text-2xl font-bold text-green-600">{tests.length}</p>
               </CardContent>
             </Card>
             
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">اختبارات هذا الشهر</CardTitle>
+            <Card className="border-2 border-black">
+              <CardHeader className="pb-2 bg-black text-white">
+                <CardTitle className="text-sm font-medium">اختبارات هذا الشهر</CardTitle>
               </CardHeader>
-              <CardContent>
-                <p className="text-2xl font-bold">
-                  {testsData.filter(test => {
+              <CardContent className="pt-4">
+                <p className="text-2xl font-bold text-green-600">
+                  {tests.filter(test => {
                     const testDate = new Date(test.date);
                     const now = new Date();
                     return testDate.getMonth() === now.getMonth() && 
@@ -92,30 +113,30 @@ const Dashboard = () => {
               </CardContent>
             </Card>
             
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">متوسط النجاح</CardTitle>
+            <Card className="border-2 border-black">
+              <CardHeader className="pb-2 bg-black text-white">
+                <CardTitle className="text-sm font-medium">متوسط النجاح</CardTitle>
               </CardHeader>
-              <CardContent>
-                <p className="text-2xl font-bold">
-                  {testsData.length > 0 ?
-                    testsData.reduce((acc, test) => {
+              <CardContent className="pt-4">
+                <p className="text-2xl font-bold text-green-600">
+                  {tests.length > 0 ?
+                    (tests.reduce((acc, test) => {
                       const presentResults = test.results.filter(result => !result.isAbsent);
                       const passedCount = presentResults.filter(result => result.percentage >= 50).length;
                       const passRate = presentResults.length > 0 ? (passedCount / presentResults.length) * 100 : 0;
                       return acc + passRate;
-                    }, 0) / testsData.length : 0}%
+                    }, 0) / tests.length).toFixed(1) : 0}%
                 </p>
               </CardContent>
             </Card>
             
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">مسودات الاختبارات</CardTitle>
+            <Card className="border-2 border-black">
+              <CardHeader className="pb-2 bg-black text-white">
+                <CardTitle className="text-sm font-medium">مسودات الاختبارات</CardTitle>
               </CardHeader>
-              <CardContent>
-                <p className="text-2xl font-bold">
-                  {testsData.filter(test => test.draft).length}
+              <CardContent className="pt-4">
+                <p className="text-2xl font-bold text-[#E84c3d]">
+                  {tests.filter(test => test.draft).length}
                 </p>
               </CardContent>
             </Card>
@@ -126,12 +147,12 @@ const Dashboard = () => {
               <div className="flex items-center gap-4">
                 <h2 className="text-xl font-semibold">الاختبارات الأخيرة</h2>
                 <Select value={selectedClassId} onValueChange={setSelectedClassId}>
-                  <SelectTrigger className="w-48">
+                  <SelectTrigger className="w-48 border-green-500">
                     <SelectValue placeholder="جميع الصفوف" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">جميع الصفوف</SelectItem>
-                    {classesData.map(cls => (
+                    {availableClasses.map(cls => (
                       <SelectItem key={cls.id} value={cls.id}>{cls.name}</SelectItem>
                     ))}
                   </SelectContent>
@@ -147,16 +168,17 @@ const Dashboard = () => {
               </div>
             </div>
 
-            <div className="border rounded-md overflow-hidden">
+            <div className="border-2 border-black rounded-md overflow-hidden">
               <Table>
-                <TableHeader>
+                <TableHeader className="bg-black">
                   <TableRow>
-                    <TableHead className="text-right">اسم الاختبار</TableHead>
-                    <TableHead className="text-right">المادة</TableHead>
-                    <TableHead className="text-right">الصف</TableHead>
-                    <TableHead className="text-right">التاريخ</TableHead>
-                    <TableHead className="text-right">نسبة النجاح</TableHead>
-                    <TableHead className="text-right">الإجراءات</TableHead>
+                    <TableHead className="text-right text-white">اسم الاختبار</TableHead>
+                    <TableHead className="text-right text-white">المادة</TableHead>
+                    <TableHead className="text-right text-white">الصف</TableHead>
+                    <TableHead className="text-right text-white">التاريخ</TableHead>
+                    <TableHead className="text-right text-white">نسبة النجاح</TableHead>
+                    <TableHead className="text-right text-white">الحالة</TableHead>
+                    <TableHead className="text-right text-white">الإجراءات</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -170,8 +192,8 @@ const Dashboard = () => {
                       const passedCount = presentResults.filter(result => result.percentage >= 50).length;
                       const passRate = presentResults.length > 0 ? (passedCount / presentResults.length) * 100 : 0;
                       
-                      return (
-                        <TableRow key={test.id}>
+                        return (
+                        <TableRow key={test.id} className="hover:bg-green-50">
                           <TableCell className="font-medium">{test.name}</TableCell>
                           <TableCell>{subject?.name || ''}</TableCell>
                           <TableCell>
@@ -179,12 +201,26 @@ const Dashboard = () => {
                           </TableCell>
                           <TableCell>{test.date}</TableCell>
                           <TableCell>
-                            {passRate.toFixed(1)}%
+                            <span className={`px-2 py-1 rounded-full text-sm ${
+                              passRate >= 70 ? 'bg-green-500 text-white' : 
+                              passRate >= 50 ? 'bg-yellow-500 text-black' : 
+                              'bg-red-500 text-white'
+                            }`}>
+                              {passRate.toFixed(1)}%
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <span className={`px-2 py-1 rounded text-sm ${
+                              test.draft ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'
+                            }`}>
+                              {test.draft ? 'مسودة' : 'مكتمل'}
+                            </span>
                           </TableCell>
                           <TableCell>
                             <Button 
                               variant="outline" 
                               size="sm"
+                              className="border-green-600 text-green-600 hover:bg-green-600 hover:text-white"
                               onClick={() => navigate(`/reports/${test.id}`)}
                             >
                               عرض التقرير
@@ -195,7 +231,7 @@ const Dashboard = () => {
                     })
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-6">
+                      <TableCell colSpan={7} className="text-center py-6">
                         لا توجد اختبارات لعرضها
                       </TableCell>
                     </TableRow>
