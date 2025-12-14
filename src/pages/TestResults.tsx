@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Navbar from "@/components/Navbar";
 import Sidebar from "@/components/Sidebar";
 import TestForm from "@/components/TestForm";
@@ -11,8 +11,8 @@ import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
-import { getStudentsByClassAndSection } from "@/data/mockData";
-import { Question, Student, TestResult } from "@/types";
+import { Question, TestResult, Test } from "@/types";
+import { addTest, getTests, getCurrentTeacher, getStudentById } from "@/services/dataService";
 
 const TestResults = () => {
   const { toast } = useToast();
@@ -130,16 +130,27 @@ const TestResults = () => {
     
     const results = generateTestResults();
 
-    // Create test object
-    const testData = {
+    // Create test object with student names
+    const testData: Test = {
       id: testId,
-      ...testFormData,
+      name: testFormData.name,
+      type: testFormData.type,
+      subjectId: testFormData.subjectId,
+      teacherId: testFormData.teacherId,
+      classId: testFormData.classId,
+      sectionId: testFormData.sectionId,
+      date: testFormData.date,
+      questions: testFormData.questions,
+      notes: testFormData.notes,
       draft: asDraft,
-      results,
+      results: results.map(r => ({
+        ...r,
+        studentName: getStudentById(r.studentId)?.name || r.studentId
+      })),
     };
     
-    // In a real app, you would save this to the database
-    console.log(testData);
+    // Save to dataService (localStorage)
+    addTest(testData);
     
     toast({
       title: asDraft ? "تم حفظ المسودة" : "تم حفظ النتائج",
@@ -149,7 +160,7 @@ const TestResults = () => {
     });
     
     // Navigate to dashboard after saving
-    navigate("/dashboard");
+    navigate("/dashboard")
   };
 
   // Mock test object for report preview
