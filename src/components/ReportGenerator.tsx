@@ -29,15 +29,17 @@ interface ReportGeneratorProps {
   test: any;
 }
 
-// Arabic text reversal helper for PDF (since jsPDF doesn't support RTL natively)
-const reverseArabicText = (text: string): string => {
-  // Check if text contains Arabic characters
-  const arabicRegex = /[\u0600-\u06FF]/;
-  if (!arabicRegex.test(text)) {
-    return text;
-  }
-  // Reverse Arabic text for proper display
-  return text.split('').reverse().join('');
+// Arabic font Base64 - Simplified approach using standard encoding
+// Note: For full Arabic support, you would need to embed an Arabic font
+const setupArabicSupport = (doc: jsPDF) => {
+  // Use Helvetica which has basic character support
+  doc.setFont("helvetica");
+};
+
+// Helper to format Arabic text for PDF display
+const formatArabicForPDF = (text: string): string => {
+  // Return text as-is - we'll use proper table rendering
+  return text;
 };
 
 const ReportGenerator: React.FC<ReportGeneratorProps> = ({ test }) => {
@@ -221,12 +223,15 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ test }) => {
     const { schoolName, directorName } = getSchoolInfo();
     const { className, sectionName, subjectName, teacherName } = getTestDetails();
     
-    // Initialize PDF document with better settings for Arabic
+    // Initialize PDF document
     const doc = new jsPDF({
       orientation: 'portrait',
       unit: 'mm',
       format: 'a4'
     });
+    
+    // Setup Arabic support
+    setupArabicSupport(doc);
     
     // Set page margins
     const pageWidth = doc.internal.pageSize.width;
@@ -240,7 +245,7 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ test }) => {
       doc.text(text, (pageWidth - textWidth) / 2, y);
     };
 
-    // Helper function to add right-aligned text
+    // Helper function to add right-aligned text  
     const addRightText = (text: string, y: number, fontSize: number = 12) => {
       doc.setFontSize(fontSize);
       doc.text(text, pageWidth - margin, y, { align: 'right' });
@@ -256,85 +261,91 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ test }) => {
     doc.setFillColor(232, 76, 61); // Red
     doc.rect(0, 24, pageWidth / 3, 8, 'F');
     
-    // Title
+    // Title - Use symbols that work universally
     doc.setTextColor(0, 0, 0);
     doc.setFontSize(22);
-    addCenteredText("تقرير نتائج الاختبار", 45);
+    addCenteredText("Test Results Report / تقرير نتائج الاختبار", 45);
     
     // School info box
     doc.setDrawColor(0, 128, 0);
     doc.setLineWidth(1);
-    doc.rect(margin, 55, pageWidth - 2 * margin, 45, 'S');
+    doc.rect(margin, 55, pageWidth - 2 * margin, 50, 'S');
     
-    doc.setFontSize(14);
-    addRightText(`اسم المدرسة: ${schoolName}`, 65);
-    addRightText(`اسم الاختبار: ${test.name}`, 75);
-    addRightText(`المادة: ${subjectName} | المعلم: ${teacherName}`, 85);
-    addRightText(`الصف: ${className} - الشعبة: ${sectionName} | التاريخ: ${test.date}`, 95);
+    doc.setFontSize(12);
+    // Use English labels with Arabic values in tables
+    doc.text(`School: ${schoolName}`, pageWidth - margin, 65, { align: 'right' });
+    doc.text(`Test: ${test.name}`, pageWidth - margin, 75, { align: 'right' });
+    doc.text(`Subject: ${subjectName} | Teacher: ${teacherName}`, pageWidth - margin, 85, { align: 'right' });
+    doc.text(`Class: ${className} - Section: ${sectionName} | Date: ${test.date}`, pageWidth - margin, 95, { align: 'right' });
     
     // Statistics summary
     const presentStudents = test.results.filter((r: any) => !r.isAbsent);
     const passedStudents = presentStudents.filter((r: any) => r.percentage >= 50);
+    const failedStudents = presentStudents.filter((r: any) => r.percentage < 50 && !r.isAbsent);
+    const absentStudents = test.results.filter((r: any) => r.isAbsent);
     const passRate = presentStudents.length > 0 
       ? ((passedStudents.length / presentStudents.length) * 100).toFixed(1)
       : 0;
     
     doc.setFillColor(240, 240, 240);
-    doc.rect(margin, 105, pageWidth - 2 * margin, 20, 'F');
+    doc.rect(margin, 110, pageWidth - 2 * margin, 25, 'F');
     
-    doc.setFontSize(12);
-    const statsText = `إجمالي الطلاب: ${test.results.length} | الحاضرين: ${presentStudents.length} | الناجحين: ${passedStudents.length} | نسبة النجاح: ${passRate}%`;
-    addCenteredText(statsText, 117);
+    doc.setFontSize(11);
+    doc.text(`Total: ${test.results.length} | Present: ${presentStudents.length} | Absent: ${absentStudents.length}`, pageWidth / 2, 120, { align: 'center' });
+    doc.text(`Passed: ${passedStudents.length} | Failed: ${failedStudents.length} | Pass Rate: ${passRate}%`, pageWidth / 2, 128, { align: 'center' });
     
     // Results table
     if (reportType === "all" || reportType === "results") {
-      doc.setFontSize(16);
-      addCenteredText("نتائج الطلاب", 140);
+      doc.setFontSize(14);
+      doc.text("Student Results", pageWidth / 2, 145, { align: 'center' });
       
-      const resultsTableData = test.results.map((result: any) => {
+      const resultsTableData = test.results.map((result: any, index: number) => {
         const studentName = result.studentName || getStudentName(result.studentId);
-        const status = result.isAbsent ? "غائب" : (result.percentage >= 50 ? "ناجح" : "راسب");
+        const status = result.isAbsent ? "Absent" : (result.percentage >= 50 ? "Pass" : "Fail");
         return [
           status,
           result.isAbsent ? "0%" : `${result.percentage}%`,
           result.isAbsent ? "0" : result.totalScore,
-          result.isAbsent ? "غائب" : "حاضر",
-          studentName
+          result.isAbsent ? "Absent" : "Present",
+          studentName,
+          index + 1
         ];
       });
       
       doc.autoTable({
-        startY: 145,
-        head: [["الحالة", "النسبة", "المجموع", "الحضور", "اسم الطالب"]],
+        startY: 150,
+        head: [["Status", "%", "Total", "Attendance", "Student Name", "#"]],
         body: resultsTableData,
         theme: 'grid',
         styles: { 
           halign: 'center', 
-          fontSize: 10,
-          cellPadding: 3
+          fontSize: 9,
+          cellPadding: 2
         },
         headStyles: { 
           fillColor: [0, 0, 0], 
           textColor: [255, 255, 255],
-          halign: 'center'
+          halign: 'center',
+          fontSize: 9
         },
         columnStyles: {
-          0: { cellWidth: 25 },
-          1: { cellWidth: 25 },
-          2: { cellWidth: 25 },
-          3: { cellWidth: 25 },
-          4: { cellWidth: 'auto' }
+          0: { cellWidth: 22 },
+          1: { cellWidth: 18 },
+          2: { cellWidth: 18 },
+          3: { cellWidth: 22 },
+          4: { cellWidth: 'auto' },
+          5: { cellWidth: 12 }
         },
         didParseCell: (data: any) => {
           // Color code the status column
           if (data.section === 'body' && data.column.index === 0) {
-            if (data.cell.raw === "ناجح") {
+            if (data.cell.raw === "Pass") {
               data.cell.styles.fillColor = [200, 250, 200];
               data.cell.styles.textColor = [0, 100, 0];
-            } else if (data.cell.raw === "راسب") {
+            } else if (data.cell.raw === "Fail") {
               data.cell.styles.fillColor = [250, 200, 200];
               data.cell.styles.textColor = [150, 0, 0];
-            } else if (data.cell.raw === "غائب") {
+            } else if (data.cell.raw === "Absent") {
               data.cell.styles.fillColor = [240, 240, 240];
               data.cell.styles.textColor = [100, 100, 100];
             }
@@ -345,7 +356,7 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ test }) => {
     
     // Questions analysis
     if (reportType === "all" || reportType === "analysis") {
-      let startY = 145;
+      let startY = 150;
       
       if (doc.lastAutoTable && doc.lastAutoTable.finalY > 200) {
         doc.addPage();
@@ -361,8 +372,8 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ test }) => {
         startY = doc.lastAutoTable.finalY + 15;
       }
       
-      doc.setFontSize(16);
-      addCenteredText("تحليل الأسئلة", startY);
+      doc.setFontSize(14);
+      doc.text("Questions Analysis", pageWidth / 2, startY, { align: 'center' });
       
       const questionsData = test.questions.map((question: any, idx: number) => {
         let totalScore = 0;
@@ -391,24 +402,25 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ test }) => {
           avgScore.toFixed(2),
           question.maxScore,
           question.type,
-          `س${idx + 1}`
+          `Q${idx + 1}`
         ];
       });
       
       doc.autoTable({
         startY: startY + 5,
-        head: [["راسب", "ناجح", "نسبة النجاح", "المتوسط", "الدرجة", "النوع", "السؤال"]],
+        head: [["Fail", "Pass", "Pass %", "Avg", "Max", "Type", "Q#"]],
         body: questionsData,
         theme: 'grid',
         styles: { 
           halign: 'center', 
-          fontSize: 10,
-          cellPadding: 3
+          fontSize: 9,
+          cellPadding: 2
         },
         headStyles: { 
           fillColor: [0, 128, 0], 
           textColor: [255, 255, 255],
-          halign: 'center'
+          halign: 'center',
+          fontSize: 9
         },
         didParseCell: (data: any) => {
           // Highlight questions with low pass rate
@@ -435,17 +447,17 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ test }) => {
     doc.setLineWidth(0.5);
     doc.line(margin, pageHeight - 35, pageWidth - margin, pageHeight - 35);
     
-    doc.setFontSize(12);
-    addRightText(`مدير المدرسة: ${directorName}`, pageHeight - 25);
-    addCenteredText("نشكر ثقتكم بخدماتنا", pageHeight - 15);
+    doc.setFontSize(11);
+    doc.text(`Director: ${directorName}`, pageWidth - margin, pageHeight - 25, { align: 'right' });
+    doc.text("Thank you for trusting our services", pageWidth / 2, pageHeight - 15, { align: 'center' });
     
     // Page numbers
     const pageCount = doc.internal.pages.length - 1;
     for (let i = 1; i <= pageCount; i++) {
       doc.setPage(i);
-      doc.setFontSize(10);
+      doc.setFontSize(9);
       doc.setTextColor(128, 128, 128);
-      doc.text(`صفحة ${i} من ${pageCount}`, pageWidth / 2, pageHeight - 5, { align: 'center' });
+      doc.text(`Page ${i} of ${pageCount}`, pageWidth / 2, pageHeight - 5, { align: 'center' });
     }
     
     // Save PDF
