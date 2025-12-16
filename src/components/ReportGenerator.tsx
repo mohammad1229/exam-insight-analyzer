@@ -29,30 +29,19 @@ interface ReportGeneratorProps {
   test: any;
 }
 
-// Arabic font Base64 - Simplified approach using standard encoding
-// Note: For full Arabic support, you would need to embed an Arabic font
-const setupArabicSupport = (doc: jsPDF) => {
-  // Use Helvetica which has basic character support
-  doc.setFont("helvetica");
-};
-
-// Helper to format Arabic text for PDF display
-const formatArabicForPDF = (text: string): string => {
-  // Return text as-is - we'll use proper table rendering
-  return text;
-};
-
 const ReportGenerator: React.FC<ReportGeneratorProps> = ({ test }) => {
   const [reportType, setReportType] = useState<string>("all");
   
   const getSchoolInfo = () => {
-    const schoolName = localStorage.getItem("schoolName") || "المدرسة";
-    const directorName = localStorage.getItem("directorName") || "المدير";
+    const schoolName = localStorage.getItem("schoolName") || "School Name";
+    const directorName = localStorage.getItem("directorName") || "Director";
+    const schoolLogo = localStorage.getItem("schoolLogo") || "";
     const isActivated = localStorage.getItem("systemActivated") === "true";
     
     return {
       schoolName,
       directorName,
+      schoolLogo,
       isActivated
     };
   };
@@ -75,53 +64,138 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ test }) => {
       teacherName: teacherInfo?.name || ""
     };
   };
+
+  // Calculate statistics
+  const calculateStats = () => {
+    const presentStudents = test.results.filter((r: any) => !r.isAbsent);
+    const passedStudents = presentStudents.filter((r: any) => r.percentage >= 50);
+    const failedStudents = presentStudents.filter((r: any) => r.percentage < 50);
+    const absentStudents = test.results.filter((r: any) => r.isAbsent);
+    
+    const scores = presentStudents.map((r: any) => r.percentage);
+    const highestScore = scores.length > 0 ? Math.max(...scores) : 0;
+    const lowestScore = scores.length > 0 ? Math.min(...scores) : 0;
+    const avgScore = scores.length > 0 
+      ? scores.reduce((sum: number, s: number) => sum + s, 0) / scores.length 
+      : 0;
+    const passRate = presentStudents.length > 0 
+      ? (passedStudents.length / presentStudents.length) * 100 
+      : 0;
+    
+    // Calculate pass rate per question
+    const questionStats = test.questions.map((question: any, idx: number) => {
+      let totalScore = 0;
+      let answeredCount = 0;
+      let passedCount = 0;
+      
+      test.results.forEach((result: any) => {
+        if (!result.isAbsent) {
+          const score = result.scores[question.id] || 0;
+          totalScore += score;
+          answeredCount++;
+          if (score >= question.maxScore * 0.5) {
+            passedCount++;
+          }
+        }
+      });
+      
+      const avgQuestionScore = answeredCount > 0 ? totalScore / answeredCount : 0;
+      const questionPassRate = answeredCount > 0 ? (passedCount / answeredCount) * 100 : 0;
+      
+      return {
+        questionNum: idx + 1,
+        type: question.type,
+        maxScore: question.maxScore,
+        avgScore: avgQuestionScore,
+        passRate: questionPassRate,
+        passedCount,
+        failedCount: answeredCount - passedCount
+      };
+    });
+    
+    return {
+      totalStudents: test.results.length,
+      presentCount: presentStudents.length,
+      absentCount: absentStudents.length,
+      passedCount: passedStudents.length,
+      failedCount: failedStudents.length,
+      highestScore,
+      lowestScore,
+      avgScore,
+      passRate,
+      questionStats
+    };
+  };
   
   const generateExcelReport = () => {
-    // Test info
     const { name, type, date, questions, results } = test;
     const { schoolName, directorName } = getSchoolInfo();
     const { className, sectionName, subjectName, teacherName } = getTestDetails();
+    const stats = calculateStats();
     
-    // Create a workbook and add worksheets
     const wb = XLSX.utils.book_new();
     
     // Test info sheet
     const testInfoData = [
-      ["اسم المدرسة", schoolName],
-      ["اسم الاختبار", name],
-      ["نوع الاختبار", type],
-      ["المادة", subjectName],
-      ["المعلم", teacherName],
-      ["الصف", className],
-      ["الشعبة", sectionName],
-      ["التاريخ", date],
-      ["عدد الأسئلة", questions.length],
-      ["عدد الطلاب", results.length]
+      ["School Name", schoolName],
+      ["Test Name", name],
+      ["Test Type", type],
+      ["Subject", subjectName],
+      ["Teacher", teacherName],
+      ["Class", className],
+      ["Section", sectionName],
+      ["Date", date],
+      ["Questions Count", questions.length],
+      ["Students Count", results.length]
     ];
     
     const testInfoWs = XLSX.utils.aoa_to_sheet(testInfoData);
-    XLSX.utils.book_append_sheet(wb, testInfoWs, "معلومات الاختبار");
+    XLSX.utils.book_append_sheet(wb, testInfoWs, "Test Info");
+    
+    // Statistics Summary sheet
+    const statsData = [
+      ["General Statistics", ""],
+      ["Total Students", stats.totalStudents],
+      ["Present Students", stats.presentCount],
+      ["Absent Students", stats.absentCount],
+      ["Passed Students", stats.passedCount],
+      ["Failed Students", stats.failedCount],
+      ["Pass Rate", `${stats.passRate.toFixed(1)}%`],
+      ["Average Score", `${stats.avgScore.toFixed(1)}%`],
+      ["Highest Score", `${stats.highestScore}%`],
+      ["Lowest Score", `${stats.lowestScore}%`],
+      ["", ""],
+      ["Question Analysis", ""],
+      ["Question", "Pass Rate"]
+    ];
+    
+    stats.questionStats.forEach((q: any) => {
+      statsData.push([`Q${q.questionNum}`, `${q.passRate.toFixed(1)}%`]);
+    });
+    
+    const statsWs = XLSX.utils.aoa_to_sheet(statsData);
+    XLSX.utils.book_append_sheet(wb, statsWs, "Statistics");
     
     // Results sheet
     const resultsHeaders = [
-      "اسم الطالب", 
-      "الحضور", 
-      ...questions.map((_: any, idx: number) => `السؤال ${idx + 1}`),
-      "المجموع",
-      "النسبة المئوية",
-      "الحالة"
+      "Student Name", 
+      "Attendance", 
+      ...questions.map((_: any, idx: number) => `Q${idx + 1}`),
+      "Total",
+      "Percentage",
+      "Status"
     ];
     
     const resultsData = [
       resultsHeaders,
       ...results.map((result: any) => {
         const studentName = result.studentName || getStudentName(result.studentId);
-        const scoreItems = questions.map((q: any) => result.isAbsent ? "غائب" : (result.scores[q.id] || 0));
-        const status = result.isAbsent ? "غائب" : (result.percentage >= 50 ? "ناجح" : "راسب");
+        const scoreItems = questions.map((q: any) => result.isAbsent ? "-" : (result.scores[q.id] || 0));
+        const status = result.isAbsent ? "Absent" : (result.percentage >= 50 ? "Pass" : "Fail");
         
         return [
           studentName,
-          result.isAbsent ? "غائب" : "حاضر",
+          result.isAbsent ? "Absent" : "Present",
           ...scoreItems,
           result.isAbsent ? "0" : result.totalScore,
           result.isAbsent ? "0%" : `${result.percentage}%`,
@@ -131,219 +205,244 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ test }) => {
     ];
     
     const resultsWs = XLSX.utils.aoa_to_sheet(resultsData);
-    XLSX.utils.book_append_sheet(wb, resultsWs, "نتائج الطلاب");
+    XLSX.utils.book_append_sheet(wb, resultsWs, "Results");
     
     // Questions analysis sheet
     const questionsData = [
-      ["رقم السؤال", "نوع السؤال", "العلامة القصوى", "متوسط العلامة", "نسبة الإجابة الصحيحة", "عدد الناجحين", "عدد الراسبين"],
-      ...questions.map((question: any, idx: number) => {
-        // Calculate average score for this question
-        let totalScore = 0;
-        let answeredCount = 0;
-        let passedCount = 0;
-        let failedCount = 0;
-        
-        results.forEach((result: any) => {
-          if (!result.isAbsent) {
-            const score = result.scores[question.id] || 0;
-            totalScore += score;
-            answeredCount++;
-            
-            // Consider passing if score >= 50% of max
-            if (score >= question.maxScore * 0.5) {
-              passedCount++;
-            } else {
-              failedCount++;
-            }
-          }
-        });
-        
-        const avgScore = answeredCount > 0 ? totalScore / answeredCount : 0;
-        const correctPercentage = (avgScore / question.maxScore) * 100;
-        
-        return [
-          `السؤال ${idx + 1}`,
-          question.type,
-          question.maxScore,
-          avgScore.toFixed(2),
-          `${correctPercentage.toFixed(1)}%`,
-          passedCount,
-          failedCount
-        ];
-      })
+      ["Question", "Type", "Max Score", "Average", "Pass Rate", "Passed", "Failed"],
+      ...stats.questionStats.map((q: any) => [
+        `Q${q.questionNum}`,
+        q.type,
+        q.maxScore,
+        q.avgScore.toFixed(2),
+        `${q.passRate.toFixed(1)}%`,
+        q.passedCount,
+        q.failedCount
+      ])
     ];
     
     const questionsWs = XLSX.utils.aoa_to_sheet(questionsData);
-    XLSX.utils.book_append_sheet(wb, questionsWs, "تحليل الأسئلة");
-
-    // Statistics summary sheet
-    const presentStudents = results.filter((r: any) => !r.isAbsent);
-    const passedStudents = presentStudents.filter((r: any) => r.percentage >= 50);
-    const failedStudents = presentStudents.filter((r: any) => r.percentage < 50);
-    const absentStudents = results.filter((r: any) => r.isAbsent);
-    const avgPercentage = presentStudents.length > 0 
-      ? presentStudents.reduce((sum: number, r: any) => sum + r.percentage, 0) / presentStudents.length 
-      : 0;
-    const highestScore = presentStudents.length > 0 
-      ? Math.max(...presentStudents.map((r: any) => r.percentage))
-      : 0;
-    const lowestScore = presentStudents.length > 0 
-      ? Math.min(...presentStudents.map((r: any) => r.percentage))
-      : 0;
-
-    const statsData = [
-      ["الإحصائيات العامة", ""],
-      ["إجمالي الطلاب", results.length],
-      ["الطلاب الحاضرين", presentStudents.length],
-      ["الطلاب الغائبين", absentStudents.length],
-      ["عدد الناجحين", passedStudents.length],
-      ["عدد الراسبين", failedStudents.length],
-      ["نسبة النجاح", `${presentStudents.length > 0 ? ((passedStudents.length / presentStudents.length) * 100).toFixed(1) : 0}%`],
-      ["متوسط الدرجات", `${avgPercentage.toFixed(1)}%`],
-      ["أعلى درجة", `${highestScore}%`],
-      ["أدنى درجة", `${lowestScore}%`]
-    ];
+    XLSX.utils.book_append_sheet(wb, questionsWs, "Questions Analysis");
     
-    const statsWs = XLSX.utils.aoa_to_sheet(statsData);
-    XLSX.utils.book_append_sheet(wb, statsWs, "الإحصائيات");
-    
-    // Note at the end
+    // Footer
     const footerWs = XLSX.utils.aoa_to_sheet([
-      ["تم إنشاء هذا التقرير بواسطة نظام تحليل نتائج الاختبارات المدرسية"],
-      ["مدير المدرسة: " + directorName],
-      ["نشكر ثقتكم بخدماتنا"]
+      ["Generated by School Test Analysis System"],
+      [`Director: ${directorName}`],
+      ["Thank you for trusting our services"]
     ]);
-    XLSX.utils.book_append_sheet(wb, footerWs, "معلومات إضافية");
+    XLSX.utils.book_append_sheet(wb, footerWs, "Footer");
     
-    // Save Excel file
-    XLSX.writeFile(wb, `تقرير_${name}_${date}.xlsx`);
+    XLSX.writeFile(wb, `Report_${name}_${date}.xlsx`);
   };
   
   const generatePDFReport = () => {
-    const { schoolName, directorName } = getSchoolInfo();
+    const { schoolName, directorName, schoolLogo } = getSchoolInfo();
     const { className, sectionName, subjectName, teacherName } = getTestDetails();
+    const stats = calculateStats();
     
-    // Initialize PDF document
     const doc = new jsPDF({
       orientation: 'portrait',
       unit: 'mm',
       format: 'a4'
     });
     
-    // Setup Arabic support
-    setupArabicSupport(doc);
-    
-    // Set page margins
     const pageWidth = doc.internal.pageSize.width;
     const pageHeight = doc.internal.pageSize.height;
     const margin = 15;
     
-    // Helper function to add centered text
-    const addCenteredText = (text: string, y: number, fontSize: number = 12) => {
-      doc.setFontSize(fontSize);
-      const textWidth = doc.getTextWidth(text);
-      doc.text(text, (pageWidth - textWidth) / 2, y);
-    };
-
-    // Helper function to add right-aligned text  
-    const addRightText = (text: string, y: number, fontSize: number = 12) => {
-      doc.setFontSize(fontSize);
-      doc.text(text, pageWidth - margin, y, { align: 'right' });
-    };
-
     // Header with Palestinian colors
     doc.setFillColor(0, 0, 0); // Black
-    doc.rect(0, 0, pageWidth, 8, 'F');
+    doc.rect(0, 0, pageWidth, 6, 'F');
     doc.setFillColor(255, 255, 255); // White
-    doc.rect(0, 8, pageWidth, 8, 'F');
+    doc.rect(0, 6, pageWidth, 6, 'F');
     doc.setFillColor(0, 128, 0); // Green
-    doc.rect(0, 16, pageWidth, 8, 'F');
-    doc.setFillColor(232, 76, 61); // Red
-    doc.rect(0, 24, pageWidth / 3, 8, 'F');
+    doc.rect(0, 12, pageWidth, 6, 'F');
+    doc.setFillColor(206, 17, 38); // Red triangle
+    doc.triangle(0, 0, 0, 18, 30, 9, 'F');
     
-    // Title - Use symbols that work universally
+    let currentY = 25;
+    
+    // Logo and School Name Header
+    if (schoolLogo) {
+      try {
+        doc.addImage(schoolLogo, 'PNG', pageWidth - margin - 25, currentY, 25, 25);
+      } catch (e) {
+        console.error('Error adding logo:', e);
+      }
+    }
+    
+    // School Name (centered)
+    doc.setFontSize(18);
     doc.setTextColor(0, 0, 0);
-    doc.setFontSize(22);
-    addCenteredText("Test Results Report / تقرير نتائج الاختبار", 45);
+    doc.setFont("helvetica", "bold");
+    doc.text(schoolName, pageWidth / 2, currentY + 8, { align: 'center' });
     
-    // School info box
+    // Title
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "normal");
+    doc.text("Test Results Report", pageWidth / 2, currentY + 18, { align: 'center' });
+    
+    currentY += 35;
+    
+    // Test Information Box
     doc.setDrawColor(0, 128, 0);
     doc.setLineWidth(1);
-    doc.rect(margin, 55, pageWidth - 2 * margin, 50, 'S');
+    doc.rect(margin, currentY, pageWidth - 2 * margin, 35, 'S');
     
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    
+    // Left column
+    doc.text(`Test: ${test.name}`, margin + 5, currentY + 8);
+    doc.text(`Subject: ${subjectName}`, margin + 5, currentY + 16);
+    doc.text(`Teacher: ${teacherName}`, margin + 5, currentY + 24);
+    doc.text(`Date: ${test.date}`, margin + 5, currentY + 32);
+    
+    // Right column
+    const rightCol = pageWidth / 2 + 10;
+    doc.text(`Class: ${className}`, rightCol, currentY + 8);
+    doc.text(`Section: ${sectionName}`, rightCol, currentY + 16);
+    doc.text(`Total Students: ${stats.totalStudents}`, rightCol, currentY + 24);
+    doc.text(`Absent: ${stats.absentCount}`, rightCol, currentY + 32);
+    
+    currentY += 42;
+    
+    // Statistics Summary Table
     doc.setFontSize(12);
-    // Use English labels with Arabic values in tables
-    doc.text(`School: ${schoolName}`, pageWidth - margin, 65, { align: 'right' });
-    doc.text(`Test: ${test.name}`, pageWidth - margin, 75, { align: 'right' });
-    doc.text(`Subject: ${subjectName} | Teacher: ${teacherName}`, pageWidth - margin, 85, { align: 'right' });
-    doc.text(`Class: ${className} - Section: ${sectionName} | Date: ${test.date}`, pageWidth - margin, 95, { align: 'right' });
+    doc.setFont("helvetica", "bold");
+    doc.text("Summary Statistics", pageWidth / 2, currentY, { align: 'center' });
+    currentY += 5;
     
-    // Statistics summary
-    const presentStudents = test.results.filter((r: any) => !r.isAbsent);
-    const passedStudents = presentStudents.filter((r: any) => r.percentage >= 50);
-    const failedStudents = presentStudents.filter((r: any) => r.percentage < 50 && !r.isAbsent);
-    const absentStudents = test.results.filter((r: any) => r.isAbsent);
-    const passRate = presentStudents.length > 0 
-      ? ((passedStudents.length / presentStudents.length) * 100).toFixed(1)
-      : 0;
+    doc.autoTable({
+      startY: currentY,
+      head: [['Metric', 'Value', 'Metric', 'Value']],
+      body: [
+        ['Highest Score', `${stats.highestScore}%`, 'Lowest Score', `${stats.lowestScore}%`],
+        ['Average Score', `${stats.avgScore.toFixed(1)}%`, 'Pass Rate', `${stats.passRate.toFixed(1)}%`],
+        ['Passed', stats.passedCount, 'Failed', stats.failedCount],
+      ],
+      theme: 'grid',
+      styles: { 
+        halign: 'center', 
+        fontSize: 9,
+        cellPadding: 3
+      },
+      headStyles: { 
+        fillColor: [0, 128, 0], 
+        textColor: [255, 255, 255],
+        fontSize: 9
+      },
+      columnStyles: {
+        0: { fontStyle: 'bold', fillColor: [240, 240, 240] },
+        2: { fontStyle: 'bold', fillColor: [240, 240, 240] }
+      }
+    });
     
-    doc.setFillColor(240, 240, 240);
-    doc.rect(margin, 110, pageWidth - 2 * margin, 25, 'F');
+    currentY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 8 : currentY + 30;
     
-    doc.setFontSize(11);
-    doc.text(`Total: ${test.results.length} | Present: ${presentStudents.length} | Absent: ${absentStudents.length}`, pageWidth / 2, 120, { align: 'center' });
-    doc.text(`Passed: ${passedStudents.length} | Failed: ${failedStudents.length} | Pass Rate: ${passRate}%`, pageWidth / 2, 128, { align: 'center' });
+    // Question Pass Rates Table
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.text("Pass Rate by Question", pageWidth / 2, currentY, { align: 'center' });
+    currentY += 5;
+    
+    const questionPassRates = stats.questionStats.map((q: any) => [
+      `Q${q.questionNum}`,
+      q.type,
+      q.maxScore,
+      q.avgScore.toFixed(1),
+      `${q.passRate.toFixed(1)}%`,
+      q.passedCount,
+      q.failedCount
+    ]);
+    
+    doc.autoTable({
+      startY: currentY,
+      head: [['Question', 'Type', 'Max', 'Avg', 'Pass %', 'Passed', 'Failed']],
+      body: questionPassRates,
+      theme: 'grid',
+      styles: { 
+        halign: 'center', 
+        fontSize: 8,
+        cellPadding: 2
+      },
+      headStyles: { 
+        fillColor: [0, 0, 0], 
+        textColor: [255, 255, 255],
+        fontSize: 8
+      },
+      didParseCell: (data: any) => {
+        if (data.section === 'body' && data.column.index === 4) {
+          const percentage = parseFloat(data.cell.raw);
+          if (percentage < 50) {
+            data.cell.styles.fillColor = [255, 200, 200];
+            data.cell.styles.textColor = [150, 0, 0];
+          } else {
+            data.cell.styles.fillColor = [200, 255, 200];
+            data.cell.styles.textColor = [0, 100, 0];
+          }
+        }
+      }
+    });
+    
+    currentY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 8 : currentY + 30;
     
     // Results table
     if (reportType === "all" || reportType === "results") {
-      doc.setFontSize(14);
-      doc.text("Student Results", pageWidth / 2, 145, { align: 'center' });
+      // Check if we need a new page
+      if (currentY > pageHeight - 80) {
+        doc.addPage();
+        currentY = 20;
+      }
+      
+      doc.setFontSize(12);
+      doc.setFont("helvetica", "bold");
+      doc.text("Student Results", pageWidth / 2, currentY, { align: 'center' });
+      currentY += 5;
       
       const resultsTableData = test.results.map((result: any, index: number) => {
         const studentName = result.studentName || getStudentName(result.studentId);
         const status = result.isAbsent ? "Absent" : (result.percentage >= 50 ? "Pass" : "Fail");
         return [
-          status,
-          result.isAbsent ? "0%" : `${result.percentage}%`,
-          result.isAbsent ? "0" : result.totalScore,
-          result.isAbsent ? "Absent" : "Present",
+          index + 1,
           studentName,
-          index + 1
+          result.isAbsent ? "-" : "Present",
+          result.isAbsent ? "-" : result.totalScore,
+          result.isAbsent ? "-" : `${result.percentage}%`,
+          status
         ];
       });
       
       doc.autoTable({
-        startY: 150,
-        head: [["Status", "%", "Total", "Attendance", "Student Name", "#"]],
+        startY: currentY,
+        head: [["#", "Student Name", "Attendance", "Total", "%", "Status"]],
         body: resultsTableData,
         theme: 'grid',
         styles: { 
           halign: 'center', 
-          fontSize: 9,
+          fontSize: 8,
           cellPadding: 2
         },
         headStyles: { 
           fillColor: [0, 0, 0], 
           textColor: [255, 255, 255],
-          halign: 'center',
-          fontSize: 9
+          fontSize: 8
         },
         columnStyles: {
-          0: { cellWidth: 22 },
-          1: { cellWidth: 18 },
-          2: { cellWidth: 18 },
-          3: { cellWidth: 22 },
-          4: { cellWidth: 'auto' },
-          5: { cellWidth: 12 }
+          0: { cellWidth: 10 },
+          1: { cellWidth: 'auto', halign: 'left' },
+          2: { cellWidth: 22 },
+          3: { cellWidth: 18 },
+          4: { cellWidth: 18 },
+          5: { cellWidth: 20 }
         },
         didParseCell: (data: any) => {
-          // Color code the status column
-          if (data.section === 'body' && data.column.index === 0) {
+          if (data.section === 'body' && data.column.index === 5) {
             if (data.cell.raw === "Pass") {
-              data.cell.styles.fillColor = [200, 250, 200];
+              data.cell.styles.fillColor = [200, 255, 200];
               data.cell.styles.textColor = [0, 100, 0];
             } else if (data.cell.raw === "Fail") {
-              data.cell.styles.fillColor = [250, 200, 200];
+              data.cell.styles.fillColor = [255, 200, 200];
               data.cell.styles.textColor = [150, 0, 0];
             } else if (data.cell.raw === "Absent") {
               data.cell.styles.fillColor = [240, 240, 240];
@@ -354,151 +453,69 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ test }) => {
       });
     }
     
-    // Questions analysis
-    if (reportType === "all" || reportType === "analysis") {
-      let startY = 150;
-      
-      if (doc.lastAutoTable && doc.lastAutoTable.finalY > 200) {
-        doc.addPage();
-        
-        // Add header to new page
-        doc.setFillColor(0, 0, 0);
-        doc.rect(0, 0, pageWidth, 5, 'F');
-        doc.setFillColor(0, 128, 0);
-        doc.rect(0, 5, pageWidth, 5, 'F');
-        
-        startY = 20;
-      } else if (reportType === "all" && doc.lastAutoTable) {
-        startY = doc.lastAutoTable.finalY + 15;
-      }
-      
-      doc.setFontSize(14);
-      doc.text("Questions Analysis", pageWidth / 2, startY, { align: 'center' });
-      
-      const questionsData = test.questions.map((question: any, idx: number) => {
-        let totalScore = 0;
-        let answeredCount = 0;
-        let passedCount = 0;
-        
-        test.results.forEach((result: any) => {
-          if (!result.isAbsent) {
-            const score = result.scores[question.id] || 0;
-            totalScore += score;
-            answeredCount++;
-            if (score >= question.maxScore * 0.5) {
-              passedCount++;
-            }
-          }
-        });
-        
-        const avgScore = answeredCount > 0 ? totalScore / answeredCount : 0;
-        const correctPercentage = (avgScore / question.maxScore) * 100;
-        const failedCount = answeredCount - passedCount;
-        
-        return [
-          failedCount,
-          passedCount,
-          `${correctPercentage.toFixed(1)}%`,
-          avgScore.toFixed(2),
-          question.maxScore,
-          question.type,
-          `Q${idx + 1}`
-        ];
-      });
-      
-      doc.autoTable({
-        startY: startY + 5,
-        head: [["Fail", "Pass", "Pass %", "Avg", "Max", "Type", "Q#"]],
-        body: questionsData,
-        theme: 'grid',
-        styles: { 
-          halign: 'center', 
-          fontSize: 9,
-          cellPadding: 2
-        },
-        headStyles: { 
-          fillColor: [0, 128, 0], 
-          textColor: [255, 255, 255],
-          halign: 'center',
-          fontSize: 9
-        },
-        didParseCell: (data: any) => {
-          // Highlight questions with low pass rate
-          if (data.section === 'body' && data.column.index === 2) {
-            const percentage = parseFloat(data.cell.raw);
-            if (percentage < 50) {
-              data.cell.styles.fillColor = [250, 200, 200];
-              data.cell.styles.textColor = [150, 0, 0];
-            }
-          }
-        }
-      });
-    }
-    
-    // Footer
-    const finalY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 20 : 200;
-    
-    if (finalY > pageHeight - 40) {
-      doc.addPage();
-    }
-    
-    // Footer line
-    doc.setDrawColor(0, 128, 0);
-    doc.setLineWidth(0.5);
-    doc.line(margin, pageHeight - 35, pageWidth - margin, pageHeight - 35);
-    
-    doc.setFontSize(11);
-    doc.text(`Director: ${directorName}`, pageWidth - margin, pageHeight - 25, { align: 'right' });
-    doc.text("Thank you for trusting our services", pageWidth / 2, pageHeight - 15, { align: 'center' });
-    
-    // Page numbers
+    // Footer on each page
     const pageCount = doc.internal.pages.length - 1;
     for (let i = 1; i <= pageCount; i++) {
       doc.setPage(i);
+      
+      // Footer line
+      doc.setDrawColor(0, 128, 0);
+      doc.setLineWidth(0.5);
+      doc.line(margin, pageHeight - 25, pageWidth - margin, pageHeight - 25);
+      
       doc.setFontSize(9);
-      doc.setTextColor(128, 128, 128);
-      doc.text(`Page ${i} of ${pageCount}`, pageWidth / 2, pageHeight - 5, { align: 'center' });
+      doc.setTextColor(80, 80, 80);
+      doc.setFont("helvetica", "normal");
+      doc.text(`Director: ${directorName}`, margin, pageHeight - 18);
+      doc.text("Thank you for trusting our services", pageWidth / 2, pageHeight - 18, { align: 'center' });
+      doc.text(`Page ${i} / ${pageCount}`, pageWidth - margin, pageHeight - 18, { align: 'right' });
+      
+      // Small Palestinian flag indicator
+      doc.setFillColor(0, 0, 0);
+      doc.rect(margin, pageHeight - 12, 15, 2, 'F');
+      doc.setFillColor(255, 255, 255);
+      doc.rect(margin, pageHeight - 10, 15, 2, 'F');
+      doc.setFillColor(0, 128, 0);
+      doc.rect(margin, pageHeight - 8, 15, 2, 'F');
     }
     
-    // Save PDF
-    doc.save(`تقرير_${test.name}_${test.date}.pdf`);
+    doc.save(`Report_${test.name}_${test.date}.pdf`);
   };
   
   return (
     <Card className="border-2 border-[#E84c3d]">
       <CardContent className="pt-6 space-y-4">
         <div className="space-y-2">
-          <h3 className="text-lg font-medium">تصدير التقرير</h3>
-          <p className="text-sm text-muted-foreground">يمكنك تصدير التقرير بصيغة إكسل أو PDF</p>
+          <h3 className="text-lg font-medium">Export Report</h3>
+          <p className="text-sm text-muted-foreground">Export report in Excel or PDF format</p>
         </div>
         
         <Select value={reportType} onValueChange={setReportType}>
           <SelectTrigger className="w-full">
-            <SelectValue placeholder="اختر نوع التقرير" />
+            <SelectValue placeholder="Select report type" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">تقرير كامل</SelectItem>
-            <SelectItem value="results">نتائج الطلاب فقط</SelectItem>
-            <SelectItem value="analysis">تحليل الأسئلة فقط</SelectItem>
+            <SelectItem value="all">Full Report</SelectItem>
+            <SelectItem value="results">Student Results Only</SelectItem>
+            <SelectItem value="analysis">Questions Analysis Only</SelectItem>
           </SelectContent>
         </Select>
         
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 gap-4">
           <Button 
-            variant="outline" 
-            className="w-full border-green-600 text-green-600 hover:bg-green-600 hover:text-white"
             onClick={generateExcelReport}
+            className="w-full bg-[#008000] hover:bg-[#006600] text-white"
           >
-            <FileText className="mr-2 h-4 w-4" />
-            تنزيل Excel
+            <Download className="ml-2 h-4 w-4" />
+            Excel
           </Button>
           
           <Button 
-            className="w-full bg-[#E84c3d] hover:bg-red-700 text-white"
             onClick={generatePDFReport}
+            className="w-full bg-[#E84c3d] hover:bg-[#d43d2e] text-white"
           >
-            <Download className="mr-2 h-4 w-4" />
-            تنزيل PDF
+            <FileText className="ml-2 h-4 w-4" />
+            PDF
           </Button>
         </div>
       </CardContent>
