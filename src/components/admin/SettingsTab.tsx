@@ -1,10 +1,10 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Download, Upload, Edit, Trash2, Plus } from "lucide-react";
+import { Download, Upload, Edit, Trash2, Plus, Image } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import * as XLSX from 'xlsx';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
@@ -15,9 +15,12 @@ const SettingsTab = () => {
   const { toast } = useToast();
   const [schoolName, setSchoolName] = useState("مدرسة النجاح الثانوية");
   const [academicYear, setAcademicYear] = useState("2023-2024");
+  const [directorName, setDirectorName] = useState("");
+  const [schoolLogo, setSchoolLogo] = useState<string>("");
   const [teachers, setTeachers] = useState<any[]>([]);
   const [students, setStudents] = useState<any[]>([]);
   const [subjects, setSubjects] = useState<any[]>([]);
+  const logoInputRef = useRef<HTMLInputElement>(null);
   
   // New state for edit mode
   const [editingTeacher, setEditingTeacher] = useState<any>(null);
@@ -43,7 +46,19 @@ const SettingsTab = () => {
         const settings = JSON.parse(settingsStr);
         setSchoolName(settings.name || "مدرسة النجاح الثانوية");
         setAcademicYear(settings.academicYear || "2023-2024");
+        setDirectorName(settings.directorName || "");
+        setSchoolLogo(settings.logo || "");
       }
+      
+      // Also load from legacy keys
+      const legacySchoolName = localStorage.getItem("schoolName");
+      const legacyDirectorName = localStorage.getItem("directorName");
+      if (legacySchoolName) setSchoolName(legacySchoolName);
+      if (legacyDirectorName) setDirectorName(legacyDirectorName);
+      
+      // Load logo
+      const savedLogo = localStorage.getItem("schoolLogo");
+      if (savedLogo) setSchoolLogo(savedLogo);
       
       // Load teachers
       if (isElectron()) {
@@ -75,6 +90,42 @@ const SettingsTab = () => {
         variant: "destructive",
       });
     }
+  };
+  
+  // Handle logo upload
+  const handleLogoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    
+    if (file.size > 500000) { // 500KB limit
+      toast({
+        title: "الملف كبير جداً",
+        description: "يجب أن يكون حجم الشعار أقل من 500 كيلوبايت",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const base64 = e.target?.result as string;
+      setSchoolLogo(base64);
+      localStorage.setItem("schoolLogo", base64);
+      toast({
+        title: "تم رفع الشعار",
+        description: "تم رفع شعار المدرسة بنجاح",
+      });
+    };
+    reader.readAsDataURL(file);
+  };
+  
+  const handleRemoveLogo = () => {
+    setSchoolLogo("");
+    localStorage.removeItem("schoolLogo");
+    toast({
+      title: "تم حذف الشعار",
+      description: "تم حذف شعار المدرسة",
+    });
   };
 
   // Function to handle file uploads for teachers
@@ -249,13 +300,20 @@ const SettingsTab = () => {
     try {
       const settings = {
         name: schoolName,
-        academicYear: academicYear
+        academicYear: academicYear,
+        directorName: directorName,
+        logo: schoolLogo
       };
+      
+      // Save to both keys for compatibility
+      localStorage.setItem("schoolName", schoolName);
+      localStorage.setItem("directorName", directorName);
       
       if (isElectron()) {
         await electronService.updateSystemSettings({
           schoolName: schoolName,
-          academicYear: academicYear
+          academicYear: academicYear,
+          directorName: directorName
         });
       } else {
         localStorage.setItem("schoolSettings", JSON.stringify(settings));
@@ -419,12 +477,59 @@ const SettingsTab = () => {
             </div>
             
             <div>
+              <Label>اسم المدير</Label>
+              <Input 
+                value={directorName} 
+                onChange={(e) => setDirectorName(e.target.value)}
+                className="mt-1" 
+              />
+            </div>
+            
+            <div>
               <Label>العام الدراسي</Label>
               <Input 
                 value={academicYear} 
                 onChange={(e) => setAcademicYear(e.target.value)}
                 className="mt-1" 
               />
+            </div>
+            
+            <div>
+              <Label>شعار المدرسة</Label>
+              <div className="mt-1 flex items-center gap-4">
+                {schoolLogo ? (
+                  <div className="relative">
+                    <img src={schoolLogo} alt="School Logo" className="h-16 w-16 object-contain border rounded" />
+                    <Button 
+                      variant="destructive" 
+                      size="sm" 
+                      className="absolute -top-2 -right-2 h-6 w-6 p-0"
+                      onClick={handleRemoveLogo}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="h-16 w-16 border-2 border-dashed rounded flex items-center justify-center text-muted-foreground">
+                    <Image className="h-6 w-6" />
+                  </div>
+                )}
+                <input
+                  type="file"
+                  ref={logoInputRef}
+                  onChange={handleLogoUpload}
+                  accept="image/*"
+                  className="hidden"
+                />
+                <Button 
+                  variant="outline" 
+                  onClick={() => logoInputRef.current?.click()}
+                >
+                  <Upload className="h-4 w-4 ml-2" />
+                  رفع شعار
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">الحد الأقصى 500 كيلوبايت - يظهر في جميع التقارير</p>
             </div>
           </div>
           
