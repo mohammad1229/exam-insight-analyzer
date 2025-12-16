@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/select";
 import { Download, FileText } from "lucide-react";
 import { getStudentById, getClassById, getSectionById, getSubjectById, getTeacherById } from "@/services/dataService";
+import { processArabicText, containsArabic } from "@/utils/arabicPdfUtils";
 
 // Add the required typings for jsPDF with autoTable
 declare module "jspdf" {
@@ -33,8 +34,8 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ test }) => {
   const [reportType, setReportType] = useState<string>("all");
   
   const getSchoolInfo = () => {
-    const schoolName = localStorage.getItem("schoolName") || "School Name";
-    const directorName = localStorage.getItem("directorName") || "Director";
+    const schoolName = localStorage.getItem("schoolName") || "المدرسة";
+    const directorName = localStorage.getItem("directorName") || "المدير";
     const schoolLogo = localStorage.getItem("schoolLogo") || "";
     const isActivated = localStorage.getItem("systemActivated") === "true";
     
@@ -65,6 +66,14 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ test }) => {
     };
   };
 
+  // Helper to format text for PDF (Arabic or English)
+  const formatText = (text: string): string => {
+    if (containsArabic(text)) {
+      return processArabicText(text);
+    }
+    return text;
+  };
+
   // Calculate statistics
   const calculateStats = () => {
     const presentStudents = test.results.filter((r: any) => !r.isAbsent);
@@ -82,7 +91,6 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ test }) => {
       ? (passedStudents.length / presentStudents.length) * 100 
       : 0;
     
-    // Calculate pass rate per question
     const questionStats = test.questions.map((question: any, idx: number) => {
       let totalScore = 0;
       let answeredCount = 0;
@@ -135,55 +143,55 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ test }) => {
     
     const wb = XLSX.utils.book_new();
     
-    // Test info sheet
+    // Test info sheet (Arabic)
     const testInfoData = [
-      ["School Name", schoolName],
-      ["Test Name", name],
-      ["Test Type", type],
-      ["Subject", subjectName],
-      ["Teacher", teacherName],
-      ["Class", className],
-      ["Section", sectionName],
-      ["Date", date],
-      ["Questions Count", questions.length],
-      ["Students Count", results.length]
+      ["اسم المدرسة", schoolName],
+      ["اسم الاختبار", name],
+      ["نوع الاختبار", type],
+      ["المادة", subjectName],
+      ["المعلم", teacherName],
+      ["الصف", className],
+      ["الشعبة", sectionName],
+      ["التاريخ", date],
+      ["عدد الأسئلة", questions.length],
+      ["عدد الطلاب", results.length]
     ];
     
     const testInfoWs = XLSX.utils.aoa_to_sheet(testInfoData);
-    XLSX.utils.book_append_sheet(wb, testInfoWs, "Test Info");
+    XLSX.utils.book_append_sheet(wb, testInfoWs, "معلومات الاختبار");
     
-    // Statistics Summary sheet
+    // Statistics Summary sheet (Arabic)
     const statsData = [
-      ["General Statistics", ""],
-      ["Total Students", stats.totalStudents],
-      ["Present Students", stats.presentCount],
-      ["Absent Students", stats.absentCount],
-      ["Passed Students", stats.passedCount],
-      ["Failed Students", stats.failedCount],
-      ["Pass Rate", `${stats.passRate.toFixed(1)}%`],
-      ["Average Score", `${stats.avgScore.toFixed(1)}%`],
-      ["Highest Score", `${stats.highestScore}%`],
-      ["Lowest Score", `${stats.lowestScore}%`],
+      ["الإحصائيات العامة", ""],
+      ["إجمالي الطلاب", stats.totalStudents],
+      ["الطلاب الحاضرين", stats.presentCount],
+      ["الطلاب الغائبين", stats.absentCount],
+      ["عدد الناجحين", stats.passedCount],
+      ["عدد الراسبين", stats.failedCount],
+      ["نسبة النجاح", `${stats.passRate.toFixed(1)}%`],
+      ["متوسط الدرجات", `${stats.avgScore.toFixed(1)}%`],
+      ["أعلى درجة", `${stats.highestScore}%`],
+      ["أدنى درجة", `${stats.lowestScore}%`],
       ["", ""],
-      ["Question Analysis", ""],
-      ["Question", "Pass Rate"]
+      ["تحليل الأسئلة", ""],
+      ["السؤال", "نسبة النجاح"]
     ];
     
     stats.questionStats.forEach((q: any) => {
-      statsData.push([`Q${q.questionNum}`, `${q.passRate.toFixed(1)}%`]);
+      statsData.push([`س${q.questionNum}`, `${q.passRate.toFixed(1)}%`]);
     });
     
     const statsWs = XLSX.utils.aoa_to_sheet(statsData);
-    XLSX.utils.book_append_sheet(wb, statsWs, "Statistics");
+    XLSX.utils.book_append_sheet(wb, statsWs, "الإحصائيات");
     
-    // Results sheet
+    // Results sheet (Arabic)
     const resultsHeaders = [
-      "Student Name", 
-      "Attendance", 
-      ...questions.map((_: any, idx: number) => `Q${idx + 1}`),
-      "Total",
-      "Percentage",
-      "Status"
+      "اسم الطالب", 
+      "الحضور", 
+      ...questions.map((_: any, idx: number) => `س${idx + 1}`),
+      "المجموع",
+      "النسبة",
+      "الحالة"
     ];
     
     const resultsData = [
@@ -191,11 +199,11 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ test }) => {
       ...results.map((result: any) => {
         const studentName = result.studentName || getStudentName(result.studentId);
         const scoreItems = questions.map((q: any) => result.isAbsent ? "-" : (result.scores[q.id] || 0));
-        const status = result.isAbsent ? "Absent" : (result.percentage >= 50 ? "Pass" : "Fail");
+        const status = result.isAbsent ? "غائب" : (result.percentage >= 50 ? "ناجح" : "راسب");
         
         return [
           studentName,
-          result.isAbsent ? "Absent" : "Present",
+          result.isAbsent ? "غائب" : "حاضر",
           ...scoreItems,
           result.isAbsent ? "0" : result.totalScore,
           result.isAbsent ? "0%" : `${result.percentage}%`,
@@ -205,13 +213,13 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ test }) => {
     ];
     
     const resultsWs = XLSX.utils.aoa_to_sheet(resultsData);
-    XLSX.utils.book_append_sheet(wb, resultsWs, "Results");
+    XLSX.utils.book_append_sheet(wb, resultsWs, "نتائج الطلاب");
     
-    // Questions analysis sheet
+    // Questions analysis sheet (Arabic)
     const questionsData = [
-      ["Question", "Type", "Max Score", "Average", "Pass Rate", "Passed", "Failed"],
+      ["السؤال", "النوع", "الدرجة القصوى", "المتوسط", "نسبة النجاح", "ناجحون", "راسبون"],
       ...stats.questionStats.map((q: any) => [
-        `Q${q.questionNum}`,
+        `س${q.questionNum}`,
         q.type,
         q.maxScore,
         q.avgScore.toFixed(2),
@@ -222,17 +230,17 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ test }) => {
     ];
     
     const questionsWs = XLSX.utils.aoa_to_sheet(questionsData);
-    XLSX.utils.book_append_sheet(wb, questionsWs, "Questions Analysis");
+    XLSX.utils.book_append_sheet(wb, questionsWs, "تحليل الأسئلة");
     
     // Footer
     const footerWs = XLSX.utils.aoa_to_sheet([
-      ["Generated by School Test Analysis System"],
-      [`Director: ${directorName}`],
-      ["Thank you for trusting our services"]
+      ["تم إنشاء هذا التقرير بواسطة نظام تحليل نتائج الاختبارات"],
+      [`مدير المدرسة: ${directorName}`],
+      ["نشكر ثقتكم بخدماتنا"]
     ]);
-    XLSX.utils.book_append_sheet(wb, footerWs, "Footer");
+    XLSX.utils.book_append_sheet(wb, footerWs, "معلومات إضافية");
     
-    XLSX.writeFile(wb, `Report_${name}_${date}.xlsx`);
+    XLSX.writeFile(wb, `تقرير_${name}_${date}.xlsx`);
   };
   
   const generatePDFReport = () => {
@@ -262,7 +270,7 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ test }) => {
     
     let currentY = 25;
     
-    // Logo and School Name Header
+    // Logo
     if (schoolLogo) {
       try {
         doc.addImage(schoolLogo, 'PNG', pageWidth - margin - 25, currentY, 25, 25);
@@ -271,55 +279,68 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ test }) => {
       }
     }
     
-    // School Name (centered)
+    // School Name Header (Arabic formatted)
     doc.setFontSize(18);
     doc.setTextColor(0, 0, 0);
     doc.setFont("helvetica", "bold");
-    doc.text(schoolName, pageWidth / 2, currentY + 8, { align: 'center' });
+    doc.text(formatText(schoolName), pageWidth / 2, currentY + 8, { align: 'center' });
     
     // Title
     doc.setFontSize(14);
     doc.setFont("helvetica", "normal");
-    doc.text("Test Results Report", pageWidth / 2, currentY + 18, { align: 'center' });
+    doc.text(formatText("تقرير نتائج الاختبار"), pageWidth / 2, currentY + 18, { align: 'center' });
     
     currentY += 35;
     
     // Test Information Box
     doc.setDrawColor(0, 128, 0);
     doc.setLineWidth(1);
-    doc.rect(margin, currentY, pageWidth - 2 * margin, 35, 'S');
+    doc.rect(margin, currentY, pageWidth - 2 * margin, 40, 'S');
     
     doc.setFontSize(10);
     doc.setFont("helvetica", "bold");
     
+    // Right-aligned info (Arabic style)
+    const rightX = pageWidth - margin - 5;
+    doc.text(formatText(`الاختبار: ${test.name}`), rightX, currentY + 8, { align: 'right' });
+    doc.text(formatText(`المادة: ${subjectName}`), rightX, currentY + 16, { align: 'right' });
+    doc.text(formatText(`المعلم: ${teacherName}`), rightX, currentY + 24, { align: 'right' });
+    doc.text(formatText(`التاريخ: ${test.date}`), rightX, currentY + 32, { align: 'right' });
+    
     // Left column
-    doc.text(`Test: ${test.name}`, margin + 5, currentY + 8);
-    doc.text(`Subject: ${subjectName}`, margin + 5, currentY + 16);
-    doc.text(`Teacher: ${teacherName}`, margin + 5, currentY + 24);
-    doc.text(`Date: ${test.date}`, margin + 5, currentY + 32);
+    const leftX = margin + 5;
+    doc.text(formatText(`الصف: ${className}`), leftX + 60, currentY + 8);
+    doc.text(formatText(`الشعبة: ${sectionName}`), leftX + 60, currentY + 16);
+    doc.text(formatText(`عدد الطلاب: ${stats.totalStudents}`), leftX + 60, currentY + 24);
+    doc.text(formatText(`الغائبون: ${stats.absentCount}`), leftX + 60, currentY + 32);
     
-    // Right column
-    const rightCol = pageWidth / 2 + 10;
-    doc.text(`Class: ${className}`, rightCol, currentY + 8);
-    doc.text(`Section: ${sectionName}`, rightCol, currentY + 16);
-    doc.text(`Total Students: ${stats.totalStudents}`, rightCol, currentY + 24);
-    doc.text(`Absent: ${stats.absentCount}`, rightCol, currentY + 32);
-    
-    currentY += 42;
+    currentY += 47;
     
     // Statistics Summary Table
     doc.setFontSize(12);
     doc.setFont("helvetica", "bold");
-    doc.text("Summary Statistics", pageWidth / 2, currentY, { align: 'center' });
+    doc.text(formatText("ملخص الإحصائيات"), pageWidth / 2, currentY, { align: 'center' });
     currentY += 5;
     
     doc.autoTable({
       startY: currentY,
-      head: [['Metric', 'Value', 'Metric', 'Value']],
+      head: [[
+        formatText('القيمة'), formatText('البيان'), 
+        formatText('القيمة'), formatText('البيان')
+      ]],
       body: [
-        ['Highest Score', `${stats.highestScore}%`, 'Lowest Score', `${stats.lowestScore}%`],
-        ['Average Score', `${stats.avgScore.toFixed(1)}%`, 'Pass Rate', `${stats.passRate.toFixed(1)}%`],
-        ['Passed', stats.passedCount, 'Failed', stats.failedCount],
+        [
+          `${stats.highestScore}%`, formatText('أعلى درجة'),
+          `${stats.lowestScore}%`, formatText('أدنى درجة')
+        ],
+        [
+          `${stats.avgScore.toFixed(1)}%`, formatText('متوسط الدرجات'),
+          `${stats.passRate.toFixed(1)}%`, formatText('نسبة النجاح')
+        ],
+        [
+          stats.passedCount, formatText('عدد الناجحين'),
+          stats.failedCount, formatText('عدد الراسبين')
+        ],
       ],
       theme: 'grid',
       styles: { 
@@ -333,8 +354,8 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ test }) => {
         fontSize: 9
       },
       columnStyles: {
-        0: { fontStyle: 'bold', fillColor: [240, 240, 240] },
-        2: { fontStyle: 'bold', fillColor: [240, 240, 240] }
+        1: { fontStyle: 'bold', fillColor: [240, 240, 240] },
+        3: { fontStyle: 'bold', fillColor: [240, 240, 240] }
       }
     });
     
@@ -343,22 +364,25 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ test }) => {
     // Question Pass Rates Table
     doc.setFontSize(12);
     doc.setFont("helvetica", "bold");
-    doc.text("Pass Rate by Question", pageWidth / 2, currentY, { align: 'center' });
+    doc.text(formatText("نسبة النجاح لكل سؤال"), pageWidth / 2, currentY, { align: 'center' });
     currentY += 5;
     
     const questionPassRates = stats.questionStats.map((q: any) => [
-      `Q${q.questionNum}`,
-      q.type,
-      q.maxScore,
-      q.avgScore.toFixed(1),
-      `${q.passRate.toFixed(1)}%`,
+      q.failedCount,
       q.passedCount,
-      q.failedCount
+      `${q.passRate.toFixed(1)}%`,
+      q.avgScore.toFixed(1),
+      q.maxScore,
+      q.type,
+      formatText(`س${q.questionNum}`)
     ]);
     
     doc.autoTable({
       startY: currentY,
-      head: [['Question', 'Type', 'Max', 'Avg', 'Pass %', 'Passed', 'Failed']],
+      head: [[
+        formatText('راسبون'), formatText('ناجحون'), formatText('نسبة النجاح'),
+        formatText('المتوسط'), formatText('الدرجة'), formatText('النوع'), formatText('السؤال')
+      ]],
       body: questionPassRates,
       theme: 'grid',
       styles: { 
@@ -372,7 +396,7 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ test }) => {
         fontSize: 8
       },
       didParseCell: (data: any) => {
-        if (data.section === 'body' && data.column.index === 4) {
+        if (data.section === 'body' && data.column.index === 2) {
           const percentage = parseFloat(data.cell.raw);
           if (percentage < 50) {
             data.cell.styles.fillColor = [255, 200, 200];
@@ -389,7 +413,6 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ test }) => {
     
     // Results table
     if (reportType === "all" || reportType === "results") {
-      // Check if we need a new page
       if (currentY > pageHeight - 80) {
         doc.addPage();
         currentY = 20;
@@ -397,25 +420,30 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ test }) => {
       
       doc.setFontSize(12);
       doc.setFont("helvetica", "bold");
-      doc.text("Student Results", pageWidth / 2, currentY, { align: 'center' });
+      doc.text(formatText("نتائج الطلاب"), pageWidth / 2, currentY, { align: 'center' });
       currentY += 5;
       
       const resultsTableData = test.results.map((result: any, index: number) => {
         const studentName = result.studentName || getStudentName(result.studentId);
-        const status = result.isAbsent ? "Absent" : (result.percentage >= 50 ? "Pass" : "Fail");
+        const status = result.isAbsent 
+          ? formatText("غائب") 
+          : (result.percentage >= 50 ? formatText("ناجح") : formatText("راسب"));
         return [
-          index + 1,
-          studentName,
-          result.isAbsent ? "-" : "Present",
-          result.isAbsent ? "-" : result.totalScore,
+          status,
           result.isAbsent ? "-" : `${result.percentage}%`,
-          status
+          result.isAbsent ? "-" : result.totalScore,
+          result.isAbsent ? formatText("غائب") : formatText("حاضر"),
+          formatText(studentName),
+          index + 1
         ];
       });
       
       doc.autoTable({
         startY: currentY,
-        head: [["#", "Student Name", "Attendance", "Total", "%", "Status"]],
+        head: [[
+          formatText("الحالة"), "%", formatText("المجموع"), 
+          formatText("الحضور"), formatText("اسم الطالب"), "#"
+        ]],
         body: resultsTableData,
         theme: 'grid',
         styles: { 
@@ -429,22 +457,23 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ test }) => {
           fontSize: 8
         },
         columnStyles: {
-          0: { cellWidth: 10 },
-          1: { cellWidth: 'auto', halign: 'left' },
-          2: { cellWidth: 22 },
-          3: { cellWidth: 18 },
-          4: { cellWidth: 18 },
-          5: { cellWidth: 20 }
+          0: { cellWidth: 22 },
+          1: { cellWidth: 18 },
+          2: { cellWidth: 18 },
+          3: { cellWidth: 22 },
+          4: { cellWidth: 'auto' },
+          5: { cellWidth: 12 }
         },
         didParseCell: (data: any) => {
-          if (data.section === 'body' && data.column.index === 5) {
-            if (data.cell.raw === "Pass") {
+          if (data.section === 'body' && data.column.index === 0) {
+            const text = data.cell.raw;
+            if (text.includes('ناجح') || text.includes('جحان')) {
               data.cell.styles.fillColor = [200, 255, 200];
               data.cell.styles.textColor = [0, 100, 0];
-            } else if (data.cell.raw === "Fail") {
+            } else if (text.includes('راسب') || text.includes('بسار')) {
               data.cell.styles.fillColor = [255, 200, 200];
               data.cell.styles.textColor = [150, 0, 0];
-            } else if (data.cell.raw === "Absent") {
+            } else if (text.includes('غائب') || text.includes('بئاغ')) {
               data.cell.styles.fillColor = [240, 240, 240];
               data.cell.styles.textColor = [100, 100, 100];
             }
@@ -466,9 +495,9 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ test }) => {
       doc.setFontSize(9);
       doc.setTextColor(80, 80, 80);
       doc.setFont("helvetica", "normal");
-      doc.text(`Director: ${directorName}`, margin, pageHeight - 18);
-      doc.text("Thank you for trusting our services", pageWidth / 2, pageHeight - 18, { align: 'center' });
-      doc.text(`Page ${i} / ${pageCount}`, pageWidth - margin, pageHeight - 18, { align: 'right' });
+      doc.text(formatText(`مدير المدرسة: ${directorName}`), pageWidth - margin, pageHeight - 18, { align: 'right' });
+      doc.text(formatText("نشكر ثقتكم بخدماتنا"), pageWidth / 2, pageHeight - 18, { align: 'center' });
+      doc.text(`${i} / ${pageCount}`, margin, pageHeight - 18);
       
       // Small Palestinian flag indicator
       doc.setFillColor(0, 0, 0);
@@ -479,25 +508,25 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ test }) => {
       doc.rect(margin, pageHeight - 8, 15, 2, 'F');
     }
     
-    doc.save(`Report_${test.name}_${test.date}.pdf`);
+    doc.save(`تقرير_${test.name}_${test.date}.pdf`);
   };
   
   return (
     <Card className="border-2 border-[#E84c3d]">
       <CardContent className="pt-6 space-y-4">
         <div className="space-y-2">
-          <h3 className="text-lg font-medium">Export Report</h3>
-          <p className="text-sm text-muted-foreground">Export report in Excel or PDF format</p>
+          <h3 className="text-lg font-medium">تصدير التقرير</h3>
+          <p className="text-sm text-muted-foreground">يمكنك تصدير التقرير بصيغة إكسل أو PDF</p>
         </div>
         
         <Select value={reportType} onValueChange={setReportType}>
           <SelectTrigger className="w-full">
-            <SelectValue placeholder="Select report type" />
+            <SelectValue placeholder="اختر نوع التقرير" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Full Report</SelectItem>
-            <SelectItem value="results">Student Results Only</SelectItem>
-            <SelectItem value="analysis">Questions Analysis Only</SelectItem>
+            <SelectItem value="all">تقرير كامل</SelectItem>
+            <SelectItem value="results">نتائج الطلاب فقط</SelectItem>
+            <SelectItem value="analysis">تحليل الأسئلة فقط</SelectItem>
           </SelectContent>
         </Select>
         
