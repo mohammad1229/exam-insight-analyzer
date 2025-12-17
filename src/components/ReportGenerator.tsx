@@ -12,9 +12,11 @@ import {
   SelectTrigger, 
   SelectValue 
 } from "@/components/ui/select";
-import { Download, FileText } from "lucide-react";
+import { Download, FileText, Eye, Loader2 } from "lucide-react";
 import { getStudentById, getClassById, getSectionById, getSubjectById, getTeacherById } from "@/services/dataService";
-import { processArabicText, containsArabic } from "@/utils/arabicPdfUtils";
+import { loadAmiriFont, ARABIC_FONT_NAME } from "@/utils/fontLoader";
+import ReportPreview from "./ReportPreview";
+import { toast } from "sonner";
 
 // Add the required typings for jsPDF with autoTable
 declare module "jspdf" {
@@ -32,7 +34,9 @@ interface ReportGeneratorProps {
 
 const ReportGenerator: React.FC<ReportGeneratorProps> = ({ test }) => {
   const [reportType, setReportType] = useState<string>("all");
-  
+  const [showPreview, setShowPreview] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+
   const getSchoolInfo = () => {
     const schoolName = localStorage.getItem("schoolName") || "المدرسة";
     const directorName = localStorage.getItem("directorName") || "المدير";
@@ -64,14 +68,6 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ test }) => {
       subjectName: subjectInfo?.name || "",
       teacherName: teacherInfo?.name || ""
     };
-  };
-
-  // Helper to format text for PDF (Arabic or English)
-  const formatText = (text: string): string => {
-    if (containsArabic(text)) {
-      return processArabicText(text);
-    }
-    return text;
   };
 
   // Calculate statistics
@@ -241,314 +237,330 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ test }) => {
     XLSX.utils.book_append_sheet(wb, footerWs, "معلومات إضافية");
     
     XLSX.writeFile(wb, `تقرير_${name}_${date}.xlsx`);
+    toast.success("تم تصدير التقرير بنجاح");
   };
   
-  const generatePDFReport = () => {
-    const { schoolName, directorName, schoolLogo } = getSchoolInfo();
-    const { className, sectionName, subjectName, teacherName } = getTestDetails();
-    const stats = calculateStats();
-    
-    const doc = new jsPDF({
-      orientation: 'portrait',
-      unit: 'mm',
-      format: 'a4'
-    });
-    
-    const pageWidth = doc.internal.pageSize.width;
-    const pageHeight = doc.internal.pageSize.height;
-    const margin = 15;
-    
-    // Header with Palestinian colors
-    doc.setFillColor(0, 0, 0); // Black
-    doc.rect(0, 0, pageWidth, 6, 'F');
-    doc.setFillColor(255, 255, 255); // White
-    doc.rect(0, 6, pageWidth, 6, 'F');
-    doc.setFillColor(0, 128, 0); // Green
-    doc.rect(0, 12, pageWidth, 6, 'F');
-    doc.setFillColor(206, 17, 38); // Red triangle
-    doc.triangle(0, 0, 0, 18, 30, 9, 'F');
-    
-    let currentY = 25;
-    
-    // Logo
-    if (schoolLogo) {
+  const generatePDFReport = async () => {
+    setIsGenerating(true);
+    try {
+      const { schoolName, directorName, schoolLogo } = getSchoolInfo();
+      const { className, sectionName, subjectName, teacherName } = getTestDetails();
+      const stats = calculateStats();
+      
+      const doc = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+      });
+
+      // Load and embed Arabic font
       try {
-        doc.addImage(schoolLogo, 'PNG', pageWidth - margin - 25, currentY, 25, 25);
-      } catch (e) {
-        console.error('Error adding logo:', e);
+        const fontBase64 = await loadAmiriFont();
+        doc.addFileToVFS("Amiri-Regular.ttf", fontBase64);
+        doc.addFont("Amiri-Regular.ttf", ARABIC_FONT_NAME, "normal");
+        doc.setFont(ARABIC_FONT_NAME);
+      } catch (fontError) {
+        console.error("Failed to load Arabic font, using fallback:", fontError);
+        doc.setFont("helvetica");
       }
-    }
-    
-    // School Name Header (Arabic formatted)
-    doc.setFontSize(18);
-    doc.setTextColor(0, 0, 0);
-    doc.setFont("helvetica", "bold");
-    doc.text(formatText(schoolName), pageWidth / 2, currentY + 8, { align: 'center' });
-    
-    // Title
-    doc.setFontSize(14);
-    doc.setFont("helvetica", "normal");
-    doc.text(formatText("تقرير نتائج الاختبار"), pageWidth / 2, currentY + 18, { align: 'center' });
-    
-    currentY += 35;
-    
-    // Test Information Box
-    doc.setDrawColor(0, 128, 0);
-    doc.setLineWidth(1);
-    doc.rect(margin, currentY, pageWidth - 2 * margin, 40, 'S');
-    
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "bold");
-    
-    // Right-aligned info (Arabic style)
-    const rightX = pageWidth - margin - 5;
-    doc.text(formatText(`الاختبار: ${test.name}`), rightX, currentY + 8, { align: 'right' });
-    doc.text(formatText(`المادة: ${subjectName}`), rightX, currentY + 16, { align: 'right' });
-    doc.text(formatText(`المعلم: ${teacherName}`), rightX, currentY + 24, { align: 'right' });
-    doc.text(formatText(`التاريخ: ${test.date}`), rightX, currentY + 32, { align: 'right' });
-    
-    // Left column
-    const leftX = margin + 5;
-    doc.text(formatText(`الصف: ${className}`), leftX + 60, currentY + 8);
-    doc.text(formatText(`الشعبة: ${sectionName}`), leftX + 60, currentY + 16);
-    doc.text(formatText(`عدد الطلاب: ${stats.totalStudents}`), leftX + 60, currentY + 24);
-    doc.text(formatText(`الغائبون: ${stats.absentCount}`), leftX + 60, currentY + 32);
-    
-    currentY += 47;
-    
-    // Statistics Summary Table
-    doc.setFontSize(12);
-    doc.setFont("helvetica", "bold");
-    doc.text(formatText("ملخص الإحصائيات"), pageWidth / 2, currentY, { align: 'center' });
-    currentY += 5;
-    
-    doc.autoTable({
-      startY: currentY,
-      head: [[
-        formatText('القيمة'), formatText('البيان'), 
-        formatText('القيمة'), formatText('البيان')
-      ]],
-      body: [
-        [
-          `${stats.highestScore}%`, formatText('أعلى درجة'),
-          `${stats.lowestScore}%`, formatText('أدنى درجة')
-        ],
-        [
-          `${stats.avgScore.toFixed(1)}%`, formatText('متوسط الدرجات'),
-          `${stats.passRate.toFixed(1)}%`, formatText('نسبة النجاح')
-        ],
-        [
-          stats.passedCount, formatText('عدد الناجحين'),
-          stats.failedCount, formatText('عدد الراسبين')
-        ],
-      ],
-      theme: 'grid',
-      styles: { 
-        halign: 'center', 
-        fontSize: 9,
-        cellPadding: 3
-      },
-      headStyles: { 
-        fillColor: [0, 128, 0], 
-        textColor: [255, 255, 255],
-        fontSize: 9
-      },
-      columnStyles: {
-        1: { fontStyle: 'bold', fillColor: [240, 240, 240] },
-        3: { fontStyle: 'bold', fillColor: [240, 240, 240] }
-      }
-    });
-    
-    currentY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 8 : currentY + 30;
-    
-    // Question Pass Rates Table
-    doc.setFontSize(12);
-    doc.setFont("helvetica", "bold");
-    doc.text(formatText("نسبة النجاح لكل سؤال"), pageWidth / 2, currentY, { align: 'center' });
-    currentY += 5;
-    
-    const questionPassRates = stats.questionStats.map((q: any) => [
-      q.failedCount,
-      q.passedCount,
-      `${q.passRate.toFixed(1)}%`,
-      q.avgScore.toFixed(1),
-      q.maxScore,
-      q.type,
-      formatText(`س${q.questionNum}`)
-    ]);
-    
-    doc.autoTable({
-      startY: currentY,
-      head: [[
-        formatText('راسبون'), formatText('ناجحون'), formatText('نسبة النجاح'),
-        formatText('المتوسط'), formatText('الدرجة'), formatText('النوع'), formatText('السؤال')
-      ]],
-      body: questionPassRates,
-      theme: 'grid',
-      styles: { 
-        halign: 'center', 
-        fontSize: 8,
-        cellPadding: 2
-      },
-      headStyles: { 
-        fillColor: [0, 0, 0], 
-        textColor: [255, 255, 255],
-        fontSize: 8
-      },
-      didParseCell: (data: any) => {
-        if (data.section === 'body' && data.column.index === 2) {
-          const percentage = parseFloat(data.cell.raw);
-          if (percentage < 50) {
-            data.cell.styles.fillColor = [255, 200, 200];
-            data.cell.styles.textColor = [150, 0, 0];
-          } else {
-            data.cell.styles.fillColor = [200, 255, 200];
-            data.cell.styles.textColor = [0, 100, 0];
-          }
+      
+      const pageWidth = doc.internal.pageSize.width;
+      const pageHeight = doc.internal.pageSize.height;
+      const margin = 15;
+      
+      // Header with Palestinian colors
+      doc.setFillColor(0, 0, 0);
+      doc.rect(0, 0, pageWidth, 6, 'F');
+      doc.setFillColor(255, 255, 255);
+      doc.rect(0, 6, pageWidth, 6, 'F');
+      doc.setFillColor(0, 128, 0);
+      doc.rect(0, 12, pageWidth, 6, 'F');
+      doc.setFillColor(206, 17, 38);
+      doc.triangle(0, 0, 0, 18, 30, 9, 'F');
+      
+      let currentY = 25;
+      
+      // Logo
+      if (schoolLogo) {
+        try {
+          doc.addImage(schoolLogo, 'PNG', pageWidth - margin - 25, currentY, 25, 25);
+        } catch (e) {
+          console.error('Error adding logo:', e);
         }
       }
-    });
-    
-    currentY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 8 : currentY + 30;
-    
-    // Results table
-    if (reportType === "all" || reportType === "results") {
-      if (currentY > pageHeight - 80) {
-        doc.addPage();
-        currentY = 20;
-      }
       
+      // School Name Header
+      doc.setFontSize(18);
+      doc.setTextColor(0, 0, 0);
+      doc.text(schoolName, pageWidth / 2, currentY + 8, { align: 'center' });
+      
+      // Title
+      doc.setFontSize(14);
+      doc.text("تقرير نتائج الاختبار", pageWidth / 2, currentY + 18, { align: 'center' });
+      
+      currentY += 35;
+      
+      // Test Information Box
+      doc.setDrawColor(0, 128, 0);
+      doc.setLineWidth(1);
+      doc.rect(margin, currentY, pageWidth - 2 * margin, 40, 'S');
+      
+      doc.setFontSize(10);
+      
+      const rightX = pageWidth - margin - 5;
+      doc.text(`الاختبار: ${test.name}`, rightX, currentY + 8, { align: 'right' });
+      doc.text(`المادة: ${subjectName}`, rightX, currentY + 16, { align: 'right' });
+      doc.text(`المعلم: ${teacherName}`, rightX, currentY + 24, { align: 'right' });
+      doc.text(`التاريخ: ${test.date}`, rightX, currentY + 32, { align: 'right' });
+      
+      doc.text(`الصف: ${className}`, margin + 65, currentY + 8);
+      doc.text(`الشعبة: ${sectionName}`, margin + 65, currentY + 16);
+      doc.text(`عدد الطلاب: ${stats.totalStudents}`, margin + 65, currentY + 24);
+      doc.text(`الغائبون: ${stats.absentCount}`, margin + 65, currentY + 32);
+      
+      currentY += 47;
+      
+      // Statistics Summary Table
       doc.setFontSize(12);
-      doc.setFont("helvetica", "bold");
-      doc.text(formatText("نتائج الطلاب"), pageWidth / 2, currentY, { align: 'center' });
+      doc.text("ملخص الإحصائيات", pageWidth / 2, currentY, { align: 'center' });
       currentY += 5;
-      
-      const resultsTableData = test.results.map((result: any, index: number) => {
-        const studentName = result.studentName || getStudentName(result.studentId);
-        const status = result.isAbsent 
-          ? formatText("غائب") 
-          : (result.percentage >= 50 ? formatText("ناجح") : formatText("راسب"));
-        return [
-          status,
-          result.isAbsent ? "-" : `${result.percentage}%`,
-          result.isAbsent ? "-" : result.totalScore,
-          result.isAbsent ? formatText("غائب") : formatText("حاضر"),
-          formatText(studentName),
-          index + 1
-        ];
-      });
       
       doc.autoTable({
         startY: currentY,
-        head: [[
-          formatText("الحالة"), "%", formatText("المجموع"), 
-          formatText("الحضور"), formatText("اسم الطالب"), "#"
-        ]],
-        body: resultsTableData,
+        head: [['القيمة', 'البيان', 'القيمة', 'البيان']],
+        body: [
+          [`${stats.highestScore}%`, 'أعلى درجة', `${stats.lowestScore}%`, 'أدنى درجة'],
+          [`${stats.avgScore.toFixed(1)}%`, 'متوسط الدرجات', `${stats.passRate.toFixed(1)}%`, 'نسبة النجاح'],
+          [stats.passedCount, 'عدد الناجحين', stats.failedCount, 'عدد الراسبين'],
+        ],
+        theme: 'grid',
+        styles: { 
+          halign: 'center', 
+          fontSize: 9,
+          cellPadding: 3,
+          font: ARABIC_FONT_NAME
+        },
+        headStyles: { 
+          fillColor: [0, 128, 0], 
+          textColor: [255, 255, 255],
+          fontSize: 9
+        },
+        columnStyles: {
+          1: { fontStyle: 'bold', fillColor: [240, 240, 240] },
+          3: { fontStyle: 'bold', fillColor: [240, 240, 240] }
+        }
+      });
+      
+      currentY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 8 : currentY + 30;
+      
+      // Question Pass Rates Table
+      doc.setFontSize(12);
+      doc.text("نسبة النجاح لكل سؤال", pageWidth / 2, currentY, { align: 'center' });
+      currentY += 5;
+      
+      const questionPassRates = stats.questionStats.map((q: any) => [
+        q.failedCount,
+        q.passedCount,
+        `${q.passRate.toFixed(1)}%`,
+        q.avgScore.toFixed(1),
+        q.maxScore,
+        q.type,
+        `س${q.questionNum}`
+      ]);
+      
+      doc.autoTable({
+        startY: currentY,
+        head: [['راسبون', 'ناجحون', 'نسبة النجاح', 'المتوسط', 'الدرجة', 'النوع', 'السؤال']],
+        body: questionPassRates,
         theme: 'grid',
         styles: { 
           halign: 'center', 
           fontSize: 8,
-          cellPadding: 2
+          cellPadding: 2,
+          font: ARABIC_FONT_NAME
         },
         headStyles: { 
           fillColor: [0, 0, 0], 
           textColor: [255, 255, 255],
           fontSize: 8
         },
-        columnStyles: {
-          0: { cellWidth: 22 },
-          1: { cellWidth: 18 },
-          2: { cellWidth: 18 },
-          3: { cellWidth: 22 },
-          4: { cellWidth: 'auto' },
-          5: { cellWidth: 12 }
-        },
         didParseCell: (data: any) => {
-          if (data.section === 'body' && data.column.index === 0) {
-            const text = data.cell.raw;
-            if (text.includes('ناجح') || text.includes('جحان')) {
-              data.cell.styles.fillColor = [200, 255, 200];
-              data.cell.styles.textColor = [0, 100, 0];
-            } else if (text.includes('راسب') || text.includes('بسار')) {
+          if (data.section === 'body' && data.column.index === 2) {
+            const percentage = parseFloat(data.cell.raw);
+            if (percentage < 50) {
               data.cell.styles.fillColor = [255, 200, 200];
               data.cell.styles.textColor = [150, 0, 0];
-            } else if (text.includes('غائب') || text.includes('بئاغ')) {
-              data.cell.styles.fillColor = [240, 240, 240];
-              data.cell.styles.textColor = [100, 100, 100];
+            } else {
+              data.cell.styles.fillColor = [200, 255, 200];
+              data.cell.styles.textColor = [0, 100, 0];
             }
           }
         }
       });
+      
+      currentY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 8 : currentY + 30;
+      
+      // Results table
+      if (reportType === "all" || reportType === "results") {
+        if (currentY > pageHeight - 80) {
+          doc.addPage();
+          currentY = 20;
+        }
+        
+        doc.setFontSize(12);
+        doc.text("نتائج الطلاب", pageWidth / 2, currentY, { align: 'center' });
+        currentY += 5;
+        
+        const resultsTableData = test.results.map((result: any, index: number) => {
+          const studentName = result.studentName || getStudentName(result.studentId);
+          const status = result.isAbsent ? "غائب" : (result.percentage >= 50 ? "ناجح" : "راسب");
+          return [
+            status,
+            result.isAbsent ? "-" : `${result.percentage}%`,
+            result.isAbsent ? "-" : result.totalScore,
+            result.isAbsent ? "غائب" : "حاضر",
+            studentName,
+            index + 1
+          ];
+        });
+        
+        doc.autoTable({
+          startY: currentY,
+          head: [["الحالة", "%", "المجموع", "الحضور", "اسم الطالب", "#"]],
+          body: resultsTableData,
+          theme: 'grid',
+          styles: { 
+            halign: 'center', 
+            fontSize: 8,
+            cellPadding: 2,
+            font: ARABIC_FONT_NAME
+          },
+          headStyles: { 
+            fillColor: [0, 0, 0], 
+            textColor: [255, 255, 255],
+            fontSize: 8
+          },
+          columnStyles: {
+            0: { cellWidth: 22 },
+            1: { cellWidth: 18 },
+            2: { cellWidth: 18 },
+            3: { cellWidth: 22 },
+            4: { cellWidth: 'auto' },
+            5: { cellWidth: 12 }
+          },
+          didParseCell: (data: any) => {
+            if (data.section === 'body' && data.column.index === 0) {
+              const text = data.cell.raw;
+              if (text === 'ناجح') {
+                data.cell.styles.fillColor = [200, 255, 200];
+                data.cell.styles.textColor = [0, 100, 0];
+              } else if (text === 'راسب') {
+                data.cell.styles.fillColor = [255, 200, 200];
+                data.cell.styles.textColor = [150, 0, 0];
+              } else if (text === 'غائب') {
+                data.cell.styles.fillColor = [240, 240, 240];
+                data.cell.styles.textColor = [100, 100, 100];
+              }
+            }
+          }
+        });
+      }
+      
+      // Footer on each page
+      const pageCount = doc.internal.pages.length - 1;
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        
+        doc.setDrawColor(0, 128, 0);
+        doc.setLineWidth(0.5);
+        doc.line(margin, pageHeight - 25, pageWidth - margin, pageHeight - 25);
+        
+        doc.setFontSize(9);
+        doc.setTextColor(80, 80, 80);
+        doc.text(`مدير المدرسة: ${directorName}`, pageWidth - margin, pageHeight - 18, { align: 'right' });
+        doc.text("نشكر ثقتكم بخدماتنا", pageWidth / 2, pageHeight - 18, { align: 'center' });
+        doc.text(`${i} / ${pageCount}`, margin, pageHeight - 18);
+        
+        // Small Palestinian flag indicator
+        doc.setFillColor(0, 0, 0);
+        doc.rect(margin, pageHeight - 12, 15, 2, 'F');
+        doc.setFillColor(255, 255, 255);
+        doc.rect(margin, pageHeight - 10, 15, 2, 'F');
+        doc.setFillColor(0, 128, 0);
+        doc.rect(margin, pageHeight - 8, 15, 2, 'F');
+      }
+      
+      doc.save(`تقرير_${test.name}_${test.date}.pdf`);
+      toast.success("تم تصدير التقرير بنجاح");
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      toast.error("حدث خطأ أثناء إنشاء التقرير");
+    } finally {
+      setIsGenerating(false);
     }
-    
-    // Footer on each page
-    const pageCount = doc.internal.pages.length - 1;
-    for (let i = 1; i <= pageCount; i++) {
-      doc.setPage(i);
-      
-      // Footer line
-      doc.setDrawColor(0, 128, 0);
-      doc.setLineWidth(0.5);
-      doc.line(margin, pageHeight - 25, pageWidth - margin, pageHeight - 25);
-      
-      doc.setFontSize(9);
-      doc.setTextColor(80, 80, 80);
-      doc.setFont("helvetica", "normal");
-      doc.text(formatText(`مدير المدرسة: ${directorName}`), pageWidth - margin, pageHeight - 18, { align: 'right' });
-      doc.text(formatText("نشكر ثقتكم بخدماتنا"), pageWidth / 2, pageHeight - 18, { align: 'center' });
-      doc.text(`${i} / ${pageCount}`, margin, pageHeight - 18);
-      
-      // Small Palestinian flag indicator
-      doc.setFillColor(0, 0, 0);
-      doc.rect(margin, pageHeight - 12, 15, 2, 'F');
-      doc.setFillColor(255, 255, 255);
-      doc.rect(margin, pageHeight - 10, 15, 2, 'F');
-      doc.setFillColor(0, 128, 0);
-      doc.rect(margin, pageHeight - 8, 15, 2, 'F');
-    }
-    
-    doc.save(`تقرير_${test.name}_${test.date}.pdf`);
   };
   
   return (
-    <Card className="border-2 border-[#E84c3d]">
-      <CardContent className="pt-6 space-y-4">
-        <div className="space-y-2">
-          <h3 className="text-lg font-medium">تصدير التقرير</h3>
-          <p className="text-sm text-muted-foreground">يمكنك تصدير التقرير بصيغة إكسل أو PDF</p>
-        </div>
-        
-        <Select value={reportType} onValueChange={setReportType}>
-          <SelectTrigger className="w-full">
-            <SelectValue placeholder="اختر نوع التقرير" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">تقرير كامل</SelectItem>
-            <SelectItem value="results">نتائج الطلاب فقط</SelectItem>
-            <SelectItem value="analysis">تحليل الأسئلة فقط</SelectItem>
-          </SelectContent>
-        </Select>
-        
-        <div className="grid grid-cols-2 gap-4">
+    <>
+      <Card className="border-2 border-[#E84c3d]">
+        <CardContent className="pt-6 space-y-4">
+          <div className="space-y-2">
+            <h3 className="text-lg font-medium">تصدير التقرير</h3>
+            <p className="text-sm text-muted-foreground">يمكنك معاينة وتصدير التقرير بصيغة إكسل أو PDF</p>
+          </div>
+          
+          <Select value={reportType} onValueChange={setReportType}>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="اختر نوع التقرير" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">تقرير كامل</SelectItem>
+              <SelectItem value="results">نتائج الطلاب فقط</SelectItem>
+              <SelectItem value="analysis">تحليل الأسئلة فقط</SelectItem>
+            </SelectContent>
+          </Select>
+          
+          {/* Preview Button */}
           <Button 
-            onClick={generateExcelReport}
-            className="w-full bg-[#008000] hover:bg-[#006600] text-white"
+            onClick={() => setShowPreview(true)}
+            className="w-full bg-gradient-to-r from-[#000000] via-[#008000] to-[#CE1126] hover:opacity-90 text-white"
+            variant="default"
           >
-            <Download className="ml-2 h-4 w-4" />
-            Excel
+            <Eye className="ml-2 h-4 w-4" />
+            معاينة التقرير
           </Button>
           
-          <Button 
-            onClick={generatePDFReport}
-            className="w-full bg-[#E84c3d] hover:bg-[#d43d2e] text-white"
-          >
-            <FileText className="ml-2 h-4 w-4" />
-            PDF
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+          <div className="grid grid-cols-2 gap-4">
+            <Button 
+              onClick={generateExcelReport}
+              className="w-full bg-[#008000] hover:bg-[#006600] text-white"
+            >
+              <Download className="ml-2 h-4 w-4" />
+              Excel
+            </Button>
+            
+            <Button 
+              onClick={generatePDFReport}
+              disabled={isGenerating}
+              className="w-full bg-[#E84c3d] hover:bg-[#d43d2e] text-white"
+            >
+              {isGenerating ? (
+                <Loader2 className="ml-2 h-4 w-4 animate-spin" />
+              ) : (
+                <FileText className="ml-2 h-4 w-4" />
+              )}
+              PDF
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+      
+      <ReportPreview 
+        test={test} 
+        open={showPreview} 
+        onClose={() => setShowPreview(false)} 
+      />
+    </>
   );
 };
 
