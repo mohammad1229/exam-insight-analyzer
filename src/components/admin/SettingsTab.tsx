@@ -17,6 +17,8 @@ const SettingsTab = () => {
   const [academicYear, setAcademicYear] = useState("2023-2024");
   const [directorName, setDirectorName] = useState("");
   const [schoolLogo, setSchoolLogo] = useState<string>("");
+  const [ministryName, setMinistryName] = useState("وزارة التربية والتعليم العالي");
+  const [directorateName, setDirectorateName] = useState("مديرية التربية والتعليم");
   const [teachers, setTeachers] = useState<any[]>([]);
   const [students, setStudents] = useState<any[]>([]);
   const [subjects, setSubjects] = useState<any[]>([]);
@@ -48,13 +50,19 @@ const SettingsTab = () => {
         setAcademicYear(settings.academicYear || "2023-2024");
         setDirectorName(settings.directorName || "");
         setSchoolLogo(settings.logo || "");
+        setMinistryName(settings.ministryName || "وزارة التربية والتعليم العالي");
+        setDirectorateName(settings.directorateName || "مديرية التربية والتعليم");
       }
       
       // Also load from legacy keys
       const legacySchoolName = localStorage.getItem("schoolName");
       const legacyDirectorName = localStorage.getItem("directorName");
+      const legacyMinistryName = localStorage.getItem("ministryName");
+      const legacyDirectorateName = localStorage.getItem("directorateName");
       if (legacySchoolName) setSchoolName(legacySchoolName);
       if (legacyDirectorName) setDirectorName(legacyDirectorName);
+      if (legacyMinistryName) setMinistryName(legacyMinistryName);
+      if (legacyDirectorateName) setDirectorateName(legacyDirectorateName);
       
       // Load logo
       const savedLogo = localStorage.getItem("schoolLogo");
@@ -302,18 +310,24 @@ const SettingsTab = () => {
         name: schoolName,
         academicYear: academicYear,
         directorName: directorName,
-        logo: schoolLogo
+        logo: schoolLogo,
+        ministryName: ministryName,
+        directorateName: directorateName
       };
       
       // Save to both keys for compatibility
       localStorage.setItem("schoolName", schoolName);
       localStorage.setItem("directorName", directorName);
+      localStorage.setItem("ministryName", ministryName);
+      localStorage.setItem("directorateName", directorateName);
       
       if (isElectron()) {
         await electronService.updateSystemSettings({
           schoolName: schoolName,
           academicYear: academicYear,
-          directorName: directorName
+          directorName: directorName,
+          ministryName: ministryName,
+          directorateName: directorateName
         });
       } else {
         localStorage.setItem("schoolSettings", JSON.stringify(settings));
@@ -482,6 +496,26 @@ const SettingsTab = () => {
                 value={directorName} 
                 onChange={(e) => setDirectorName(e.target.value)}
                 className="mt-1" 
+              />
+            </div>
+            
+            <div>
+              <Label>اسم الوزارة</Label>
+              <Input 
+                value={ministryName} 
+                onChange={(e) => setMinistryName(e.target.value)}
+                className="mt-1" 
+                placeholder="وزارة التربية والتعليم العالي"
+              />
+            </div>
+            
+            <div>
+              <Label>اسم المديرية</Label>
+              <Input 
+                value={directorateName} 
+                onChange={(e) => setDirectorateName(e.target.value)}
+                className="mt-1" 
+                placeholder="مديرية التربية والتعليم / جنوب الخليل"
               />
             </div>
             
