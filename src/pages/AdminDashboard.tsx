@@ -28,6 +28,7 @@ import PerformanceLevelsTab from "@/components/admin/PerformanceLevelsTab";
 import HeaderSettingsTab from "@/components/admin/HeaderSettingsTab";
 import SummaryTab from "@/components/admin/SummaryTab";
 import ReportPreview from "@/components/ReportPreview";
+import FeatureToggle from "@/components/admin/FeatureToggle";
 
 // Import utility functions
 import { prepareMockReports, prepareChartData, Report } from "@/utils/reportUtils";
@@ -218,7 +219,7 @@ const AdminDashboard = () => {
         </div>
 
         <Tabs defaultValue="teachers" className="space-y-6">
-          <TabsList className="grid grid-cols-5 lg:grid-cols-10 w-full mb-6">
+          <TabsList className="grid grid-cols-5 lg:grid-cols-11 w-full mb-6">
             <TabsTrigger value="teachers">المعلمين</TabsTrigger>
             <TabsTrigger value="students">الطلاب</TabsTrigger>
             <TabsTrigger value="classes">الصفوف</TabsTrigger>
@@ -228,6 +229,7 @@ const AdminDashboard = () => {
             <TabsTrigger value="statistics">الإحصائيات</TabsTrigger>
             <TabsTrigger value="levels">المستويات</TabsTrigger>
             <TabsTrigger value="header">الترويسة</TabsTrigger>
+            <TabsTrigger value="features">الميزات</TabsTrigger>
             <TabsTrigger value="settings">الإعدادات</TabsTrigger>
           </TabsList>
           
@@ -274,6 +276,17 @@ const AdminDashboard = () => {
 
           <TabsContent value="header">
             <HeaderSettingsTab />
+          </TabsContent>
+
+          <TabsContent value="features">
+            <Card className="border-2 border-purple-500">
+              <CardHeader className="bg-purple-50 pb-2">
+                <CardTitle className="text-lg">الميزات الاختيارية</CardTitle>
+              </CardHeader>
+              <CardContent className="pt-4">
+                <FeatureToggle />
+              </CardContent>
+            </Card>
           </TabsContent>
           
           <TabsContent value="settings">

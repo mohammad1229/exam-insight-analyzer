@@ -158,6 +158,41 @@ export type Database = {
           },
         ]
       }
+      school_features: {
+        Row: {
+          created_at: string
+          enabled_at: string | null
+          id: string
+          is_enabled: boolean
+          school_id: string
+          update_id: string
+        }
+        Insert: {
+          created_at?: string
+          enabled_at?: string | null
+          id?: string
+          is_enabled?: boolean
+          school_id: string
+          update_id: string
+        }
+        Update: {
+          created_at?: string
+          enabled_at?: string | null
+          id?: string
+          is_enabled?: boolean
+          school_id?: string
+          update_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "school_features_update_id_fkey"
+            columns: ["update_id"]
+            isOneToOne: false
+            referencedRelation: "system_updates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       schools: {
         Row: {
           address: string | null
@@ -191,6 +226,42 @@ export type Database = {
           name?: string
           phone?: string | null
           updated_at?: string
+        }
+        Relationships: []
+      }
+      system_updates: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          is_optional: boolean
+          title: string
+          update_type: string
+          updated_at: string
+          version: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          is_optional?: boolean
+          title: string
+          update_type?: string
+          updated_at?: string
+          version: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          is_optional?: boolean
+          title?: string
+          update_type?: string
+          updated_at?: string
+          version?: string
         }
         Relationships: []
       }
