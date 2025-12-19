@@ -141,8 +141,47 @@ const SystemAdmin = () => {
   const handleRenewLicense = async () => {
     if (!renewingLicense) return;
     
+    // Check if this is a database license (has UUID id) or localStorage license
+    const licenseId = renewingLicense.id;
+    
+    if (!licenseId || licenseId === 'undefined') {
+      // This is a localStorage license, update locally
+      try {
+        const storedLicenses = JSON.parse(localStorage.getItem("licenseKeys") || "[]");
+        const index = storedLicenses.findIndex((l: any) => l.key === renewingLicense.key);
+        
+        if (index !== -1) {
+          const currentExpiry = storedLicenses[index].validUntil 
+            ? new Date(storedLicenses[index].validUntil) 
+            : new Date();
+          const newExpiry = new Date(currentExpiry);
+          newExpiry.setMonth(newExpiry.getMonth() + parseInt(renewMonths));
+          
+          storedLicenses[index].validUntil = newExpiry.toISOString();
+          localStorage.setItem("licenseKeys", JSON.stringify(storedLicenses));
+          
+          toast({
+            title: "تم تجديد الترخيص",
+            description: `تم تجديد الترخيص حتى ${newExpiry.toLocaleDateString('ar-SA')}`,
+          });
+          
+          setShowRenewModal(false);
+          setRenewingLicense(null);
+          loadData();
+        }
+        return;
+      } catch (error: any) {
+        toast({
+          title: "خطأ",
+          description: error.message || "حدث خطأ غير متوقع",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+    
     try {
-      const result = await renewLicense(renewingLicense.id, parseInt(renewMonths));
+      const result = await renewLicense(licenseId, parseInt(renewMonths));
       
       if (result.success) {
         toast({
@@ -172,8 +211,37 @@ const SystemAdmin = () => {
   const handleDeleteLicense = async () => {
     if (!deletingLicense) return;
     
+    // Check if this is a database license (has UUID id) or localStorage license
+    const licenseId = deletingLicense.id;
+    
+    if (!licenseId || licenseId === 'undefined') {
+      // This is a localStorage license, delete locally
+      try {
+        const storedLicenses = JSON.parse(localStorage.getItem("licenseKeys") || "[]");
+        const filteredLicenses = storedLicenses.filter((l: any) => l.key !== deletingLicense.key);
+        localStorage.setItem("licenseKeys", JSON.stringify(filteredLicenses));
+        
+        toast({
+          title: "تم حذف الترخيص",
+          description: "تم حذف الترخيص بنجاح",
+        });
+        
+        setShowDeleteLicenseModal(false);
+        setDeletingLicense(null);
+        loadData();
+        return;
+      } catch (error: any) {
+        toast({
+          title: "خطأ",
+          description: error.message || "حدث خطأ غير متوقع",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+    
     try {
-      const result = await deleteLicense(deletingLicense.id);
+      const result = await deleteLicense(licenseId);
       
       if (result.success) {
         toast({
