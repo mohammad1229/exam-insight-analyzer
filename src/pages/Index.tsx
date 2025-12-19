@@ -155,7 +155,7 @@ const Index = () => {
             </CardContent>
           </Card>
           
-          <div className="pt-6 flex flex-col sm:flex-row justify-center gap-4">
+          <div className="pt-6 flex flex-wrap justify-center gap-4">
             <Button 
               size="lg" 
               className="palestine-button-secondary"
@@ -177,6 +177,15 @@ const Index = () => {
               variant="outline" 
               size="lg"
               className="border-[#34A853] text-[#34A853] hover:bg-[#34A853] hover:text-white"
+              onClick={() => navigate("/statistics")}
+            >
+              الإحصائيات
+            </Button>
+            
+            <Button 
+              variant="outline" 
+              size="lg"
+              className="border-gray-600 text-gray-600 hover:bg-gray-600 hover:text-white"
               onClick={() => navigate("/system-admin")}
             >
               مسؤول النظام

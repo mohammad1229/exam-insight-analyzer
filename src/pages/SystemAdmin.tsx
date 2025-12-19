@@ -11,11 +11,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useToast } from "@/hooks/use-toast";
 import { isElectron } from "@/services/electronService";
 import electronService from "@/services/electronService";
-import { Database, FileKey, Lock, Settings, User, Users, RefreshCw, BarChart3, Cloud } from "lucide-react";
+import { Database, FileKey, Lock, Settings, User, Users, RefreshCw, BarChart3, Cloud, Download } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { getLicenses, renewLicense, getSchools, generateLicense } from "@/services/licenseService";
 import { downloadBackup, getBackups, createAutomaticBackup } from "@/services/backupService";
+import UpdatesManagement from "@/components/admin/UpdatesManagement";
 
 const SystemAdmin = () => {
   const { toast } = useToast();
@@ -566,7 +567,7 @@ const SystemAdmin = () => {
         </div>
         
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid grid-cols-4 w-full max-w-2xl mx-auto mb-6">
+          <TabsList className="grid grid-cols-5 w-full max-w-3xl mx-auto mb-6">
             <TabsTrigger value="licenses" className="flex items-center gap-2">
               <FileKey className="h-4 w-4" />
               التراخيص
@@ -574,6 +575,10 @@ const SystemAdmin = () => {
             <TabsTrigger value="users" className="flex items-center gap-2">
               <Users className="h-4 w-4" />
               المستخدمون
+            </TabsTrigger>
+            <TabsTrigger value="updates" className="flex items-center gap-2">
+              <Download className="h-4 w-4" />
+              التحديثات
             </TabsTrigger>
             <TabsTrigger value="results" className="flex items-center gap-2">
               <Database className="h-4 w-4" />
@@ -841,6 +846,11 @@ const SystemAdmin = () => {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+          
+          {/* Updates Tab */}
+          <TabsContent value="updates">
+            <UpdatesManagement />
           </TabsContent>
           
           {/* Results Tab */}

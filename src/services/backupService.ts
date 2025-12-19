@@ -182,3 +182,43 @@ export const downloadBackup = () => {
 
   return { success: true, filename };
 };
+
+// Restore from cloud backup
+export const restoreFromCloudBackup = async (backupId: string): Promise<boolean> => {
+  try {
+    // Get backup data from localStorage (stored during cloud backup)
+    const backupDataStr = localStorage.getItem(`backup_${backupId}`);
+    
+    if (!backupDataStr) {
+      throw new Error("بيانات النسخة الاحتياطية غير موجودة");
+    }
+
+    const backupData = JSON.parse(backupDataStr);
+
+    // Restore each key
+    Object.keys(backupData).forEach(key => {
+      localStorage.setItem(key, JSON.stringify(backupData[key]));
+    });
+
+    return true;
+  } catch (error) {
+    console.error("Error restoring backup:", error);
+    throw error;
+  }
+};
+
+// Get available cloud backups for restore
+export const getCloudBackupsForRestore = async (schoolId: string) => {
+  const { data, error } = await supabase
+    .from("backups")
+    .select("*")
+    .eq("school_id", schoolId)
+    .eq("status", "completed")
+    .order("created_at", { ascending: false })
+    .limit(10);
+
+  if (error) throw error;
+  
+  // Filter to only include backups that have data stored locally
+  return data?.filter(backup => localStorage.getItem(`backup_${backup.id}`)) || [];
+};
