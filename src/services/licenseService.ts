@@ -322,6 +322,137 @@ export const deactivateDevice = async (deviceActivationId: string) => {
   return { success: true };
 };
 
+// School Admins Management
+export interface SchoolAdmin {
+  id: string;
+  school_id: string;
+  license_id: string | null;
+  username: string;
+  password_hash: string;
+  full_name: string;
+  email: string | null;
+  phone: string | null;
+  is_active: boolean;
+  last_login_at: string | null;
+  created_at: string;
+  updated_at: string;
+  schools?: { name: string; director_name: string | null };
+  licenses?: { license_key: string; is_active: boolean };
+}
+
+// Get all school admins
+export const getSchoolAdmins = async () => {
+  const { data, error } = await supabase
+    .from("school_admins")
+    .select("*, schools(name, director_name), licenses(license_key, is_active)")
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+  return data;
+};
+
+// Create school admin
+export const createSchoolAdmin = async (adminData: {
+  school_id: string;
+  license_id?: string;
+  username: string;
+  password: string;
+  full_name: string;
+  email?: string;
+  phone?: string;
+}) => {
+  // Simple hash for demo - in production use proper hashing
+  const password_hash = btoa(adminData.password);
+
+  const { data, error } = await supabase
+    .from("school_admins")
+    .insert({
+      school_id: adminData.school_id,
+      license_id: adminData.license_id || null,
+      username: adminData.username,
+      password_hash,
+      full_name: adminData.full_name,
+      email: adminData.email || null,
+      phone: adminData.phone || null,
+    })
+    .select("*, schools(name, director_name), licenses(license_key, is_active)")
+    .single();
+
+  if (error) throw error;
+  return data;
+};
+
+// Update school admin
+export const updateSchoolAdmin = async (
+  adminId: string,
+  updates: {
+    username?: string;
+    password?: string;
+    full_name?: string;
+    email?: string;
+    phone?: string;
+    is_active?: boolean;
+    school_id?: string;
+    license_id?: string;
+  }
+) => {
+  const updateData: any = { ...updates };
+  
+  // If password is being updated, hash it
+  if (updates.password) {
+    updateData.password_hash = btoa(updates.password);
+    delete updateData.password;
+  }
+
+  const { data, error } = await supabase
+    .from("school_admins")
+    .update(updateData)
+    .eq("id", adminId)
+    .select("*, schools(name, director_name), licenses(license_key, is_active)")
+    .single();
+
+  if (error) throw error;
+  return data;
+};
+
+// Delete school admin
+export const deleteSchoolAdmin = async (adminId: string) => {
+  const { error } = await supabase
+    .from("school_admins")
+    .delete()
+    .eq("id", adminId);
+
+  if (error) throw error;
+  return { success: true };
+};
+
+// Verify school admin login
+export const verifySchoolAdminLogin = async (username: string, password: string) => {
+  const { data, error } = await supabase
+    .from("school_admins")
+    .select("*, schools(name, director_name), licenses(license_key, is_active, expiry_date)")
+    .eq("username", username)
+    .eq("is_active", true)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data) return { success: false, error: "اسم المستخدم غير موجود" };
+
+  // Verify password
+  const hashedPassword = btoa(password);
+  if (data.password_hash !== hashedPassword) {
+    return { success: false, error: "كلمة المرور غير صحيحة" };
+  }
+
+  // Update last login
+  await supabase
+    .from("school_admins")
+    .update({ last_login_at: new Date().toISOString() })
+    .eq("id", data.id);
+
+  return { success: true, admin: data };
+};
+
 // Delete license
 export const deleteLicense = async (licenseId: string) => {
   try {
