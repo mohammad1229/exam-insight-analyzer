@@ -43,7 +43,7 @@ const LicenseActivation = ({ onActivate, onStartTrial, isLoading }: LicenseActiv
         <Button
           variant="outline"
           onClick={() => navigate("/system-admin")}
-          className="bg-white/90 border-gray-300 text-black hover:bg-white flex items-center gap-2"
+          className="bg-white/90 border-gray-300 text-black font-semibold hover:bg-white flex items-center gap-2 transition-transform duration-200 hover:scale-105"
         >
           <Settings className="h-4 w-4" />
           مسؤول النظام
@@ -93,7 +93,7 @@ const LicenseActivation = ({ onActivate, onStartTrial, isLoading }: LicenseActiv
               </div>
               <Button
                 onClick={handleActivate}
-                className="w-full bg-[#E84C3D] hover:bg-red-700"
+                className="w-full bg-[#E84C3D] hover:bg-red-700 text-white font-semibold transition-transform duration-200 hover:scale-[1.02]"
                 disabled={loading || !licenseKey.trim()}
               >
                 {loading ? (
@@ -136,7 +136,7 @@ const LicenseActivation = ({ onActivate, onStartTrial, isLoading }: LicenseActiv
               </div>
               <Button
                 onClick={handleStartTrial}
-                className="w-full bg-green-600 hover:bg-green-700"
+                className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold transition-transform duration-200 hover:scale-[1.02]"
                 disabled={loading || !schoolName.trim()}
               >
                 {loading ? (
