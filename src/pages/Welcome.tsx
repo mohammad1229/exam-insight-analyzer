@@ -4,7 +4,10 @@ import { Progress } from "@/components/ui/progress";
 import SystemLogo from "@/components/SystemLogo";
 import ThemeToggle from "@/components/ThemeToggle";
 import ParticlesBackground from "@/components/ParticlesBackground";
+import ColorCustomizer from "@/components/ColorCustomizer";
+import PageTransition from "@/components/PageTransition";
 import { motion } from "framer-motion";
+import { useColorStore } from "@/stores/colorStore";
 
 const Welcome = () => {
   const [progress, setProgress] = useState(0);
@@ -82,17 +85,25 @@ const Welcome = () => {
     };
   }, [navigate]);
   
+  // Apply saved color theme
+  const { applyTheme } = useColorStore();
+  useEffect(() => {
+    applyTheme();
+  }, [applyTheme]);
+  
   return (
-    <div 
-      className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-b from-secondary via-background to-accent dir-rtl relative overflow-hidden dark:from-black dark:via-gray-900 dark:to-green-900"
-    >
-      {/* خلفية الجسيمات */}
-      <ParticlesBackground particleCount={60} />
+    <PageTransition className="min-h-screen">
+      <div 
+        className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-b from-secondary via-background to-accent dir-rtl relative overflow-hidden dark:from-black dark:via-gray-900 dark:to-green-900"
+      >
+        {/* خلفية الجسيمات */}
+        <ParticlesBackground particleCount={60} />
 
-      {/* زر تبديل الوضع */}
-      <div className="absolute top-4 left-4 z-50">
-        <ThemeToggle />
-      </div>
+        {/* أزرار التحكم */}
+        <div className="absolute top-4 left-4 z-50 flex items-center gap-2">
+          <ThemeToggle />
+          <ColorCustomizer />
+        </div>
 
       {/* تأثير التوهج */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
@@ -218,6 +229,7 @@ const Welcome = () => {
         </motion.div>
       </div>
     </div>
+    </PageTransition>
   );
 };
 

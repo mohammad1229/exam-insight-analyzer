@@ -8,6 +8,9 @@ import { useLicenseContext } from "@/contexts/LicenseContext";
 import ThemeToggle from "@/components/ThemeToggle";
 import SystemLogo from "@/components/SystemLogo";
 import ParticlesBackground from "@/components/ParticlesBackground";
+import ColorCustomizer from "@/components/ColorCustomizer";
+import PageTransition from "@/components/PageTransition";
+import { useColorStore } from "@/stores/colorStore";
 
 const Index = () => {
   const navigate = useNavigate();
@@ -113,13 +116,21 @@ const Index = () => {
     );
   }
 
+  // Apply saved color theme
+  const { applyTheme } = useColorStore();
+  useEffect(() => {
+    applyTheme();
+  }, [applyTheme]);
+
   // Main page with license info
   return (
-    <div className="min-h-screen flex flex-col dir-rtl bg-gradient-to-b from-secondary via-background to-accent dark:from-black dark:via-gray-900 dark:to-green-900 relative">
-      {/* زر تبديل الوضع */}
-      <div className="absolute top-4 left-4 z-50">
-        <ThemeToggle />
-      </div>
+    <PageTransition className="min-h-screen">
+      <div className="min-h-screen flex flex-col dir-rtl bg-gradient-to-b from-secondary via-background to-accent dark:from-black dark:via-gray-900 dark:to-green-900 relative">
+        {/* أزرار التحكم */}
+        <div className="absolute top-4 left-4 z-50 flex items-center gap-2">
+          <ThemeToggle />
+          <ColorCustomizer />
+        </div>
 
       {/* License expiry warning banner */}
       {showExpiryWarning && (
@@ -212,6 +223,7 @@ const Index = () => {
         </div>
       </div>
     </div>
+    </PageTransition>
   );
 };
 

@@ -3,6 +3,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import { schoolData } from "@/data/mockData";
 import ThemeToggle from "@/components/ThemeToggle";
+import ColorCustomizer from "@/components/ColorCustomizer";
 
 const Navbar = () => {
   const { toast } = useToast();
@@ -18,6 +19,7 @@ const Navbar = () => {
         
         <div className="flex items-center gap-3">
           <ThemeToggle />
+          <ColorCustomizer />
           <Button 
             variant="secondary" 
             size="sm"
