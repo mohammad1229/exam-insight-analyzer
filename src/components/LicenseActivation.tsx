@@ -6,6 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Key, Building2, Clock, Settings } from "lucide-react";
+import ThemeToggle from "@/components/ThemeToggle";
+import SystemLogo from "@/components/SystemLogo";
 
 interface LicenseActivationProps {
   onActivate: (licenseKey: string) => Promise<{ success: boolean; error?: string }>;
@@ -37,29 +39,35 @@ const LicenseActivation = ({ onActivate, onStartTrial, isLoading }: LicenseActiv
   const loading = isLoading || localLoading;
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center dir-rtl px-4 bg-gradient-to-br from-black via-gray-900 to-green-900 relative">
-      {/* زر دخول مسؤول النظام */}
-      <div className="absolute top-4 left-4">
+    <div className="min-h-screen flex flex-col items-center justify-center dir-rtl px-4 bg-gradient-to-br from-secondary via-background to-accent dark:from-black dark:via-gray-900 dark:to-green-900 relative">
+      {/* أزرار التحكم */}
+      <div className="absolute top-4 left-4 flex items-center gap-2">
+        <ThemeToggle />
         <Button
           variant="outline"
           onClick={() => navigate("/system-admin")}
-          className="bg-white/90 border-gray-300 text-black font-semibold hover:bg-white flex items-center gap-2 transition-transform duration-200 hover:scale-105"
+          className="bg-white/90 dark:bg-gray-800/90 border-gray-300 dark:border-gray-600 text-foreground font-semibold hover:bg-white dark:hover:bg-gray-700 flex items-center gap-2 transition-transform duration-200 hover:scale-105"
         >
           <Settings className="h-4 w-4" />
           مسؤول النظام
         </Button>
       </div>
 
+      {/* الشعار */}
+      <div className="mb-6">
+        <SystemLogo size={120} />
+      </div>
+
       <div className="text-center mb-8">
-        <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">
+        <h1 className="text-4xl md:text-5xl font-bold text-foreground dark:text-white mb-4">
           نظام تحليل نتائج الاختبارات المدرسية
         </h1>
-        <p className="text-gray-300 text-lg">
+        <p className="text-muted-foreground dark:text-gray-300 text-lg">
           قم بتفعيل الترخيص أو بدء فترة تجريبية للمتابعة
         </p>
       </div>
 
-      <Card className="w-full max-w-lg border-2 border-[#E84C3D] bg-white/95 backdrop-blur">
+      <Card className="w-full max-w-lg border-2 border-primary bg-card/95 dark:bg-gray-800/95 backdrop-blur">
         <CardHeader className="bg-gradient-to-r from-[#E84C3D] to-red-700 text-white">
           <CardTitle className="text-center text-xl flex items-center justify-center gap-2">
             <Key className="h-5 w-5" />
