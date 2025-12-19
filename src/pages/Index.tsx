@@ -27,6 +27,13 @@ const Index = () => {
 
   const [progress, setProgress] = useState(0);
   const [showWelcome, setShowWelcome] = useState(true);
+  
+  // Apply saved color theme - MUST be called before any conditional returns
+  const { applyTheme } = useColorStore();
+  
+  useEffect(() => {
+    applyTheme();
+  }, [applyTheme]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -116,11 +123,7 @@ const Index = () => {
     );
   }
 
-  // Apply saved color theme
-  const { applyTheme } = useColorStore();
-  useEffect(() => {
-    applyTheme();
-  }, [applyTheme]);
+  // Main page with license info
 
   // Main page with license info
   return (
