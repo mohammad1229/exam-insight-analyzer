@@ -164,10 +164,27 @@ export const checkLicenseValidity = async () => {
     const result = data as unknown as LicenseValidityResult;
 
     if (result.valid) {
-      // Update stored info
-      stored.remainingDays = result.remaining_days;
-      stored.isTrial = result.is_trial;
-      storeLicense(stored);
+      // Fetch latest school info from database
+      const { data: license } = await supabase
+        .from("licenses")
+        .select("*, schools(*)")
+        .eq("license_key", stored.licenseKey)
+        .maybeSingle();
+
+      if (license) {
+        // Update stored info with latest data from database
+        stored.remainingDays = result.remaining_days;
+        stored.isTrial = result.is_trial;
+        stored.schoolName = (license.schools as any)?.name || stored.schoolName;
+        stored.directorName = (license.schools as any)?.director_name || stored.directorName;
+        stored.schoolId = license.school_id || stored.schoolId;
+        storeLicense(stored);
+
+        // Update localStorage for UI components
+        localStorage.setItem("schoolName", stored.schoolName || "");
+        localStorage.setItem("directorName", stored.directorName || "");
+        localStorage.setItem("currentSchoolId", stored.schoolId || "");
+      }
     }
 
     return result;
@@ -271,19 +288,56 @@ export const renewLicense = async (
   }
 };
 
+// Default data for new schools
+const getDefaultSchoolData = () => ({
+  classes: [
+    { id: "c1", name: "الصف الأول", sections: [{ id: "s1c1", name: "أ" }, { id: "s2c1", name: "ب" }] },
+    { id: "c2", name: "الصف الثاني", sections: [{ id: "s1c2", name: "أ" }, { id: "s2c2", name: "ب" }] },
+    { id: "c3", name: "الصف الثالث", sections: [{ id: "s1c3", name: "أ" }, { id: "s2c3", name: "ب" }] },
+    { id: "c4", name: "الصف الرابع", sections: [{ id: "s1c4", name: "أ" }, { id: "s2c4", name: "ب" }] },
+    { id: "c5", name: "الصف الخامس", sections: [{ id: "s1c5", name: "أ" }, { id: "s2c5", name: "ب" }] },
+    { id: "c6", name: "الصف السادس", sections: [{ id: "s1c6", name: "أ" }, { id: "s2c6", name: "ب" }] },
+    { id: "c7", name: "الصف السابع", sections: [{ id: "s1c7", name: "أ" }, { id: "s2c7", name: "ب" }] },
+    { id: "c8", name: "الصف الثامن", sections: [{ id: "s1c8", name: "أ" }, { id: "s2c8", name: "ب" }] },
+    { id: "c9", name: "الصف التاسع", sections: [{ id: "s1c9", name: "أ" }, { id: "s2c9", name: "ب" }] },
+    { id: "c10", name: "الصف العاشر", sections: [{ id: "s1c10", name: "أ" }, { id: "s2c10", name: "ب" }] },
+  ],
+  subjects: [
+    { id: "sub1", name: "الرياضيات" },
+    { id: "sub2", name: "العلوم" },
+    { id: "sub3", name: "اللغة العربية" },
+    { id: "sub4", name: "اللغة الإنجليزية" },
+    { id: "sub5", name: "التربية الإسلامية" },
+    { id: "sub6", name: "الدراسات الاجتماعية" },
+    { id: "sub7", name: "التربية الوطنية" },
+    { id: "sub8", name: "الحاسوب" },
+  ],
+  performanceLevels: [
+    { id: "lvl1", name: "متفوق", minScore: 90, maxScore: 100, color: "#22c55e" },
+    { id: "lvl2", name: "جيد جداً", minScore: 80, maxScore: 89, color: "#3b82f6" },
+    { id: "lvl3", name: "جيد", minScore: 70, maxScore: 79, color: "#eab308" },
+    { id: "lvl4", name: "مقبول", minScore: 60, maxScore: 69, color: "#f97316" },
+    { id: "lvl5", name: "ضعيف", minScore: 50, maxScore: 59, color: "#ef4444" },
+    { id: "lvl6", name: "راسب", minScore: 0, maxScore: 49, color: "#991b1b" },
+  ]
+});
+
 // Initialize empty database for a new school
-export const initializeSchoolDatabase = (schoolId: string) => {
-  // Create empty data structures for the new school
-  const emptyData = {
+export const initializeSchoolDatabase = (schoolId: string, schoolName: string, directorName: string, withDefaults: boolean = true) => {
+  const defaults = withDefaults ? getDefaultSchoolData() : { classes: [], subjects: [], performanceLevels: [] };
+  
+  // Create data structures for the new school
+  const schoolData = {
     students: [],
-    classes: [],
-    subjects: [],
+    classes: defaults.classes,
+    subjects: defaults.subjects,
     teachers: [],
     tests: [],
+    performanceLevels: defaults.performanceLevels,
     school: {
       id: schoolId,
-      name: "",
-      director_name: "",
+      name: schoolName,
+      director_name: directorName,
       logo: "",
       address: "",
       phone: "",
@@ -291,8 +345,8 @@ export const initializeSchoolDatabase = (schoolId: string) => {
     }
   };
 
-  // Save empty data with school ID prefix
-  Object.entries(emptyData).forEach(([key, value]) => {
+  // Save data with school ID prefix
+  Object.entries(schoolData).forEach(([key, value]) => {
     const storageKey = `${schoolId}_${key}`;
     // Only initialize if not already exists
     if (!localStorage.getItem(storageKey)) {
@@ -300,7 +354,7 @@ export const initializeSchoolDatabase = (schoolId: string) => {
     }
   });
 
-  console.log(`Initialized empty database for school: ${schoolId}`);
+  console.log(`Initialized database for school: ${schoolId} (with defaults: ${withDefaults})`);
 };
 
 // Create school
@@ -319,8 +373,8 @@ export const createSchool = async (schoolData: {
 
   if (error) throw error;
 
-  // Initialize empty database for the new school
-  initializeSchoolDatabase(data.id);
+  // Initialize database with default data for the new school
+  initializeSchoolDatabase(data.id, schoolData.name, schoolData.director_name || "", true);
 
   return data;
 };
