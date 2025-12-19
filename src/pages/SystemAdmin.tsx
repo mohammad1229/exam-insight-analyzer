@@ -17,6 +17,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { getLicenses, renewLicense, getSchools, generateLicense, deleteLicense, createSchool } from "@/services/licenseService";
 import { downloadBackup, getBackups, createAutomaticBackup } from "@/services/backupService";
 import UpdatesManagement from "@/components/admin/UpdatesManagement";
+import SchoolAdminsTab from "@/components/admin/SchoolAdminsTab";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 const SystemAdmin = () => {
@@ -687,10 +688,14 @@ const SystemAdmin = () => {
         </div>
         
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid grid-cols-5 w-full max-w-3xl mx-auto mb-6">
+          <TabsList className="grid grid-cols-6 w-full max-w-4xl mx-auto mb-6">
             <TabsTrigger value="licenses" className="flex items-center gap-2">
               <FileKey className="h-4 w-4" />
               التراخيص
+            </TabsTrigger>
+            <TabsTrigger value="school-admins" className="flex items-center gap-2">
+              <User className="h-4 w-4" />
+              مدراء المدارس
             </TabsTrigger>
             <TabsTrigger value="users" className="flex items-center gap-2">
               <Users className="h-4 w-4" />
@@ -709,6 +714,11 @@ const SystemAdmin = () => {
               الإعدادات
             </TabsTrigger>
           </TabsList>
+          
+          {/* School Admins Tab */}
+          <TabsContent value="school-admins">
+            <SchoolAdminsTab />
+          </TabsContent>
           
           {/* Licenses Tab */}
           <TabsContent value="licenses">
