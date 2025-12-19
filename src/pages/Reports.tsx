@@ -2,6 +2,9 @@ import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import Navbar from "@/components/Navbar";
 import Sidebar from "@/components/Sidebar";
+import LicenseBanner from "@/components/LicenseBanner";
+import AnimatedBackground from "@/components/AnimatedBackground";
+import PageTransition from "@/components/PageTransition";
 import QuestionAnalysis from "@/components/QuestionAnalysis";
 import ReportGenerator from "@/components/ReportGenerator";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -70,14 +73,17 @@ const Reports = () => {
   };
 
   return (
-    <div className="flex min-h-screen bg-gradient-to-b from-white to-green-50">
-      <Sidebar />
-      <div className="flex-1 flex flex-col">
-        <Navbar />
-        <main className="flex-1 container mx-auto p-6 dir-rtl">
-          <div className="mb-8 pb-4 border-b-2 border-red-500">
-            <h1 className="text-3xl font-bold text-black">تقارير الاختبارات</h1>
-            <p className="text-muted-foreground">عرض وتحليل نتائج الاختبارات وإنشاء التقارير</p>
+    <PageTransition className="min-h-screen">
+      <AnimatedBackground>
+        <div className="flex min-h-screen">
+          <Sidebar />
+          <div className="flex-1 flex flex-col">
+            <LicenseBanner />
+            <Navbar />
+            <main className="flex-1 container mx-auto p-6 dir-rtl">
+              <div className="mb-8 pb-4 border-b-2 border-primary">
+                <h1 className="text-3xl font-bold text-foreground">تقارير الاختبارات</h1>
+                <p className="text-muted-foreground">عرض وتحليل نتائج الاختبارات وإنشاء التقارير</p>
           </div>
 
           <div className="mb-8 flex items-center gap-4">
@@ -251,8 +257,10 @@ const Reports = () => {
             </div>
           )}
         </main>
-      </div>
-    </div>
+          </div>
+        </div>
+      </AnimatedBackground>
+    </PageTransition>
   );
 };
 

@@ -1,7 +1,9 @@
-
 import { useState, useEffect } from "react";
 import Navbar from "@/components/Navbar";
 import Sidebar from "@/components/Sidebar";
+import LicenseBanner from "@/components/LicenseBanner";
+import AnimatedBackground from "@/components/AnimatedBackground";
+import PageTransition from "@/components/PageTransition";
 import TestForm from "@/components/TestForm";
 import StudentList from "@/components/StudentList";
 import QuestionAnalysis from "@/components/QuestionAnalysis";
@@ -172,15 +174,18 @@ const TestResults = () => {
   };
 
   return (
-    <div className="flex min-h-screen">
-      <Sidebar />
-      <div className="flex-1 flex flex-col">
-        <Navbar />
-        <main className="flex-1 container mx-auto p-6 dir-rtl">
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold">إدخال نتائج اختبار</h1>
-            <p className="text-muted-foreground">إنشاء اختبار جديد وإدخال نتائج الطلاب</p>
-          </div>
+    <PageTransition className="min-h-screen">
+      <AnimatedBackground>
+        <div className="flex min-h-screen">
+          <Sidebar />
+          <div className="flex-1 flex flex-col">
+            <LicenseBanner />
+            <Navbar />
+            <main className="flex-1 container mx-auto p-6 dir-rtl">
+              <div className="mb-8">
+                <h1 className="text-3xl font-bold text-foreground">إدخال نتائج اختبار</h1>
+                <p className="text-muted-foreground">إنشاء اختبار جديد وإدخال نتائج الطلاب</p>
+              </div>
 
           <Tabs 
             defaultValue="test-info" 
@@ -332,8 +337,10 @@ const TestResults = () => {
             </TabsContent>
           </Tabs>
         </main>
-      </div>
-    </div>
+          </div>
+        </div>
+      </AnimatedBackground>
+    </PageTransition>
   );
 };
 

@@ -1,7 +1,9 @@
-
 import { useState, useEffect } from "react";
 import Navbar from "@/components/Navbar";
 import Sidebar from "@/components/Sidebar";
+import LicenseBanner from "@/components/LicenseBanner";
+import AnimatedBackground from "@/components/AnimatedBackground";
+import PageTransition from "@/components/PageTransition";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { 
   Select, 
@@ -69,11 +71,14 @@ const Dashboard = () => {
   });
 
   return (
-    <div className="flex min-h-screen bg-background dark:bg-gray-950">
-      <Sidebar />
-      <div className="flex-1 flex flex-col">
-        <Navbar />
-        <main className="flex-1 container mx-auto p-6 dir-rtl">
+    <PageTransition className="min-h-screen">
+      <AnimatedBackground>
+        <div className="flex min-h-screen">
+          <Sidebar />
+          <div className="flex-1 flex flex-col">
+            <LicenseBanner />
+            <Navbar />
+            <main className="flex-1 container mx-auto p-6 dir-rtl">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
             <div>
               <h1 className="text-3xl font-bold">لوحة المعلومات</h1>
@@ -241,8 +246,10 @@ const Dashboard = () => {
             </div>
           </div>
         </main>
-      </div>
-    </div>
+          </div>
+        </div>
+      </AnimatedBackground>
+    </PageTransition>
   );
 };
 
