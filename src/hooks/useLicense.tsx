@@ -17,6 +17,7 @@ interface LicenseState {
   schoolId: string | null;
   schoolName: string | null;
   directorName: string | null;
+  schoolLogo: string | null;
   licenseKey: string | null;
   devicesUsed: number;
   maxDevices: number;
@@ -34,6 +35,7 @@ export const useLicense = () => {
     schoolId: null,
     schoolName: null,
     directorName: null,
+    schoolLogo: null,
     licenseKey: null,
     devicesUsed: 0,
     maxDevices: 1,
@@ -76,6 +78,7 @@ export const useLicense = () => {
           schoolId: stored.schoolId,
           schoolName: stored.schoolName,
           directorName: stored.directorName || null,
+          schoolLogo: stored.schoolLogo || null,
           licenseKey: stored.licenseKey,
           devicesUsed: devicesUsed || 0,
           maxDevices: maxDevices || 1,
@@ -174,6 +177,7 @@ export const useLicense = () => {
           schoolId: result.licenseInfo.schoolId,
           schoolName: result.licenseInfo.schoolName,
           directorName: result.licenseInfo.directorName || null,
+          schoolLogo: result.licenseInfo.schoolLogo || null,
           licenseKey: result.licenseInfo.licenseKey,
         }));
 
@@ -211,6 +215,7 @@ export const useLicense = () => {
       schoolId: null,
       schoolName: null,
       directorName: null,
+      schoolLogo: null,
       licenseKey: null,
       devicesUsed: 0,
       maxDevices: 1,
