@@ -8,6 +8,7 @@ interface LicenseContextType {
   remainingDays: number;
   schoolId: string | null;
   schoolName: string | null;
+  directorName: string | null;
   licenseKey: string | null;
   devicesUsed: number;
   maxDevices: number;

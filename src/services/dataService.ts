@@ -1,16 +1,28 @@
 // Data Service - Manages all data with localStorage for persistence
+// Each school has its own isolated data using school_id prefix
 
 import { Student, Teacher, Class, Subject, Section, Test, School } from "@/types";
 import { studentsData as initialStudents, classesData as initialClasses, subjectsData as initialSubjects, teachersData as initialTeachers, testsData as initialTests, schoolData as initialSchool } from "@/data/mockData";
 
-// Keys for localStorage
-const STORAGE_KEYS = {
-  STUDENTS: "app_students",
-  CLASSES: "app_classes",
-  SUBJECTS: "app_subjects",
-  TEACHERS: "app_teachers",
-  TESTS: "app_tests",
-  SCHOOL: "app_school",
+// Get current school ID for data isolation
+const getCurrentSchoolId = (): string => {
+  return localStorage.getItem("currentSchoolId") || "default";
+};
+
+// Generate storage key with school prefix for data isolation
+const getSchoolStorageKey = (baseKey: string): string => {
+  const schoolId = getCurrentSchoolId();
+  return `${schoolId}_${baseKey}`;
+};
+
+// Keys for localStorage (base keys - will be prefixed with school_id)
+const BASE_STORAGE_KEYS = {
+  STUDENTS: "students",
+  CLASSES: "classes",
+  SUBJECTS: "subjects",
+  TEACHERS: "teachers",
+  TESTS: "tests",
+  SCHOOL: "school",
 };
 
 // Extended types
@@ -22,8 +34,9 @@ export interface TeacherWithCredentials extends Teacher {
 }
 
 // Initialize data from localStorage or use defaults
-const initializeData = <T>(key: string, defaultData: T): T => {
+const initializeData = <T>(baseKey: string, defaultData: T): T => {
   try {
+    const key = getSchoolStorageKey(baseKey);
     const stored = localStorage.getItem(key);
     if (stored) {
       return JSON.parse(stored);
@@ -31,27 +44,28 @@ const initializeData = <T>(key: string, defaultData: T): T => {
     localStorage.setItem(key, JSON.stringify(defaultData));
     return defaultData;
   } catch (error) {
-    console.error(`Error loading ${key}:`, error);
+    console.error(`Error loading ${baseKey}:`, error);
     return defaultData;
   }
 };
 
-// Save data to localStorage
-const saveData = <T>(key: string, data: T): void => {
+// Save data to localStorage with school prefix
+const saveData = <T>(baseKey: string, data: T): void => {
   try {
+    const key = getSchoolStorageKey(baseKey);
     localStorage.setItem(key, JSON.stringify(data));
   } catch (error) {
-    console.error(`Error saving ${key}:`, error);
+    console.error(`Error saving ${baseKey}:`, error);
   }
 };
 
 // Students
 export const getStudents = (): Student[] => {
-  return initializeData(STORAGE_KEYS.STUDENTS, initialStudents);
+  return initializeData(BASE_STORAGE_KEYS.STUDENTS, initialStudents);
 };
 
 export const saveStudents = (students: Student[]): void => {
-  saveData(STORAGE_KEYS.STUDENTS, students);
+  saveData(BASE_STORAGE_KEYS.STUDENTS, students);
 };
 
 export const addStudent = (student: Student): void => {
@@ -84,11 +98,11 @@ export const getStudentById = (studentId: string): Student | undefined => {
 
 // Classes
 export const getClasses = (): Class[] => {
-  return initializeData(STORAGE_KEYS.CLASSES, initialClasses);
+  return initializeData(BASE_STORAGE_KEYS.CLASSES, initialClasses);
 };
 
 export const saveClasses = (classes: Class[]): void => {
-  saveData(STORAGE_KEYS.CLASSES, classes);
+  saveData(BASE_STORAGE_KEYS.CLASSES, classes);
 };
 
 export const addClass = (cls: Class): void => {
@@ -122,11 +136,11 @@ export const getSectionById = (classId: string, sectionId: string): Section | un
 
 // Subjects
 export const getSubjects = (): Subject[] => {
-  return initializeData(STORAGE_KEYS.SUBJECTS, initialSubjects);
+  return initializeData(BASE_STORAGE_KEYS.SUBJECTS, initialSubjects);
 };
 
 export const saveSubjects = (subjects: Subject[]): void => {
-  saveData(STORAGE_KEYS.SUBJECTS, subjects);
+  saveData(BASE_STORAGE_KEYS.SUBJECTS, subjects);
 };
 
 export const addSubject = (subject: Subject): void => {
@@ -155,7 +169,8 @@ export const getSubjectById = (subjectId: string): Subject | undefined => {
 
 // Teachers
 export const getTeachers = (): TeacherWithCredentials[] => {
-  const stored = localStorage.getItem(STORAGE_KEYS.TEACHERS);
+  const key = getSchoolStorageKey(BASE_STORAGE_KEYS.TEACHERS);
+  const stored = localStorage.getItem(key);
   if (stored) {
     return JSON.parse(stored);
   }
@@ -172,7 +187,7 @@ export const getTeachers = (): TeacherWithCredentials[] => {
 };
 
 export const saveTeachers = (teachers: TeacherWithCredentials[]): void => {
-  saveData(STORAGE_KEYS.TEACHERS, teachers);
+  saveData(BASE_STORAGE_KEYS.TEACHERS, teachers);
 };
 
 export const addTeacher = (teacher: TeacherWithCredentials): void => {
@@ -201,11 +216,11 @@ export const getTeacherById = (teacherId: string): TeacherWithCredentials | unde
 
 // Tests
 export const getTests = (): Test[] => {
-  return initializeData(STORAGE_KEYS.TESTS, initialTests);
+  return initializeData(BASE_STORAGE_KEYS.TESTS, initialTests);
 };
 
 export const saveTests = (tests: Test[]): void => {
-  saveData(STORAGE_KEYS.TESTS, tests);
+  saveData(BASE_STORAGE_KEYS.TESTS, tests);
 };
 
 export const addTest = (test: Test): void => {
@@ -230,11 +245,11 @@ export const deleteTest = (testId: string): void => {
 
 // School
 export const getSchool = (): School => {
-  return initializeData(STORAGE_KEYS.SCHOOL, initialSchool);
+  return initializeData(BASE_STORAGE_KEYS.SCHOOL, initialSchool);
 };
 
 export const saveSchool = (school: School): void => {
-  saveData(STORAGE_KEYS.SCHOOL, school);
+  saveData(BASE_STORAGE_KEYS.SCHOOL, school);
 };
 
 // Get current logged in teacher

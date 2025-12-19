@@ -16,6 +16,7 @@ interface LicenseState {
   remainingDays: number;
   schoolId: string | null;
   schoolName: string | null;
+  directorName: string | null;
   licenseKey: string | null;
   devicesUsed: number;
   maxDevices: number;
@@ -32,6 +33,7 @@ export const useLicense = () => {
     remainingDays: 0,
     schoolId: null,
     schoolName: null,
+    directorName: null,
     licenseKey: null,
     devicesUsed: 0,
     maxDevices: 1,
@@ -73,6 +75,7 @@ export const useLicense = () => {
           remainingDays: remainingDays || 0,
           schoolId: stored.schoolId,
           schoolName: stored.schoolName,
+          directorName: stored.directorName || null,
           licenseKey: stored.licenseKey,
           devicesUsed: devicesUsed || 0,
           maxDevices: maxDevices || 1,
@@ -127,6 +130,7 @@ export const useLicense = () => {
           remainingDays: result.licenseInfo.remainingDays || 0,
           schoolId: result.licenseInfo.schoolId,
           schoolName: result.licenseInfo.schoolName,
+          directorName: result.licenseInfo.directorName || null,
           licenseKey: result.licenseInfo.licenseKey,
           devicesUsed: result.licenseInfo.devicesUsed || 0,
           maxDevices: result.licenseInfo.maxDevices || 1,
@@ -169,6 +173,7 @@ export const useLicense = () => {
           remainingDays: 15,
           schoolId: result.licenseInfo.schoolId,
           schoolName: result.licenseInfo.schoolName,
+          directorName: result.licenseInfo.directorName || null,
           licenseKey: result.licenseInfo.licenseKey,
         }));
 
@@ -205,6 +210,7 @@ export const useLicense = () => {
       remainingDays: 0,
       schoolId: null,
       schoolName: null,
+      directorName: null,
       licenseKey: null,
       devicesUsed: 0,
       maxDevices: 1,
