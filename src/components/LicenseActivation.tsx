@@ -242,12 +242,12 @@ const LicenseActivation = ({ onActivate, onStartTrial, isLoading }: LicenseActiv
           </motion.div>
 
           <motion.div 
-            className="mt-8 text-center text-sm text-gray-400"
+            className="mt-8"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.8 }}
           >
-            <CopyrightFooter />
+            <CopyrightFooter className="text-white" />
           </motion.div>
         </div>
       </div>
