@@ -1481,15 +1481,25 @@ const SystemAdmin = () => {
       <AlertDialog open={showDeleteLicenseModal} onOpenChange={setShowDeleteLicenseModal}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>تأكيد إلغاء الترخيص</AlertDialogTitle>
+            <AlertDialogTitle className="text-red-600">⚠️ تحذير: حذف الترخيص نهائياً</AlertDialogTitle>
             <AlertDialogDescription className="text-right">
-              <div className="space-y-2">
-                <p>هل أنت متأكد من إلغاء هذا الترخيص؟</p>
-                <div className="p-3 bg-gray-50 rounded-lg mt-2">
+              <div className="space-y-3">
+                <div className="p-3 bg-gray-50 rounded-lg border">
                   <p className="text-sm">المدرسة: <strong>{deletingLicense?.schools?.name || deletingLicense?.schoolName || 'غير محدد'}</strong></p>
+                  <p className="text-sm">المدير: <strong>{deletingLicense?.schools?.director_name || 'غير محدد'}</strong></p>
                   <p className="text-sm">مفتاح الترخيص: <strong className="font-mono">{deletingLicense?.license_key || deletingLicense?.key}</strong></p>
                 </div>
-                <p className="text-red-500 text-sm mt-2">سيتم إلغاء تفعيل هذا الترخيص ولن يتمكن أي جهاز من استخدامه</p>
+                
+                <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                  <p className="text-red-700 font-semibold mb-2">سيتم حذف البيانات التالية نهائياً:</p>
+                  <ul className="text-red-600 text-sm list-disc list-inside space-y-1">
+                    <li>الترخيص وجميع بيانات الأجهزة المرتبطة</li>
+                    <li>بيانات المدرسة المحلية (الطلاب، المعلمين، الصفوف، المواد)</li>
+                    <li>جميع الاختبارات والتقارير المحفوظة</li>
+                  </ul>
+                </div>
+                
+                <p className="text-gray-700 font-medium">هل أنت متأكد من الحذف؟ لا يمكن التراجع عن هذا الإجراء.</p>
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -1499,7 +1509,7 @@ const SystemAdmin = () => {
               className="bg-red-600 hover:bg-red-700"
               onClick={handleDeleteLicense}
             >
-              نعم، إلغاء الترخيص
+              نعم، حذف الترخيص نهائياً
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
