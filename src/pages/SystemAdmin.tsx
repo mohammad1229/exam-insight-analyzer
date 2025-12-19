@@ -18,6 +18,8 @@ import { getLicenses, renewLicense, getSchools, generateLicense, deleteLicense, 
 import { downloadBackup, getBackups, createAutomaticBackup } from "@/services/backupService";
 import UpdatesManagement from "@/components/admin/UpdatesManagement";
 import SchoolAdminsTab from "@/components/admin/SchoolAdminsTab";
+import DefaultDataSettings from "@/components/admin/DefaultDataSettings";
+import ImportSchoolData from "@/components/admin/ImportSchoolData";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 const SystemAdmin = () => {
@@ -893,6 +895,17 @@ const SystemAdmin = () => {
                   )}
                 </CardContent>
               </Card>
+              
+              {/* Import School Data Section */}
+              {schools.length > 0 && (
+                <div className="mt-6">
+                  <ImportSchoolData 
+                    schoolId={schools[0]?.id || ""} 
+                    schoolName={schools[0]?.name || ""} 
+                    onImportComplete={loadData}
+                  />
+                </div>
+              )}
             </div>
           </TabsContent>
           
@@ -1109,7 +1122,11 @@ const SystemAdmin = () => {
           
           {/* Settings Tab */}
           <TabsContent value="settings">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div className="space-y-8">
+              {/* Default Data Settings */}
+              <DefaultDataSettings />
+              
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               <Card className="border-2 border-[#E84c3d]">
                 <CardHeader className="bg-gradient-to-r from-red-100 to-white border-b border-[#E84c3d]">
                   <CardTitle>إعدادات النظام</CardTitle>
@@ -1340,6 +1357,7 @@ const SystemAdmin = () => {
                   </div>
                 </CardContent>
               </Card>
+              </div>
             </div>
           </TabsContent>
         </Tabs>
