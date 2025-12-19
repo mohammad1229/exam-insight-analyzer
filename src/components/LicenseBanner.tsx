@@ -1,10 +1,10 @@
 import { useLicenseContext } from "@/contexts/LicenseContext";
 import { Badge } from "@/components/ui/badge";
-import { Shield, Building2 } from "lucide-react";
+import { Shield, Building2, User } from "lucide-react";
 import { motion } from "framer-motion";
 
 const LicenseBanner = () => {
-  const { isActivated, isTrial, schoolName, remainingDays } = useLicenseContext();
+  const { isActivated, isTrial, schoolName, directorName, remainingDays } = useLicenseContext();
 
   if (!isActivated) return null;
 
@@ -14,7 +14,7 @@ const LicenseBanner = () => {
       animate={{ y: 0, opacity: 1 }}
       className="bg-gradient-to-r from-primary/90 via-primary to-primary/90 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 text-white py-2 px-4 flex items-center justify-between text-sm backdrop-blur-sm border-b border-white/10"
     >
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-4 flex-wrap">
         <div className="flex items-center gap-2">
           <Shield className="h-4 w-4" />
           <Badge 
@@ -29,6 +29,13 @@ const LicenseBanner = () => {
           <div className="flex items-center gap-2">
             <Building2 className="h-4 w-4" />
             <span className="font-semibold">{schoolName}</span>
+          </div>
+        )}
+        
+        {directorName && (
+          <div className="flex items-center gap-2">
+            <User className="h-4 w-4" />
+            <span className="text-white/80">{directorName}</span>
           </div>
         )}
       </div>

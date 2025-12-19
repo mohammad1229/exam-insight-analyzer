@@ -12,14 +12,19 @@ import { useColorStore } from "@/stores/colorStore";
 const Welcome = () => {
   const [progress, setProgress] = useState(0);
   const [schoolName, setSchoolName] = useState<string | null>(null);
+  const [directorName, setDirectorName] = useState<string | null>(null);
   const navigate = useNavigate();
   const audioContextRef = useRef<AudioContext | null>(null);
   
-  // Load school name from localStorage
+  // Load school name and director from localStorage
   useEffect(() => {
     const storedSchoolName = localStorage.getItem("schoolName");
+    const storedDirectorName = localStorage.getItem("directorName");
     if (storedSchoolName) {
       setSchoolName(storedSchoolName);
+    }
+    if (storedDirectorName) {
+      setDirectorName(storedDirectorName);
     }
   }, []);
 
@@ -177,10 +182,10 @@ const Welcome = () => {
           نظام تحليل نتائج الاختبارات المدرسية
         </motion.h1>
         
-        {/* اسم المدرسة المرخصة */}
+        {/* اسم المدرسة والمدير */}
         {schoolName && (
           <motion.div
-            className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg px-6 py-3 inline-block"
+            className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg px-6 py-4 inline-block"
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.5, duration: 0.5 }}
@@ -188,6 +193,11 @@ const Welcome = () => {
             <p className="text-xl md:text-2xl font-semibold text-accent">
               🏫 {schoolName}
             </p>
+            {directorName && (
+              <p className="text-lg text-white/80 mt-2">
+                👤 {directorName}
+              </p>
+            )}
           </motion.div>
         )}
         

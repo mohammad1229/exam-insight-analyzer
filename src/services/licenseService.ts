@@ -73,12 +73,19 @@ export const startTrial = async (schoolName: string) => {
       licenseKey,
       schoolId: school.id,
       schoolName,
+      directorName: "",
       isTrial: true,
       remainingDays: 15,
       startDate: new Date().toISOString(),
     };
 
     storeLicense(licenseInfo);
+    
+    // Store school name in localStorage for Welcome page
+    localStorage.setItem("schoolName", schoolName);
+    localStorage.setItem("directorName", "");
+    localStorage.setItem("currentSchoolId", school.id);
+    
     return { success: true, licenseInfo };
   } catch (error: any) {
     console.error("Error starting trial:", error);
@@ -115,6 +122,7 @@ export const activateLicense = async (licenseKey: string) => {
       licenseKey,
       schoolId: license?.school_id,
       schoolName: (license?.schools as any)?.name || "",
+      directorName: (license?.schools as any)?.director_name || "",
       isTrial: result.is_trial,
       remainingDays: result.remaining_days,
       devicesUsed: result.devices_used,
@@ -123,6 +131,12 @@ export const activateLicense = async (licenseKey: string) => {
     };
 
     storeLicense(licenseInfo);
+    
+    // Store school name and director in localStorage for Welcome page
+    localStorage.setItem("schoolName", licenseInfo.schoolName);
+    localStorage.setItem("directorName", licenseInfo.directorName);
+    localStorage.setItem("currentSchoolId", licenseInfo.schoolId || "");
+    
     return { success: true, licenseInfo, data: result };
   } catch (error: any) {
     console.error("Error activating license:", error);
