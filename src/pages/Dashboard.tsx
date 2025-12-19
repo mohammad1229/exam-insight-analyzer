@@ -69,7 +69,7 @@ const Dashboard = () => {
   });
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen bg-background dark:bg-gray-950">
       <Sidebar />
       <div className="flex-1 flex flex-col">
         <Navbar />
@@ -97,12 +97,12 @@ const Dashboard = () => {
               </CardContent>
             </Card>
             
-            <Card className="border-2 border-black">
-              <CardHeader className="pb-2 bg-black text-white">
+            <Card className="border-2 border-secondary dark:border-gray-700 dark:bg-gray-900">
+              <CardHeader className="pb-2 bg-secondary dark:bg-gray-800 text-secondary-foreground">
                 <CardTitle className="text-sm font-medium">اختبارات هذا الشهر</CardTitle>
               </CardHeader>
               <CardContent className="pt-4">
-                <p className="text-2xl font-bold text-green-600">
+                <p className="text-2xl font-bold text-accent">
                   {tests.filter(test => {
                     const testDate = new Date(test.date);
                     const now = new Date();
@@ -113,12 +113,12 @@ const Dashboard = () => {
               </CardContent>
             </Card>
             
-            <Card className="border-2 border-black">
-              <CardHeader className="pb-2 bg-black text-white">
+            <Card className="border-2 border-secondary dark:border-gray-700 dark:bg-gray-900">
+              <CardHeader className="pb-2 bg-secondary dark:bg-gray-800 text-secondary-foreground">
                 <CardTitle className="text-sm font-medium">متوسط النجاح</CardTitle>
               </CardHeader>
               <CardContent className="pt-4">
-                <p className="text-2xl font-bold text-green-600">
+                <p className="text-2xl font-bold text-accent">
                   {tests.length > 0 ?
                     (tests.reduce((acc, test) => {
                       const presentResults = test.results.filter(result => !result.isAbsent);
@@ -130,12 +130,12 @@ const Dashboard = () => {
               </CardContent>
             </Card>
             
-            <Card className="border-2 border-black">
-              <CardHeader className="pb-2 bg-black text-white">
+            <Card className="border-2 border-secondary dark:border-gray-700 dark:bg-gray-900">
+              <CardHeader className="pb-2 bg-secondary dark:bg-gray-800 text-secondary-foreground">
                 <CardTitle className="text-sm font-medium">مسودات الاختبارات</CardTitle>
               </CardHeader>
               <CardContent className="pt-4">
-                <p className="text-2xl font-bold text-[#E84c3d]">
+                <p className="text-2xl font-bold text-primary">
                   {tests.filter(test => test.draft).length}
                 </p>
               </CardContent>
@@ -145,9 +145,9 @@ const Dashboard = () => {
           <div className="space-y-6">
             <div className="flex flex-col md:flex-row gap-4 justify-between">
               <div className="flex items-center gap-4">
-                <h2 className="text-xl font-semibold">الاختبارات الأخيرة</h2>
+                <h2 className="text-xl font-semibold text-foreground">الاختبارات الأخيرة</h2>
                 <Select value={selectedClassId} onValueChange={setSelectedClassId}>
-                  <SelectTrigger className="w-48 border-green-500">
+                  <SelectTrigger className="w-48 border-accent dark:border-gray-600 dark:bg-gray-800">
                     <SelectValue placeholder="جميع الصفوف" />
                   </SelectTrigger>
                   <SelectContent>
@@ -168,17 +168,17 @@ const Dashboard = () => {
               </div>
             </div>
 
-            <div className="border-2 border-black rounded-md overflow-hidden">
+            <div className="border-2 border-secondary dark:border-gray-700 rounded-md overflow-hidden">
               <Table>
-                <TableHeader className="bg-black">
+                <TableHeader className="bg-secondary dark:bg-gray-800">
                   <TableRow>
-                    <TableHead className="text-right text-white">اسم الاختبار</TableHead>
-                    <TableHead className="text-right text-white">المادة</TableHead>
-                    <TableHead className="text-right text-white">الصف</TableHead>
-                    <TableHead className="text-right text-white">التاريخ</TableHead>
-                    <TableHead className="text-right text-white">نسبة النجاح</TableHead>
-                    <TableHead className="text-right text-white">الحالة</TableHead>
-                    <TableHead className="text-right text-white">الإجراءات</TableHead>
+                    <TableHead className="text-right text-secondary-foreground">اسم الاختبار</TableHead>
+                    <TableHead className="text-right text-secondary-foreground">المادة</TableHead>
+                    <TableHead className="text-right text-secondary-foreground">الصف</TableHead>
+                    <TableHead className="text-right text-secondary-foreground">التاريخ</TableHead>
+                    <TableHead className="text-right text-secondary-foreground">نسبة النجاح</TableHead>
+                    <TableHead className="text-right text-secondary-foreground">الحالة</TableHead>
+                    <TableHead className="text-right text-secondary-foreground">الإجراءات</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -193,7 +193,7 @@ const Dashboard = () => {
                       const passRate = presentResults.length > 0 ? (passedCount / presentResults.length) * 100 : 0;
                       
                         return (
-                        <TableRow key={test.id} className="hover:bg-green-50">
+                        <TableRow key={test.id} className="hover:bg-accent/10 dark:hover:bg-gray-800">
                           <TableCell className="font-medium">{test.name}</TableCell>
                           <TableCell>{subject?.name || ''}</TableCell>
                           <TableCell>
