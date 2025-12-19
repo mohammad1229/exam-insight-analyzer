@@ -517,6 +517,37 @@ const SystemAdmin = () => {
                         onChange={(e) => setDirectorName(e.target.value)}
                       />
                     </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="validityMonths">مدة الصلاحية (بالأشهر)</Label>
+                      <Select defaultValue="12">
+                        <SelectTrigger>
+                          <SelectValue placeholder="اختر المدة" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="1">شهر واحد</SelectItem>
+                          <SelectItem value="3">3 أشهر</SelectItem>
+                          <SelectItem value="6">6 أشهر</SelectItem>
+                          <SelectItem value="12">سنة كاملة</SelectItem>
+                          <SelectItem value="24">سنتان</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="maxDevices">عدد الأجهزة المسموحة</Label>
+                      <Select defaultValue="1">
+                        <SelectTrigger>
+                          <SelectValue placeholder="اختر العدد" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="1">جهاز واحد</SelectItem>
+                          <SelectItem value="2">جهازين</SelectItem>
+                          <SelectItem value="3">3 أجهزة</SelectItem>
+                          <SelectItem value="5">5 أجهزة</SelectItem>
+                          <SelectItem value="10">10 أجهزة</SelectItem>
+                          <SelectItem value="999">غير محدود</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                     <Button 
                       onClick={generateLicenseKey}
                       className="w-full bg-green-600 hover:bg-green-700"
@@ -542,28 +573,62 @@ const SystemAdmin = () => {
                         <TableHeader className="bg-black text-white">
                           <TableRow>
                             <TableHead className="text-right text-white">المفتاح</TableHead>
-                            <TableHead className="text-right text-white">اسم المدرسة</TableHead>
-                            <TableHead className="text-right text-white">تاريخ الإنشاء</TableHead>
-                            <TableHead className="text-right text-white">صالح حتى</TableHead>
+                            <TableHead className="text-right text-white">المدرسة</TableHead>
+                            <TableHead className="text-right text-white">النوع</TableHead>
+                            <TableHead className="text-right text-white">الأجهزة</TableHead>
+                            <TableHead className="text-right text-white">انتهاء الصلاحية</TableHead>
                             <TableHead className="text-right text-white">الحالة</TableHead>
+                            <TableHead className="text-right text-white">الإجراءات</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {licenses.map((license, index) => (
-                            <TableRow key={index} className="border-t hover:bg-gray-50">
-                              <TableCell className="font-mono">{license.key}</TableCell>
-                              <TableCell>{license.schoolName || "غير محدد"}</TableCell>
-                              <TableCell>{new Date(license.createdAt).toLocaleDateString('ar-SA')}</TableCell>
-                              <TableCell>{new Date(license.validUntil).toLocaleDateString('ar-SA')}</TableCell>
-                              <TableCell>
-                                <span className={`px-2 py-1 rounded text-sm ${
-                                  license.used ? 'bg-gray-200' : 'bg-green-100 text-green-800'
-                                }`}>
-                                  {license.used ? "مستخدم" : "متاح"}
-                                </span>
-                              </TableCell>
-                            </TableRow>
-                          ))}
+                          {licenses.map((license, index) => {
+                            const isExpired = license.validUntil && new Date(license.validUntil) < new Date();
+                            const isTrial = license.isTrial || license.is_trial;
+                            const remainingDays = license.validUntil 
+                              ? Math.ceil((new Date(license.validUntil).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+                              : 0;
+                            
+                            return (
+                              <TableRow key={index} className="border-t hover:bg-gray-50">
+                                <TableCell className="font-mono text-sm">{license.key || license.license_key}</TableCell>
+                                <TableCell>{license.schoolName || license.schools?.name || "غير محدد"}</TableCell>
+                                <TableCell>
+                                  <span className={`px-2 py-1 rounded text-xs ${
+                                    isTrial ? 'bg-yellow-100 text-yellow-800' : 'bg-blue-100 text-blue-800'
+                                  }`}>
+                                    {isTrial ? `تجريبي (${remainingDays} يوم)` : "مرخص"}
+                                  </span>
+                                </TableCell>
+                                <TableCell>
+                                  {license.devicesUsed || license.device_activations?.length || 0} / {license.maxDevices || license.max_devices || 1}
+                                </TableCell>
+                                <TableCell>
+                                  {license.validUntil || license.expiry_date 
+                                    ? new Date(license.validUntil || license.expiry_date).toLocaleDateString('ar-SA')
+                                    : "-"
+                                  }
+                                </TableCell>
+                                <TableCell>
+                                  <span className={`px-2 py-1 rounded text-xs ${
+                                    isExpired ? 'bg-red-100 text-red-800' : 
+                                    license.used || !license.is_active ? 'bg-gray-200' : 'bg-green-100 text-green-800'
+                                  }`}>
+                                    {isExpired ? "منتهي" : license.used ? "مستخدم" : "نشط"}
+                                  </span>
+                                </TableCell>
+                                <TableCell>
+                                  <Button 
+                                    variant="outline" 
+                                    size="sm"
+                                    className="text-blue-600 border-blue-600 hover:bg-blue-50"
+                                  >
+                                    تجديد
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
                         </TableBody>
                       </Table>
                     </div>
@@ -816,16 +881,61 @@ const SystemAdmin = () => {
                 </CardContent>
               </Card>
               
+              <Card className="border-2 border-purple-500">
+                <CardHeader className="bg-gradient-to-r from-purple-100 to-white border-b border-purple-500">
+                  <CardTitle>إعدادات التذييل والحقوق</CardTitle>
+                </CardHeader>
+                <CardContent className="pt-6">
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>نص الحقوق (أسفل التقرير)</Label>
+                      <Input 
+                        placeholder="مثال: جميع الحقوق محفوظة © 2025"
+                        defaultValue={localStorage.getItem("copyrightText") || ""}
+                        onChange={(e) => localStorage.setItem("copyrightText", e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>عبارة إضافية</Label>
+                      <Textarea 
+                        placeholder="أي عبارة تريد إظهارها أسفل التقرير..."
+                        rows={3}
+                        defaultValue={localStorage.getItem("footerNote") || ""}
+                        onChange={(e) => localStorage.setItem("footerNote", e.target.value)}
+                      />
+                    </div>
+                    <Button 
+                      className="bg-purple-600 hover:bg-purple-700"
+                      onClick={() => {
+                        toast({
+                          title: "تم الحفظ",
+                          description: "تم حفظ إعدادات التذييل بنجاح",
+                        });
+                      }}
+                    >
+                      حفظ إعدادات التذييل
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
               <Card className="border-2 border-black">
                 <CardHeader className="bg-gradient-to-r from-gray-100 to-white border-b border-black">
                   <CardTitle>النسخ الاحتياطي واستعادة البيانات</CardTitle>
                 </CardHeader>
                 <CardContent className="pt-6">
                   <div className="space-y-6">
+                    <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                      <h4 className="font-medium text-blue-800 mb-2">النسخ الاحتياطي التلقائي</h4>
+                      <p className="text-sm text-blue-600">
+                        يتم إنشاء نسخة احتياطية تلقائياً يومياً في الساعة 11 مساءً
+                      </p>
+                    </div>
+                    
                     <div className="space-y-2">
-                      <h3 className="font-medium">إنشاء نسخة احتياطية</h3>
+                      <h3 className="font-medium">إنشاء نسخة احتياطية يدوية</h3>
                       <p className="text-sm text-muted-foreground">
-                        قم بإنشاء نسخة احتياطية من جميع بيانات النظام
+                        قم بإنشاء نسخة احتياطية من جميع بيانات النظام الآن
                       </p>
                       <Button 
                         variant="outline" 
@@ -840,7 +950,7 @@ const SystemAdmin = () => {
                     <div className="space-y-2">
                       <h3 className="font-medium">استعادة البيانات</h3>
                       <p className="text-sm text-muted-foreground">
-                        استعادة البيانات من نسخة احتياطية سابقة (متوفرة في النسخة المثبتة فقط)
+                        استعادة البيانات من نسخة احتياطية سابقة
                       </p>
                       {isElectron() ? (
                         <Label htmlFor="restoreFile" className="block w-full">
@@ -860,9 +970,43 @@ const SystemAdmin = () => {
                           </div>
                         </Label>
                       ) : (
-                        <div className="cursor-not-allowed border-2 border-dashed border-gray-300 rounded-md p-6 text-center bg-gray-50">
-                          <span className="text-gray-500">وظيفة استعادة البيانات متاحة في النسخة المثبتة فقط</span>
-                        </div>
+                        <Label htmlFor="restoreFileWeb" className="block w-full">
+                          <div className="cursor-pointer border-2 border-dashed border-gray-300 rounded-md p-6 text-center hover:border-gray-400">
+                            <Input 
+                              id="restoreFileWeb" 
+                              type="file" 
+                              accept=".json"
+                              className="hidden" 
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  const reader = new FileReader();
+                                  reader.onload = (event) => {
+                                    try {
+                                      const data = JSON.parse(event.target?.result as string);
+                                      // Restore each key
+                                      Object.keys(data).forEach(key => {
+                                        localStorage.setItem(key, JSON.stringify(data[key]));
+                                      });
+                                      toast({
+                                        title: "تم الاستعادة",
+                                        description: "تم استعادة البيانات بنجاح. يرجى تحديث الصفحة.",
+                                      });
+                                    } catch (error) {
+                                      toast({
+                                        title: "خطأ",
+                                        description: "ملف النسخة الاحتياطية غير صالح",
+                                        variant: "destructive",
+                                      });
+                                    }
+                                  };
+                                  reader.readAsText(file);
+                                }
+                              }}
+                            />
+                            <span className="text-gray-600">اختر ملف النسخة الاحتياطية (JSON)</span>
+                          </div>
+                        </Label>
                       )}
                     </div>
                   </div>
