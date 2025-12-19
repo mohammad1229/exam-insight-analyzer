@@ -99,9 +99,18 @@ const AdminDashboard = () => {
   // Get recent tests (last 5)
   const recentTests = tests.slice(-5).reverse();
 
+  const handleLoginSuccess = () => {
+    const schoolAdminId = localStorage.getItem("schoolAdminId");
+    const schoolAdminName = localStorage.getItem("schoolAdminName");
+    if (schoolAdminId) {
+      setIsLoggedIn(true);
+      setAdminName(schoolAdminName || "");
+    }
+  };
+
   // Login form
   if (!isLoggedIn) {
-    return <AdminLoginForm />;
+    return <AdminLoginForm onLoginSuccess={handleLoginSuccess} />;
   }
 
   return (

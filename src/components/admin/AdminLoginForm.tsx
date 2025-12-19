@@ -7,9 +7,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { verifySchoolAdminLogin } from "@/services/licenseService";
-import { Loader2 } from "lucide-react";
+import { Loader2, ArrowRight } from "lucide-react";
 
-const AdminLoginForm = () => {
+interface AdminLoginFormProps {
+  onLoginSuccess?: () => void;
+}
+
+const AdminLoginForm = ({ onLoginSuccess }: AdminLoginFormProps) => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [username, setUsername] = useState("");
@@ -43,7 +47,10 @@ const AdminLoginForm = () => {
           description: `مرحباً بك ${result.admin.full_name}`,
         });
         
-        navigate("/admin-dashboard");
+        // Call the callback to update parent state
+        if (onLoginSuccess) {
+          onLoginSuccess();
+        }
       } else {
         toast({
           title: "فشل تسجيل الدخول",
@@ -61,6 +68,10 @@ const AdminLoginForm = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleBackToMain = () => {
+    navigate("/");
   };
 
   return (
@@ -110,6 +121,15 @@ const AdminLoginForm = () => {
                 ) : (
                   "تسجيل الدخول"
                 )}
+              </Button>
+              <Button 
+                type="button"
+                variant="outline"
+                onClick={handleBackToMain}
+                className="border-gray-400 text-gray-700 hover:bg-gray-100"
+              >
+                <ArrowRight className="ml-2 h-4 w-4" />
+                العودة للشاشة الرئيسية
               </Button>
             </div>
           </form>
