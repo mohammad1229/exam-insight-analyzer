@@ -14,7 +14,7 @@ import electronService from "@/services/electronService";
 import { Database, FileKey, Lock, Settings, User, Users, RefreshCw, BarChart3, Cloud, Download, Copy, Trash2 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { getLicenses, renewLicense, getSchools, generateLicense, deleteLicense } from "@/services/licenseService";
+import { getLicenses, renewLicense, getSchools, generateLicense, deleteLicense, createSchool } from "@/services/licenseService";
 import { downloadBackup, getBackups, createAutomaticBackup } from "@/services/backupService";
 import UpdatesManagement from "@/components/admin/UpdatesManagement";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -352,57 +352,65 @@ const SystemAdmin = () => {
       });
       return;
     }
-    
+
     try {
-      let newLicense;
-      
+      let newLicense: any;
+
       if (isElectron()) {
         // Use the Electron service to generate a license
         newLicense = await electronService.generateLicense(schoolName, directorName);
-      } else {
-        // Generate in the browser
-        const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-        let key = "";
-        
-        // Format: XXXX-XXXX-XXXX-XXXX
-        for (let i = 0; i < 4; i++) {
-          for (let j = 0; j < 4; j++) {
-            key += chars.charAt(Math.floor(Math.random() * chars.length));
-          }
-          if (i < 3) key += "-";
-        }
-        
-        // Store in localStorage with expiry (1 year)
-        newLicense = {
-          key,
-          schoolName,
-          directorName,
-          createdAt: new Date().toISOString(),
-          validUntil: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
-          used: false
-        };
-        
-        const licenses = JSON.parse(localStorage.getItem("licenseKeys") || "[]");
-        licenses.push(newLicense);
-        localStorage.setItem("licenseKeys", JSON.stringify(licenses));
+
+        // Update UI
+        setLicenses((prev) => [...prev, newLicense]);
+        setSchoolName("");
+        setDirectorName("");
+
+        toast({
+          title: "تم إنشاء رمز ترخيص جديد",
+          description: `الرمز: ${newLicense.key}`,
+        });
+
+        return newLicense.key;
       }
-      
-      // Update the UI
-      setLicenses(prev => [...prev, newLicense]);
-      setSchoolName("");
-      setDirectorName("");
-      
+
+      // Web (Lovable Cloud): create school + license in database
+      const createdSchool = await createSchool({
+        name: schoolName,
+        director_name: directorName || undefined,
+      });
+
+      const result = await generateLicense(
+        createdSchool.id,
+        parseInt(validityMonths || "12"),
+        parseInt(maxDevices || "1")
+      );
+
+      if (!result.success) {
+        toast({
+          title: "خطأ في إنشاء الترخيص",
+          description: result.error || "حدث خطأ أثناء إنشاء رمز الترخيص",
+          variant: "destructive",
+        });
+        return;
+      }
+
       toast({
         title: "تم إنشاء رمز ترخيص جديد",
-        description: `الرمز: ${newLicense.key}`,
+        description: `الرمز: ${result.licenseKey}`,
       });
-      
-      return newLicense.key;
-    } catch (error) {
+
+      setSchoolName("");
+      setDirectorName("");
+
+      // Reload to show latest DB licenses
+      loadData();
+
+      return result.licenseKey;
+    } catch (error: any) {
       console.error("Error generating license:", error);
       toast({
         title: "خطأ في إنشاء الترخيص",
-        description: "حدث خطأ أثناء إنشاء رمز الترخيص",
+        description: error.message || "حدث خطأ أثناء إنشاء رمز الترخيص",
         variant: "destructive",
       });
     }
