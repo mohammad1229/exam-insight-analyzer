@@ -11,12 +11,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useToast } from "@/hooks/use-toast";
 import { isElectron } from "@/services/electronService";
 import electronService from "@/services/electronService";
-import { Database, FileKey, Lock, Settings, User, Users, RefreshCw, BarChart3, Cloud, Download } from "lucide-react";
+import { Database, FileKey, Lock, Settings, User, Users, RefreshCw, BarChart3, Cloud, Download, Copy, Trash2 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { getLicenses, renewLicense, getSchools, generateLicense } from "@/services/licenseService";
+import { getLicenses, renewLicense, getSchools, generateLicense, deleteLicense } from "@/services/licenseService";
 import { downloadBackup, getBackups, createAutomaticBackup } from "@/services/backupService";
 import UpdatesManagement from "@/components/admin/UpdatesManagement";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 const SystemAdmin = () => {
   const { toast } = useToast();
@@ -48,6 +49,10 @@ const SystemAdmin = () => {
   const [showRenewModal, setShowRenewModal] = useState(false);
   const [renewingLicense, setRenewingLicense] = useState<any>(null);
   const [renewMonths, setRenewMonths] = useState("12");
+  
+  // Delete license state
+  const [showDeleteLicenseModal, setShowDeleteLicenseModal] = useState(false);
+  const [deletingLicense, setDeletingLicense] = useState<any>(null);
   
   // Modals state
   const [showEditUserModal, setShowEditUserModal] = useState(false);
@@ -162,6 +167,45 @@ const SystemAdmin = () => {
         variant: "destructive",
       });
     }
+  };
+
+  const handleDeleteLicense = async () => {
+    if (!deletingLicense) return;
+    
+    try {
+      const result = await deleteLicense(deletingLicense.id);
+      
+      if (result.success) {
+        toast({
+          title: "تم إلغاء الترخيص",
+          description: "تم إلغاء تفعيل الترخيص بنجاح",
+        });
+        
+        setShowDeleteLicenseModal(false);
+        setDeletingLicense(null);
+        loadData();
+      } else {
+        toast({
+          title: "خطأ في الحذف",
+          description: result.error || "حدث خطأ أثناء إلغاء الترخيص",
+          variant: "destructive",
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: "خطأ",
+        description: error.message || "حدث خطأ غير متوقع",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast({
+      title: "تم النسخ",
+      description: "تم نسخ مفتاح الترخيص إلى الحافظة",
+    });
   };
   
   const handleManualBackup = async () => {
@@ -718,18 +762,41 @@ const SystemAdmin = () => {
                                   </span>
                                 </TableCell>
                                 <TableCell>
-                                  <Button 
-                                    variant="outline" 
-                                    size="sm"
-                                    className="text-blue-600 border-blue-600 hover:bg-blue-50"
-                                    onClick={() => {
-                                      setRenewingLicense(license);
-                                      setShowRenewModal(true);
-                                    }}
-                                  >
-                                    <RefreshCw className="h-3 w-3 ml-1" />
-                                    تجديد
-                                  </Button>
+                                  <div className="flex gap-1">
+                                    <Button 
+                                      variant="outline" 
+                                      size="sm"
+                                      className="text-gray-600 border-gray-400 hover:bg-gray-50"
+                                      onClick={() => copyToClipboard(license.license_key || license.key)}
+                                      title="نسخ المفتاح"
+                                    >
+                                      <Copy className="h-3 w-3" />
+                                    </Button>
+                                    <Button 
+                                      variant="outline" 
+                                      size="sm"
+                                      className="text-blue-600 border-blue-600 hover:bg-blue-50"
+                                      onClick={() => {
+                                        setRenewingLicense(license);
+                                        setShowRenewModal(true);
+                                      }}
+                                    >
+                                      <RefreshCw className="h-3 w-3 ml-1" />
+                                      تجديد
+                                    </Button>
+                                    <Button 
+                                      variant="outline" 
+                                      size="sm"
+                                      className="text-red-600 border-red-600 hover:bg-red-50"
+                                      onClick={() => {
+                                        setDeletingLicense(license);
+                                        setShowDeleteLicenseModal(true);
+                                      }}
+                                      title="حذف الترخيص"
+                                    >
+                                      <Trash2 className="h-3 w-3" />
+                                    </Button>
+                                  </div>
                                 </TableCell>
                               </TableRow>
                             );
@@ -1323,6 +1390,34 @@ const SystemAdmin = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      
+      {/* Confirm Delete License Modal */}
+      <AlertDialog open={showDeleteLicenseModal} onOpenChange={setShowDeleteLicenseModal}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>تأكيد إلغاء الترخيص</AlertDialogTitle>
+            <AlertDialogDescription className="text-right">
+              <div className="space-y-2">
+                <p>هل أنت متأكد من إلغاء هذا الترخيص؟</p>
+                <div className="p-3 bg-gray-50 rounded-lg mt-2">
+                  <p className="text-sm">المدرسة: <strong>{deletingLicense?.schools?.name || deletingLicense?.schoolName || 'غير محدد'}</strong></p>
+                  <p className="text-sm">مفتاح الترخيص: <strong className="font-mono">{deletingLicense?.license_key || deletingLicense?.key}</strong></p>
+                </div>
+                <p className="text-red-500 text-sm mt-2">سيتم إلغاء تفعيل هذا الترخيص ولن يتمكن أي جهاز من استخدامه</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex gap-2">
+            <AlertDialogCancel>إلغاء</AlertDialogCancel>
+            <AlertDialogAction 
+              className="bg-red-600 hover:bg-red-700"
+              onClick={handleDeleteLicense}
+            >
+              نعم، إلغاء الترخيص
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
