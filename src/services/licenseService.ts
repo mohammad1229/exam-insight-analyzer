@@ -307,3 +307,26 @@ export const deactivateDevice = async (deviceActivationId: string) => {
   if (error) throw error;
   return { success: true };
 };
+
+// Delete license
+export const deleteLicense = async (licenseId: string) => {
+  try {
+    // First deactivate all device activations for this license
+    await supabase
+      .from("device_activations")
+      .update({ is_active: false })
+      .eq("license_id", licenseId);
+
+    // Then deactivate the license
+    const { error } = await supabase
+      .from("licenses")
+      .update({ is_active: false })
+      .eq("id", licenseId);
+
+    if (error) throw error;
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error deleting license:", error);
+    return { success: false, error: error.message };
+  }
+};

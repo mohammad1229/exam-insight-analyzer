@@ -1,10 +1,11 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Key, Building2, Clock } from "lucide-react";
+import { Key, Building2, Clock, Settings } from "lucide-react";
 
 interface LicenseActivationProps {
   onActivate: (licenseKey: string) => Promise<{ success: boolean; error?: string }>;
@@ -13,6 +14,7 @@ interface LicenseActivationProps {
 }
 
 const LicenseActivation = ({ onActivate, onStartTrial, isLoading }: LicenseActivationProps) => {
+  const navigate = useNavigate();
   const [licenseKey, setLicenseKey] = useState("");
   const [schoolName, setSchoolName] = useState("");
   const [activeTab, setActiveTab] = useState("activate");
@@ -35,7 +37,19 @@ const LicenseActivation = ({ onActivate, onStartTrial, isLoading }: LicenseActiv
   const loading = isLoading || localLoading;
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center dir-rtl px-4 bg-gradient-to-br from-black via-gray-900 to-green-900">
+    <div className="min-h-screen flex flex-col items-center justify-center dir-rtl px-4 bg-gradient-to-br from-black via-gray-900 to-green-900 relative">
+      {/* زر دخول مسؤول النظام */}
+      <div className="absolute top-4 left-4">
+        <Button
+          variant="outline"
+          onClick={() => navigate("/system-admin")}
+          className="border-white/50 text-white hover:bg-white/10 flex items-center gap-2"
+        >
+          <Settings className="h-4 w-4" />
+          مسؤول النظام
+        </Button>
+      </div>
+
       <div className="text-center mb-8">
         <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">
           نظام تحليل نتائج الاختبارات المدرسية
