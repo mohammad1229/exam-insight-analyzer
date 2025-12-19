@@ -12,6 +12,7 @@ import ParticlesBackground from "@/components/ParticlesBackground";
 import ColorCustomizer from "@/components/ColorCustomizer";
 import PageTransition from "@/components/PageTransition";
 import { motion } from "framer-motion";
+import CopyrightFooter from "@/components/CopyrightFooter";
 
 interface LicenseActivationProps {
   onActivate: (licenseKey: string) => Promise<{ success: boolean; error?: string }>;
@@ -246,8 +247,7 @@ const LicenseActivation = ({ onActivate, onStartTrial, isLoading }: LicenseActiv
             animate={{ opacity: 1 }}
             transition={{ delay: 0.8 }}
           >
-            <p>جميع الحقوق محفوظة © {new Date().getFullYear()} - محمد الشوامرة للبرمجة والتصميم</p>
-            <p>0566000140</p>
+            <CopyrightFooter />
           </motion.div>
         </div>
       </div>

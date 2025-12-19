@@ -5,6 +5,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowRight, Users, GraduationCap, BookOpen, FileText, TrendingUp, Calendar } from "lucide-react";
 import { getStudents, getTeachers, getClasses, getTests, getSubjects } from "@/services/dataService";
 import { useLicenseContext } from "@/contexts/LicenseContext";
+import LicenseBanner from "@/components/LicenseBanner";
+import AnimatedBackground from "@/components/AnimatedBackground";
+import PageTransition from "@/components/PageTransition";
+import ThemeToggle from "@/components/ThemeToggle";
+import ColorCustomizer from "@/components/ColorCustomizer";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Legend } from "recharts";
 
 const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
@@ -104,29 +109,33 @@ const SchoolStatistics = () => {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-white to-green-50 dir-rtl">
-      <header className="bg-black text-white shadow-sm">
-        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <h1 className="text-2xl font-bold">إحصائيات المدرسة</h1>
-          <div className="flex items-center gap-4">
-            <span className="text-green-400">{schoolName}</span>
-            <Button 
-              variant="outline" 
-              className="border-white text-white hover:bg-white hover:text-black"
-              onClick={() => navigate("/")}
-            >
-              <ArrowRight className="h-4 w-4 ml-2" />
-              الرئيسية
-            </Button>
+    <PageTransition className="min-h-screen">
+      <AnimatedBackground>
+        <LicenseBanner />
+        <header className="bg-secondary/90 dark:bg-gray-900/90 backdrop-blur text-secondary-foreground shadow-sm">
+          <div className="container mx-auto px-4 py-4 flex justify-between items-center dir-rtl">
+            <h1 className="text-2xl font-bold">إحصائيات المدرسة</h1>
+            <div className="flex items-center gap-4">
+              <span className="text-accent">{schoolName}</span>
+              <ThemeToggle />
+              <ColorCustomizer />
+              <Button 
+                variant="outline" 
+                className="border-white/30 text-white hover:bg-white/20"
+                onClick={() => navigate("/")}
+              >
+                <ArrowRight className="h-4 w-4 ml-2" />
+                الرئيسية
+              </Button>
+            </div>
           </div>
-        </div>
-      </header>
+        </header>
 
-      <main className="container mx-auto px-4 py-8">
-        <div className="mb-8">
-          <h2 className="text-3xl font-bold mb-2">لوحة الإحصائيات</h2>
-          <p className="text-muted-foreground">نظرة شاملة على بيانات المدرسة</p>
-        </div>
+        <main className="container mx-auto px-4 py-8 dir-rtl">
+          <div className="mb-8">
+            <h2 className="text-3xl font-bold mb-2 text-foreground">لوحة الإحصائيات</h2>
+            <p className="text-muted-foreground">نظرة شاملة على بيانات المدرسة</p>
+          </div>
 
         {/* Stats Cards */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
@@ -290,7 +299,8 @@ const SchoolStatistics = () => {
           </Card>
         </div>
       </main>
-    </div>
+      </AnimatedBackground>
+    </PageTransition>
   );
 };
 
