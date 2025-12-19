@@ -5,6 +5,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import LicenseActivation from "@/components/LicenseActivation";
 import LicenseExpiryWarning from "@/components/LicenseExpiryWarning";
 import { useLicenseContext } from "@/contexts/LicenseContext";
+import ThemeToggle from "@/components/ThemeToggle";
+import SystemLogo from "@/components/SystemLogo";
+import ParticlesBackground from "@/components/ParticlesBackground";
 
 const Index = () => {
   const navigate = useNavigate();
@@ -42,20 +45,22 @@ const Index = () => {
   // Show welcome screen with loading bar
   if (showWelcome) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center dir-rtl px-4 bg-black">
-        <div className="text-center space-y-6 max-w-2xl">
-          <h1 className="text-5xl md:text-7xl font-bold text-white mb-6">
+      <div className="min-h-screen flex flex-col items-center justify-center dir-rtl px-4 bg-secondary dark:bg-black relative overflow-hidden">
+        <ParticlesBackground particleCount={40} />
+        <div className="text-center space-y-6 max-w-2xl relative z-10">
+          <SystemLogo size={120} className="mx-auto" />
+          <h1 className="text-4xl md:text-6xl font-bold text-primary-foreground dark:text-white mb-6">
             نظام تحليل نتائج الاختبارات المدرسية
           </h1>
           
-          <div className="w-full max-w-md mx-auto bg-gray-900 h-4 rounded-full overflow-hidden">
+          <div className="w-full max-w-md mx-auto bg-gray-900/50 h-4 rounded-full overflow-hidden backdrop-blur">
             <div 
-              className="h-full bg-gradient-to-r from-[#E84C3D] via-white to-[#34A853] transition-all duration-300"
+              className="h-full bg-gradient-to-r from-primary via-white to-accent transition-all duration-300"
               style={{ width: `${progress}%` }}
             ></div>
           </div>
           
-          <p className="text-[#34A853] text-xl">جاري تحميل النظام... {progress}%</p>
+          <p className="text-accent text-xl">جاري تحميل النظام... {progress}%</p>
         </div>
       </div>
     );
@@ -64,10 +69,10 @@ const Index = () => {
   // Show loading state while checking license
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-black via-gray-900 to-green-900">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-secondary via-background to-accent dark:from-black dark:via-gray-900 dark:to-green-900">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-4 border-t-[#E84C3D] border-[#E84C3D]/30 mx-auto"></div>
-          <p className="mt-4 text-lg text-white">جاري التحقق من الترخيص...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-4 border-t-primary border-primary/30 mx-auto"></div>
+          <p className="mt-4 text-lg text-foreground dark:text-white">جاري التحقق من الترخيص...</p>
         </div>
       </div>
     );
@@ -86,19 +91,19 @@ const Index = () => {
   // Check if license/trial expired
   if (remainingDays <= 0) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center dir-rtl px-4 bg-gradient-to-br from-black via-gray-900 to-red-900">
-        <Card className="w-full max-w-lg border-2 border-red-600 bg-white/95">
+      <div className="min-h-screen flex flex-col items-center justify-center dir-rtl px-4 bg-gradient-to-br from-secondary via-background to-destructive dark:from-black dark:via-gray-900 dark:to-red-900">
+        <Card className="w-full max-w-lg border-2 border-destructive bg-card/95 dark:bg-gray-800/95">
           <CardContent className="pt-6 text-center space-y-4">
-            <div className="text-red-600 text-6xl mb-4">⚠️</div>
-            <h2 className="text-2xl font-bold text-red-600">
+            <div className="text-destructive text-6xl mb-4">⚠️</div>
+            <h2 className="text-2xl font-bold text-destructive">
               {isTrial ? "انتهت الفترة التجريبية" : "انتهى الترخيص"}
             </h2>
-            <p className="text-gray-600">
+            <p className="text-muted-foreground">
               يرجى التواصل مع مسؤول النظام لتجديد الترخيص
             </p>
             <Button
               onClick={() => navigate("/system-admin")}
-              className="bg-[#E84C3D] hover:bg-red-700"
+              className="bg-primary hover:bg-primary/90"
             >
               الذهاب لصفحة التجديد
             </Button>
@@ -110,7 +115,12 @@ const Index = () => {
 
   // Main page with license info
   return (
-    <div className="min-h-screen flex flex-col dir-rtl">
+    <div className="min-h-screen flex flex-col dir-rtl bg-gradient-to-b from-secondary via-background to-accent dark:from-black dark:via-gray-900 dark:to-green-900 relative">
+      {/* زر تبديل الوضع */}
+      <div className="absolute top-4 left-4 z-50">
+        <ThemeToggle />
+      </div>
+
       {/* License expiry warning banner */}
       {showExpiryWarning && (
         <LicenseExpiryWarning
@@ -119,36 +129,39 @@ const Index = () => {
         />
       )}
 
-      <div className="flex-1 flex flex-col items-center justify-center px-4 palestine-gradient">
+      <div className="flex-1 flex flex-col items-center justify-center px-4 relative">
+        <ParticlesBackground particleCount={30} />
+        
         <div className="space-y-8 text-center max-w-3xl relative z-10">
           <div className="mb-8">
-            <h1 className="text-4xl md:text-6xl font-bold tracking-tighter text-[#E84c3d] mb-4">
+            <SystemLogo size={100} className="mx-auto mb-6" />
+            <h1 className="text-4xl md:text-5xl font-bold tracking-tighter text-primary dark:text-red-400 mb-4">
               نظام تحليل نتائج الاختبارات المدرسية
             </h1>
             
-            <p className="text-xl md:text-2xl text-black font-medium">
+            <p className="text-lg md:text-xl text-foreground/80 dark:text-gray-300 font-medium">
               منصة متكاملة لإدارة وتحليل نتائج الاختبارات وإصدار التقارير الإحصائية
             </p>
           </div>
 
           {/* School and license info */}
-          <Card className="palestine-card max-w-md mx-auto">
+          <Card className="border-2 border-primary/50 bg-card/80 dark:bg-gray-800/80 backdrop-blur max-w-md mx-auto">
             <CardContent className="pt-6 pb-6">
               <div className="space-y-3 text-right">
                 {schoolName && (
                   <div className="text-lg">
-                    <span className="text-gray-600">المدرسة: </span>
-                    <span className="font-bold text-[#E84c3d]">{schoolName}</span>
+                    <span className="text-muted-foreground">المدرسة: </span>
+                    <span className="font-bold text-primary">{schoolName}</span>
                   </div>
                 )}
                 <div className="text-sm">
                   <span className={`px-3 py-1 rounded-full ${
-                    isTrial ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'
+                    isTrial ? 'bg-yellow-100 dark:bg-yellow-900/50 text-yellow-800 dark:text-yellow-200' : 'bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-200'
                   }`}>
                     {isTrial ? `فترة تجريبية` : "ترخيص مفعل"}
                   </span>
-                  <span className="mr-2 text-gray-600">
-                    متبقي <span className="font-bold text-[#E84c3d]">{remainingDays}</span> يوم
+                  <span className="mr-2 text-muted-foreground">
+                    متبقي <span className="font-bold text-primary">{remainingDays}</span> يوم
                   </span>
                 </div>
               </div>
@@ -158,7 +171,7 @@ const Index = () => {
           <div className="pt-6 flex flex-wrap justify-center gap-4">
             <Button 
               size="lg" 
-              className="palestine-button-secondary"
+              className="bg-secondary text-secondary-foreground hover:bg-secondary/90 dark:bg-gray-800 dark:hover:bg-gray-700"
               onClick={() => navigate("/teacher-login")}
             >
               دخول المعلمين
@@ -167,7 +180,7 @@ const Index = () => {
             <Button 
               variant="outline" 
               size="lg"
-              className="border-[#E84c3d] text-[#E84c3d] hover:bg-[#E84c3d] hover:text-white"
+              className="border-primary text-primary hover:bg-primary hover:text-primary-foreground dark:border-red-400 dark:text-red-400"
               onClick={() => navigate("/admin")}
             >
               لوحة تحكم المدير
@@ -176,7 +189,7 @@ const Index = () => {
             <Button 
               variant="outline" 
               size="lg"
-              className="border-[#34A853] text-[#34A853] hover:bg-[#34A853] hover:text-white"
+              className="border-accent text-accent-foreground bg-accent/20 hover:bg-accent hover:text-accent-foreground dark:border-green-400 dark:text-green-400"
               onClick={() => navigate("/statistics")}
             >
               الإحصائيات
@@ -185,7 +198,7 @@ const Index = () => {
             <Button 
               variant="outline" 
               size="lg"
-              className="border-gray-600 text-gray-600 hover:bg-gray-600 hover:text-white"
+              className="border-muted-foreground text-muted-foreground hover:bg-muted-foreground hover:text-background dark:border-gray-400 dark:text-gray-400"
               onClick={() => navigate("/system-admin")}
             >
               مسؤول النظام
@@ -193,7 +206,7 @@ const Index = () => {
           </div>
         </div>
         
-        <div className="absolute bottom-6 text-center text-sm text-black">
+        <div className="absolute bottom-6 text-center text-sm text-foreground/60 dark:text-gray-400">
           <p>جميع الحقوق محفوظة © {new Date().getFullYear()} - محمد الشوامرة للبرمجة والتصميم</p>
           <p>0566000140</p>
         </div>

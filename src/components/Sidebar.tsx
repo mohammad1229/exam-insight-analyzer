@@ -34,7 +34,7 @@ const Sidebar = () => {
   return (
     <div
       className={cn(
-        "h-screen bg-sidebar transition-all duration-300 overflow-y-auto dir-rtl",
+        "h-screen bg-sidebar dark:bg-gray-900 transition-all duration-300 overflow-y-auto dir-rtl border-l border-sidebar-border dark:border-gray-800",
         collapsed ? "w-16" : "w-64"
       )}
     >
