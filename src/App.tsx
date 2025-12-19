@@ -1,6 +1,8 @@
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route } from "react-router-dom";
 import { Toaster } from "@/components/ui/toaster";
+import { useEffect } from "react";
 import { LicenseProvider } from "@/contexts/LicenseContext";
+import { initializeBackupScheduler } from "@/services/backupService";
 import Welcome from "./pages/Welcome";
 import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
@@ -10,9 +12,15 @@ import Admin from "./pages/Admin";
 import AdminDashboard from "./pages/AdminDashboard";
 import TeacherLogin from "./pages/TeacherLogin";
 import SystemAdmin from "./pages/SystemAdmin";
+import SchoolStatistics from "./pages/SchoolStatistics";
 import NotFound from "./pages/NotFound";
 
 function App() {
+  useEffect(() => {
+    // Initialize automatic backup scheduler
+    initializeBackupScheduler();
+  }, []);
+
   return (
     <LicenseProvider>
       <Routes>
@@ -26,6 +34,7 @@ function App() {
         <Route path="/admin-dashboard" element={<AdminDashboard />} />
         <Route path="/teacher-login" element={<TeacherLogin />} />
         <Route path="/system-admin" element={<SystemAdmin />} />
+        <Route path="/statistics" element={<SchoolStatistics />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
       <Toaster />
