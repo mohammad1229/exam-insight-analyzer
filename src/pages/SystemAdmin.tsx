@@ -11,9 +11,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useToast } from "@/hooks/use-toast";
 import { isElectron } from "@/services/electronService";
 import electronService from "@/services/electronService";
-import { Database, FileKey, Lock, Settings, User, Users } from "lucide-react";
+import { Database, FileKey, Lock, Settings, User, Users, RefreshCw, BarChart3, Cloud } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { getLicenses, renewLicense, getSchools, generateLicense } from "@/services/licenseService";
+import { downloadBackup, getBackups, createAutomaticBackup } from "@/services/backupService";
 
 const SystemAdmin = () => {
   const { toast } = useToast();
@@ -35,6 +37,16 @@ const SystemAdmin = () => {
   const [licenses, setLicenses] = useState<any[]>([]);
   const [schoolName, setSchoolName] = useState("");
   const [directorName, setDirectorName] = useState("");
+  const [validityMonths, setValidityMonths] = useState("12");
+  const [maxDevices, setMaxDevices] = useState("1");
+  const [schools, setSchools] = useState<any[]>([]);
+  const [backups, setBackups] = useState<any[]>([]);
+  const [isLoadingBackups, setIsLoadingBackups] = useState(false);
+  
+  // Renewal state
+  const [showRenewModal, setShowRenewModal] = useState(false);
+  const [renewingLicense, setRenewingLicense] = useState<any>(null);
+  const [renewMonths, setRenewMonths] = useState("12");
   
   // Modals state
   const [showEditUserModal, setShowEditUserModal] = useState(false);
@@ -101,6 +113,89 @@ const SystemAdmin = () => {
       setTeachers(storedTeachers);
       setLicenses(storedLicenses);
       setTests(storedTests);
+      
+      // Load from Supabase as well
+      try {
+        const licensesFromDb = await getLicenses();
+        if (licensesFromDb && licensesFromDb.length > 0) {
+          setLicenses(licensesFromDb);
+        }
+        
+        const schoolsFromDb = await getSchools();
+        setSchools(schoolsFromDb || []);
+        
+        const backupsFromDb = await getBackups();
+        setBackups(backupsFromDb || []);
+      } catch (error) {
+        console.error("Error loading from database:", error);
+      }
+    }
+  };
+  
+  const handleRenewLicense = async () => {
+    if (!renewingLicense) return;
+    
+    try {
+      const result = await renewLicense(renewingLicense.id, parseInt(renewMonths));
+      
+      if (result.success) {
+        toast({
+          title: "تم تجديد الترخيص",
+          description: `تم تجديد الترخيص حتى ${new Date(result.newExpiry!).toLocaleDateString('ar-SA')}`,
+        });
+        
+        setShowRenewModal(false);
+        setRenewingLicense(null);
+        loadData();
+      } else {
+        toast({
+          title: "خطأ في التجديد",
+          description: result.error || "حدث خطأ أثناء تجديد الترخيص",
+          variant: "destructive",
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: "خطأ",
+        description: error.message || "حدث خطأ غير متوقع",
+        variant: "destructive",
+      });
+    }
+  };
+  
+  const handleManualBackup = async () => {
+    try {
+      const result = downloadBackup();
+      toast({
+        title: "تم إنشاء النسخة الاحتياطية",
+        description: `تم تنزيل الملف: ${result.filename}`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "خطأ في النسخ الاحتياطي",
+        description: error.message || "حدث خطأ أثناء إنشاء النسخة الاحتياطية",
+        variant: "destructive",
+      });
+    }
+  };
+  
+  const handleCloudBackup = async () => {
+    try {
+      setIsLoadingBackups(true);
+      await createAutomaticBackup();
+      toast({
+        title: "تم النسخ الاحتياطي",
+        description: "تم حفظ النسخة الاحتياطية في السحابة",
+      });
+      loadData();
+    } catch (error: any) {
+      toast({
+        title: "خطأ",
+        description: error.message || "حدث خطأ أثناء النسخ الاحتياطي",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingBackups(false);
     }
   };
   
@@ -622,7 +717,12 @@ const SystemAdmin = () => {
                                     variant="outline" 
                                     size="sm"
                                     className="text-blue-600 border-blue-600 hover:bg-blue-50"
+                                    onClick={() => {
+                                      setRenewingLicense(license);
+                                      setShowRenewModal(true);
+                                    }}
                                   >
+                                    <RefreshCw className="h-3 w-3 ml-1" />
                                     تجديد
                                   </Button>
                                 </TableCell>
@@ -932,20 +1032,85 @@ const SystemAdmin = () => {
                       </p>
                     </div>
                     
-                    <div className="space-y-2">
-                      <h3 className="font-medium">إنشاء نسخة احتياطية يدوية</h3>
-                      <p className="text-sm text-muted-foreground">
-                        قم بإنشاء نسخة احتياطية من جميع بيانات النظام الآن
-                      </p>
-                      <Button 
-                        variant="outline" 
-                        className="w-full border-green-600 text-green-600 hover:bg-green-600 hover:text-white"
-                        onClick={handleBackupDatabase}
-                      >
-                        <Database className="h-4 w-4 ml-2" />
-                        إنشاء نسخة احتياطية
-                      </Button>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <h3 className="font-medium">نسخة احتياطية محلية</h3>
+                        <p className="text-sm text-muted-foreground">
+                          تنزيل نسخة احتياطية على جهازك
+                        </p>
+                        <Button 
+                          variant="outline" 
+                          className="w-full border-green-600 text-green-600 hover:bg-green-600 hover:text-white"
+                          onClick={handleManualBackup}
+                        >
+                          <Database className="h-4 w-4 ml-2" />
+                          تنزيل نسخة احتياطية
+                        </Button>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <h3 className="font-medium">نسخة احتياطية سحابية</h3>
+                        <p className="text-sm text-muted-foreground">
+                          حفظ نسخة احتياطية في السحابة
+                        </p>
+                        <Button 
+                          variant="outline" 
+                          className="w-full border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white"
+                          onClick={handleCloudBackup}
+                          disabled={isLoadingBackups}
+                        >
+                          <Cloud className="h-4 w-4 ml-2" />
+                          {isLoadingBackups ? "جاري الحفظ..." : "حفظ في السحابة"}
+                        </Button>
+                      </div>
                     </div>
+                    
+                    {/* Backups History */}
+                    {backups.length > 0 && (
+                      <div className="space-y-2">
+                        <h3 className="font-medium">سجل النسخ الاحتياطية</h3>
+                        <div className="border rounded-lg overflow-hidden max-h-[200px] overflow-y-auto">
+                          <Table>
+                            <TableHeader className="bg-gray-100">
+                              <TableRow>
+                                <TableHead className="text-right">المدرسة</TableHead>
+                                <TableHead className="text-right">النوع</TableHead>
+                                <TableHead className="text-right">التاريخ</TableHead>
+                                <TableHead className="text-right">الحالة</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {backups.slice(0, 5).map((backup) => (
+                                <TableRow key={backup.id}>
+                                  <TableCell>{backup.school_name || 'غير محدد'}</TableCell>
+                                  <TableCell>
+                                    <span className={`px-2 py-1 rounded text-xs ${
+                                      backup.backup_type === 'automatic' 
+                                        ? 'bg-blue-100 text-blue-800' 
+                                        : 'bg-green-100 text-green-800'
+                                    }`}>
+                                      {backup.backup_type === 'automatic' ? 'تلقائي' : 'يدوي'}
+                                    </span>
+                                  </TableCell>
+                                  <TableCell>
+                                    {new Date(backup.created_at).toLocaleDateString('ar-SA')}
+                                  </TableCell>
+                                  <TableCell>
+                                    <span className={`px-2 py-1 rounded text-xs ${
+                                      backup.status === 'completed' 
+                                        ? 'bg-green-100 text-green-800' 
+                                        : 'bg-yellow-100 text-yellow-800'
+                                    }`}>
+                                      {backup.status === 'completed' ? 'مكتمل' : 'قيد التنفيذ'}
+                                    </span>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </div>
+                    )}
                     
                     <div className="space-y-2">
                       <h3 className="font-medium">استعادة البيانات</h3>
@@ -1102,6 +1267,48 @@ const SystemAdmin = () => {
             </Button>
             <Button type="button" variant="destructive" onClick={handleDeleteUser}>
               نعم، احذف المستخدم
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Renew License Modal */}
+      <Dialog open={showRenewModal} onOpenChange={setShowRenewModal}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>تجديد الترخيص</DialogTitle>
+          </DialogHeader>
+          
+          <div className="py-4 space-y-4">
+            <div className="p-3 bg-blue-50 rounded-lg">
+              <p className="text-sm">المدرسة: <strong>{renewingLicense?.schools?.name || renewingLicense?.schoolName || 'غير محدد'}</strong></p>
+              <p className="text-sm">مفتاح الترخيص: <strong className="font-mono">{renewingLicense?.license_key || renewingLicense?.key}</strong></p>
+            </div>
+            
+            <div className="space-y-2">
+              <Label>مدة التجديد</Label>
+              <Select value={renewMonths} onValueChange={setRenewMonths}>
+                <SelectTrigger>
+                  <SelectValue placeholder="اختر المدة" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">شهر واحد</SelectItem>
+                  <SelectItem value="3">3 أشهر</SelectItem>
+                  <SelectItem value="6">6 أشهر</SelectItem>
+                  <SelectItem value="12">سنة كاملة</SelectItem>
+                  <SelectItem value="24">سنتان</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setShowRenewModal(false)}>
+              إلغاء
+            </Button>
+            <Button type="button" className="bg-blue-600 hover:bg-blue-700" onClick={handleRenewLicense}>
+              <RefreshCw className="h-4 w-4 ml-2" />
+              تجديد الترخيص
             </Button>
           </DialogFooter>
         </DialogContent>

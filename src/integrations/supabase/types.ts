@@ -24,6 +24,7 @@ export type Database = {
           file_size: number | null
           id: string
           school_id: string
+          school_name: string | null
           status: string
         }
         Insert: {
@@ -35,6 +36,7 @@ export type Database = {
           file_size?: number | null
           id?: string
           school_id: string
+          school_name?: string | null
           status?: string
         }
         Update: {
@@ -46,6 +48,7 @@ export type Database = {
           file_size?: number | null
           id?: string
           school_id?: string
+          school_name?: string | null
           status?: string
         }
         Relationships: [
