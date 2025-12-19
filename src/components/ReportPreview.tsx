@@ -344,63 +344,64 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({ test, open, onClose }) =>
 
     currentY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 4 : currentY + 50;
 
-    // === STATISTICS SECTION - Side by Side ===
-    if (currentY > pageHeight - 60) {
+    // === COMPACT STATISTICS SECTION - Always at Bottom ===
+    // Check if we need a new page
+    if (currentY > pageHeight - 50) {
       doc.addPage();
       currentY = 15;
     }
 
-    doc.setFontSize(10);
+    doc.setFontSize(9);
     doc.setTextColor(0, 0, 0);
-    doc.text("الإحصائيات التفصيلية", centerCol, currentY, { align: "center" });
-    currentY += 4;
+    doc.text("الإحصائيات", pageWidth - margin, currentY, { align: "right" });
+    currentY += 3;
 
-    // Stats table (left side)
-    const statsTableWidth = 80;
-    const chartStartX = margin + statsTableWidth + 10;
+    // Small stats table (right side) - 60mm width
+    const statsTableWidth = 55;
+    const chartWidth = 90;
+    const chartStartX = margin;
 
-    // Performance levels summary table
+    // Performance levels summary table - smaller
     doc.autoTable({
       startY: currentY,
       head: [["النسبة", "العدد", "المستوى"]],
       body: [
-        [`${((stats.excellentCount / stats.presentCount) * 100 || 0).toFixed(1)}%`, stats.excellentCount, "ممتاز (85%+)"],
-        [`${((stats.goodCount / stats.presentCount) * 100 || 0).toFixed(1)}%`, stats.goodCount, "جيد (75-84%)"],
-        [`${((stats.averageCount / stats.presentCount) * 100 || 0).toFixed(1)}%`, stats.averageCount, "متوسط (65-74%)"],
-        [`${((stats.lowCount / stats.presentCount) * 100 || 0).toFixed(1)}%`, stats.lowCount, "متدني (50-64%)"],
-        [`${((stats.failedCount / stats.presentCount) * 100 || 0).toFixed(1)}%`, stats.failedCount, "راسب (<50%)"],
+        [`${((stats.excellentCount / stats.presentCount) * 100 || 0).toFixed(0)}%`, stats.excellentCount, "ممتاز (85%+)"],
+        [`${((stats.goodCount / stats.presentCount) * 100 || 0).toFixed(0)}%`, stats.goodCount, "جيد (75-84%)"],
+        [`${((stats.averageCount / stats.presentCount) * 100 || 0).toFixed(0)}%`, stats.averageCount, "متوسط (65-74%)"],
+        [`${((stats.lowCount / stats.presentCount) * 100 || 0).toFixed(0)}%`, stats.lowCount, "متدني (50-64%)"],
+        [`${((stats.failedCount / stats.presentCount) * 100 || 0).toFixed(0)}%`, stats.failedCount, "راسب (<50%)"],
       ],
       theme: "grid",
       styles: { 
         halign: "center", 
-        fontSize: 8, 
-        cellPadding: 1.5, 
+        fontSize: 7, 
+        cellPadding: 1, 
         font: ARABIC_FONT_NAME 
       },
       headStyles: { 
         fillColor: [50, 50, 50], 
         textColor: [255, 255, 255], 
-        fontSize: 8 
+        fontSize: 7 
       },
       margin: { left: pageWidth - margin - statsTableWidth, right: margin },
       tableWidth: statsTableWidth,
       didParseCell: (data: any) => {
         if (data.section === "body") {
           const rowIndex = data.row.index;
-          if (rowIndex === 0) data.cell.styles.fillColor = [200, 255, 200]; // Excellent - Green
-          else if (rowIndex === 1) data.cell.styles.fillColor = [200, 220, 255]; // Good - Blue
-          else if (rowIndex === 2) data.cell.styles.fillColor = [255, 255, 200]; // Average - Yellow
-          else if (rowIndex === 3) data.cell.styles.fillColor = [255, 230, 200]; // Low - Orange
-          else if (rowIndex === 4) data.cell.styles.fillColor = [255, 200, 200]; // Failed - Red
+          if (rowIndex === 0) data.cell.styles.fillColor = [200, 255, 200];
+          else if (rowIndex === 1) data.cell.styles.fillColor = [200, 220, 255];
+          else if (rowIndex === 2) data.cell.styles.fillColor = [255, 255, 200];
+          else if (rowIndex === 3) data.cell.styles.fillColor = [255, 230, 200];
+          else if (rowIndex === 4) data.cell.styles.fillColor = [255, 200, 200];
         }
       },
     });
 
-    // Draw bar chart on the left side
+    // Draw smaller bar chart on the left side
     const chartY = currentY;
-    const chartHeight = 35;
-    const chartWidth = pageWidth - statsTableWidth - margin * 3 - 10;
-    const barWidth = chartWidth / 5 - 5;
+    const chartHeight = 28;
+    const barWidth = (chartWidth - 30) / 5;
     
     const levels = [
       { count: stats.excellentCount, label: "ممتاز", color: [34, 197, 94] },
@@ -414,20 +415,20 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({ test, open, onClose }) =>
 
     // Chart border
     doc.setDrawColor(150, 150, 150);
-    doc.setLineWidth(0.3);
-    doc.rect(margin, chartY, chartWidth, chartHeight);
+    doc.setLineWidth(0.2);
+    doc.rect(chartStartX, chartY, chartWidth, chartHeight);
 
     // Draw bars
     levels.forEach((level, i) => {
-      const barHeight = (level.count / maxCount) * (chartHeight - 10);
-      const barX = margin + 5 + i * (barWidth + 5);
-      const barY = chartY + chartHeight - barHeight - 5;
+      const barHeight = (level.count / maxCount) * (chartHeight - 8);
+      const barX = chartStartX + 5 + i * (barWidth + 5);
+      const barY = chartY + chartHeight - barHeight - 4;
 
       doc.setFillColor(level.color[0], level.color[1], level.color[2]);
       doc.rect(barX, barY, barWidth, barHeight, "F");
 
       // Label
-      doc.setFontSize(6);
+      doc.setFontSize(5);
       doc.setTextColor(0, 0, 0);
       doc.text(level.label, barX + barWidth / 2, chartY + chartHeight - 1, { align: "center" });
       doc.text(String(level.count), barX + barWidth / 2, barY - 1, { align: "center" });
@@ -436,65 +437,9 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({ test, open, onClose }) =>
     currentY = Math.max(
       doc.lastAutoTable ? doc.lastAutoTable.finalY : currentY,
       chartY + chartHeight
-    ) + 4;
+    ) + 3;
 
-    // === DETAILED QUESTION STATISTICS ===
-    if (currentY > pageHeight - 40) {
-      doc.addPage();
-      currentY = 15;
-    }
-
-    const statsHeaders = ["المجموع", ...test.questions.map((q: any) => q.type).reverse(), "البيان"];
-    
-    const totalExcellent = stats.questionStats.reduce((sum: number, q: any) => sum + q.excellentCount, 0);
-    const totalGood = stats.questionStats.reduce((sum: number, q: any) => sum + q.goodCount, 0);
-    const totalAverage = stats.questionStats.reduce((sum: number, q: any) => sum + q.averageCount, 0);
-    const totalLow = stats.questionStats.reduce((sum: number, q: any) => sum + q.lowCount, 0);
-    const totalFailed = stats.questionStats.reduce((sum: number, q: any) => sum + q.failedCount, 0);
-
-    const statsData = [
-      [stats.totalMaxScore, ...test.questions.map((q: any) => q.maxScore).reverse(), "الدرجة العظمى"],
-      [totalExcellent, ...stats.questionStats.map((q: any) => q.excellentCount).reverse(), "ممتاز (85%+)"],
-      [totalGood, ...stats.questionStats.map((q: any) => q.goodCount).reverse(), "جيد (75-84%)"],
-      [totalAverage, ...stats.questionStats.map((q: any) => q.averageCount).reverse(), "متوسط (65-74%)"],
-      [totalLow, ...stats.questionStats.map((q: any) => q.lowCount).reverse(), "متدني (50-64%)"],
-      [totalFailed, ...stats.questionStats.map((q: any) => q.failedCount).reverse(), "راسب (<50%)"],
-      [stats.avgTotal.toFixed(1), ...stats.questionStats.map((q: any) => q.avgScore.toFixed(1)).reverse(), "المتوسط"],
-      [stats.highestTotal, ...stats.questionStats.map((q: any) => q.highestScore).reverse(), "أعلى علامة"],
-      [stats.lowestTotal, ...stats.questionStats.map((q: any) => q.lowestScore).reverse(), "أدنى علامة"],
-      [`${stats.passRate.toFixed(1)}%`, ...stats.questionStats.map((q: any) => `${q.passRate.toFixed(0)}%`).reverse(), "نسبة النجاح"],
-    ];
-
-    doc.autoTable({
-      startY: currentY,
-      head: [statsHeaders],
-      body: statsData,
-      theme: "grid",
-      styles: { 
-        halign: "center", 
-        fontSize: 7, 
-        cellPadding: 1, 
-        font: ARABIC_FONT_NAME 
-      },
-      headStyles: { 
-        fillColor: [0, 0, 0], 
-        textColor: [255, 255, 255], 
-        fontSize: 7 
-      },
-      margin: { left: margin, right: margin },
-      didParseCell: (data: any) => {
-        if (data.section === "body") {
-          const rowIndex = data.row.index;
-          if (rowIndex === 1) data.cell.styles.fillColor = [200, 255, 200];
-          else if (rowIndex === 2) data.cell.styles.fillColor = [200, 220, 255];
-          else if (rowIndex === 3) data.cell.styles.fillColor = [255, 255, 200];
-          else if (rowIndex === 4) data.cell.styles.fillColor = [255, 230, 200];
-          else if (rowIndex === 5) data.cell.styles.fillColor = [255, 200, 200];
-        }
-      },
-    });
-
-    currentY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 3 : currentY + 30;
+    // Removed detailed question statistics table
 
     // === SUMMARY BOX ===
     if (currentY > pageHeight - 25) {
