@@ -94,10 +94,63 @@ const Welcome = () => {
   return (
     <PageTransition className="min-h-screen">
       <div 
-        className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-b from-secondary via-background to-accent dir-rtl relative overflow-hidden dark:from-black dark:via-gray-900 dark:to-green-900"
+        className="min-h-screen flex flex-col items-center justify-center dir-rtl relative overflow-hidden"
       >
-        {/* خلفية الجسيمات */}
-        <ParticlesBackground particleCount={60} />
+        {/* خلفية متحركة مثل صفحة الترخيص */}
+        <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+          {/* تأثير الشبكة */}
+          <div 
+            className="absolute inset-0 opacity-20"
+            style={{
+              backgroundImage: `
+                linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)
+              `,
+              backgroundSize: '50px 50px',
+            }}
+          />
+          
+          {/* كرات متوهجة */}
+          <motion.div
+            className="absolute top-20 left-20 w-72 h-72 bg-primary/30 rounded-full blur-3xl"
+            animate={{
+              scale: [1, 1.2, 1],
+              opacity: [0.3, 0.5, 0.3],
+            }}
+            transition={{
+              duration: 4,
+              repeat: Infinity,
+              ease: "easeInOut",
+            }}
+          />
+          <motion.div
+            className="absolute bottom-20 right-20 w-96 h-96 bg-accent/30 rounded-full blur-3xl"
+            animate={{
+              scale: [1.2, 1, 1.2],
+              opacity: [0.3, 0.5, 0.3],
+            }}
+            transition={{
+              duration: 5,
+              repeat: Infinity,
+              ease: "easeInOut",
+            }}
+          />
+          <motion.div
+            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-purple-500/20 rounded-full blur-3xl"
+            animate={{
+              scale: [1, 1.3, 1],
+              rotate: [0, 180, 360],
+            }}
+            transition={{
+              duration: 8,
+              repeat: Infinity,
+              ease: "linear",
+            }}
+          />
+        </div>
+
+        {/* الجسيمات */}
+        <ParticlesBackground particleCount={50} colors={["#E84C3D", "#34A853", "#9333ea", "#ffffff"]} />
 
         {/* أزرار التحكم */}
         <div className="absolute top-4 left-4 z-50 flex items-center gap-2">
@@ -105,44 +158,21 @@ const Welcome = () => {
           <ColorCustomizer />
         </div>
 
-      {/* تأثير التوهج */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <motion.div
-          className="absolute -top-1/2 -left-1/2 w-full h-full rounded-full bg-primary/10 blur-3xl"
-          animate={{
-            x: [0, 100, 0],
-            y: [0, 50, 0],
-          }}
-          transition={{
-            duration: 10,
-            repeat: Infinity,
-            ease: "easeInOut",
-          }}
-        />
-        <motion.div
-          className="absolute -bottom-1/2 -right-1/2 w-full h-full rounded-full bg-accent/10 blur-3xl"
-          animate={{
-            x: [0, -100, 0],
-            y: [0, -50, 0],
-          }}
-          transition={{
-            duration: 10,
-            repeat: Infinity,
-            ease: "easeInOut",
-            delay: 5,
-          }}
-        />
-      </div>
-
       <div className="text-center space-y-6 max-w-4xl px-4 relative z-10">
         {/* الشعار المتحرك */}
-        <SystemLogo size={160} className="mx-auto" />
+        <motion.div 
+          initial={{ scale: 0, rotate: -180 }}
+          animate={{ scale: 1, rotate: 0 }}
+          transition={{ type: "spring", duration: 1 }}
+        >
+          <SystemLogo size={130} className="mx-auto" />
+        </motion.div>
         
         <motion.h1 
-          className="text-4xl md:text-5xl font-bold text-primary dark:text-red-400"
+          className="text-4xl md:text-5xl font-bold text-white drop-shadow-lg"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5, duration: 0.5 }}
+          transition={{ delay: 0.3, duration: 0.5 }}
         >
           نظام تحليل نتائج الاختبارات المدرسية
         </motion.h1>
@@ -150,22 +180,22 @@ const Welcome = () => {
         {/* اسم المدرسة المرخصة */}
         {schoolName && (
           <motion.div
-            className="bg-white/20 dark:bg-black/30 backdrop-blur-sm rounded-lg px-6 py-3 inline-block"
+            className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg px-6 py-3 inline-block"
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.7, duration: 0.5 }}
+            transition={{ delay: 0.5, duration: 0.5 }}
           >
-            <p className="text-xl md:text-2xl font-semibold text-accent dark:text-green-400">
+            <p className="text-xl md:text-2xl font-semibold text-accent">
               🏫 {schoolName}
             </p>
           </motion.div>
         )}
         
         <motion.p 
-          className="text-xl text-foreground/80 dark:text-gray-300"
+          className="text-xl text-gray-300"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.9, duration: 0.5 }}
+          transition={{ delay: 0.7, duration: 0.5 }}
         >
           أهلا بكم في النظام الشامل لإدارة وتحليل نتائج اختبارات الطلاب وإصدار التقارير الإحصائية
         </motion.p>
@@ -174,14 +204,14 @@ const Welcome = () => {
           className="w-full max-w-md mx-auto space-y-2"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 1.1, duration: 0.5 }}
+          transition={{ delay: 0.9, duration: 0.5 }}
         >
-          <div className="flex justify-between text-sm mb-1 text-foreground dark:text-gray-300">
+          <div className="flex justify-between text-sm mb-1 text-white">
             <span>جاري تحميل النظام...</span>
             <span className="font-bold">{progress}%</span>
           </div>
           
-          <div className="relative h-4 w-full bg-white/30 dark:bg-gray-700/50 rounded-full overflow-hidden backdrop-blur-sm border border-white/20">
+          <div className="relative h-4 w-full bg-white/20 rounded-full overflow-hidden backdrop-blur-sm border border-white/20">
             <motion.div
               className="absolute inset-y-0 left-0 rounded-full"
               style={{
@@ -208,7 +238,7 @@ const Welcome = () => {
           
           {progress === 100 && (
             <motion.p
-              className="text-accent dark:text-green-400 font-semibold text-center"
+              className="text-accent font-semibold text-center"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.3 }}
@@ -219,10 +249,10 @@ const Welcome = () => {
         </motion.div>
         
         <motion.div 
-          className="pt-6 text-sm text-foreground/70 dark:text-gray-400"
+          className="pt-6 text-sm text-white"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: 1.3, duration: 0.5 }}
+          transition={{ delay: 1.1, duration: 0.5 }}
         >
           <p>تم تطويره بواسطة محمد الشوامرة للبرمجة والتصميم</p>
           <p>0566000140</p>
