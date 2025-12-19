@@ -18,7 +18,7 @@ import {
   TableRow 
 } from "@/components/ui/table";
 import { Label } from "@/components/ui/label";
-import { FileText, Download, Users } from "lucide-react";
+import { FileText, Download, Users, Filter } from "lucide-react";
 import { 
   classesData, 
   subjectsData,
@@ -59,6 +59,16 @@ const ReportsTab = ({ mockReports }: ReportsTabProps) => {
   const [selectedSubject, setSelectedSubject] = useState("all");
   const [isGenerating, setIsGenerating] = useState(false);
   const [isGeneratingDetailed, setIsGeneratingDetailed] = useState(false);
+
+  // Filters for detailed report
+  const [reportClassFilter, setReportClassFilter] = useState("all");
+  const [reportTeacherFilter, setReportTeacherFilter] = useState("all");
+  const [reportSubjectFilter, setReportSubjectFilter] = useState("all");
+
+  // Get data for filters
+  const allClasses = getClasses();
+  const allTeachers = getTeachers();
+  const allSubjects = getSubjects();
 
   // Filter reports based on selections
   const filteredReports = mockReports.filter(report => {
@@ -265,16 +275,26 @@ const ReportsTab = ({ mockReports }: ReportsTabProps) => {
         return "راسب";
       };
 
-      // Build student results data
+      // Build student results data with filters
       const studentResults: any[] = [];
 
       students.forEach(student => {
         const cls = getClassById(student.classId);
         const section = getSectionById(student.classId, student.sectionId);
         
+        // Apply class filter
+        if (reportClassFilter !== "all" && student.classId !== reportClassFilter) return;
+        
         // Find all tests for this student
         tests.forEach((test: any) => {
           if (!test.results) return;
+          
+          // Apply subject filter
+          if (reportSubjectFilter !== "all" && test.subjectId !== reportSubjectFilter) return;
+          
+          // Apply teacher filter
+          if (reportTeacherFilter !== "all" && test.teacherId !== reportTeacherFilter) return;
+          
           const result = test.results.find((r: any) => r.studentId === student.id);
           if (result && !result.isAbsent) {
             const subject = getSubjectById(test.subjectId);
@@ -332,20 +352,47 @@ const ReportsTab = ({ mockReports }: ReportsTabProps) => {
           doc.text(headerSettings.leftLine3, margin + 5, 22, { align: "left" });
         }
 
-        // Title
+        // Title with filter info
         doc.setFontSize(12);
         doc.setTextColor(0, 100, 0);
-        doc.text("تقرير مفصل لنتائج جميع الطلاب", pageWidth / 2, 40 + yOffset, { align: "center" });
+        
+        let reportTitle = "تقرير مفصل لنتائج الطلاب";
+        const filterParts: string[] = [];
+        
+        if (reportClassFilter !== "all") {
+          const cls = getClassById(reportClassFilter);
+          if (cls) filterParts.push(`الصف: ${cls.name}`);
+        }
+        if (reportSubjectFilter !== "all") {
+          const sub = getSubjectById(reportSubjectFilter);
+          if (sub) filterParts.push(`المادة: ${sub.name}`);
+        }
+        if (reportTeacherFilter !== "all") {
+          const tch = getTeacherById(reportTeacherFilter);
+          if (tch) filterParts.push(`المعلم: ${tch.name}`);
+        }
+        
+        doc.text(reportTitle, pageWidth / 2, 40 + yOffset, { align: "center" });
+        
+        if (filterParts.length > 0) {
+          doc.setFontSize(9);
+          doc.setTextColor(100, 100, 100);
+          doc.text(filterParts.join(" | "), pageWidth / 2, 46 + yOffset, { align: "center" });
+        }
+        
         doc.setTextColor(0, 0, 0);
 
-        return 48 + yOffset;
+        return filterParts.length > 0 ? 52 + yOffset : 48 + yOffset;
       };
 
       let currentY = addHeader();
 
-      // Summary
+      // Summary with actual filtered counts
+      const filteredStudentsCount = new Set(studentResults.map(r => r.studentName)).size;
+      const filteredTestsCount = new Set(studentResults.map(r => r.testName)).size;
+      
       doc.setFontSize(9);
-      doc.text(`إجمالي الطلاب: ${students.length} | إجمالي الاختبارات: ${tests.length} | إجمالي النتائج: ${studentResults.length}`, pageWidth / 2, currentY, { align: "center" });
+      doc.text(`عدد الطلاب: ${filteredStudentsCount} | عدد الاختبارات: ${filteredTestsCount} | إجمالي النتائج: ${studentResults.length}`, pageWidth / 2, currentY, { align: "center" });
       currentY += 8;
 
       // Group by class
@@ -453,18 +500,80 @@ const ReportsTab = ({ mockReports }: ReportsTabProps) => {
           </CardContent>
         </Card>
 
-        {/* Detailed Students Report */}
+        {/* Detailed Students Report with Filters */}
         <Card className="border-2 border-blue-500">
           <CardHeader className="bg-gradient-to-r from-blue-100 to-white border-b border-blue-500">
             <CardTitle className="flex items-center gap-2 text-base">
               <Users className="h-5 w-5" />
-              تقرير مفصل لجميع الطلاب
+              تقرير مفصل للطلاب
             </CardTitle>
           </CardHeader>
-          <CardContent className="pt-4">
-            <p className="text-sm text-muted-foreground mb-4">
-              تقرير يشمل جميع نتائج الطلاب مع الصفوف والمعلمين والمواد
+          <CardContent className="pt-4 space-y-4">
+            <p className="text-sm text-muted-foreground">
+              اختر الفلاتر ثم اضغط على زر الإنشاء
             </p>
+            
+            {/* Filters for detailed report */}
+            <div className="grid grid-cols-1 gap-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+              <div className="flex items-center gap-2">
+                <Filter className="h-4 w-4 text-blue-600" />
+                <span className="text-sm font-medium text-blue-800">فلاتر التقرير:</span>
+              </div>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <div>
+                  <Label className="text-xs">الصف</Label>
+                  <Select value={reportClassFilter} onValueChange={setReportClassFilter}>
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue placeholder="جميع الصفوف" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">جميع الصفوف</SelectItem>
+                      {allClasses.map(cls => (
+                        <SelectItem key={cls.id} value={cls.id}>
+                          {cls.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div>
+                  <Label className="text-xs">المادة</Label>
+                  <Select value={reportSubjectFilter} onValueChange={setReportSubjectFilter}>
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue placeholder="جميع المواد" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">جميع المواد</SelectItem>
+                      {allSubjects.map(sub => (
+                        <SelectItem key={sub.id} value={sub.id}>
+                          {sub.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div>
+                  <Label className="text-xs">المعلم</Label>
+                  <Select value={reportTeacherFilter} onValueChange={setReportTeacherFilter}>
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue placeholder="جميع المعلمين" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">جميع المعلمين</SelectItem>
+                      {allTeachers.map(t => (
+                        <SelectItem key={t.id} value={t.id}>
+                          {t.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+            
             <Button 
               onClick={generateDetailedStudentsReport}
               disabled={isGeneratingDetailed}
