@@ -1,5 +1,4 @@
-
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,19 +18,20 @@ import {
   TableRow 
 } from "@/components/ui/table";
 import { Label } from "@/components/ui/label";
-import { FileText, Download, Printer } from "lucide-react";
+import { FileText, Download, Users } from "lucide-react";
 import { 
   classesData, 
   subjectsData,
   teachersData,
 } from "@/data/mockData";
-import { getTests, getStudents, getClasses, getTeachers, getSubjects } from "@/services/dataService";
+import { getTests, getStudents, getClasses, getTeachers, getSubjects, getClassById, getSectionById, getSubjectById, getTeacherById } from "@/services/dataService";
 import { jsPDF } from "jspdf";
 import "jspdf-autotable";
 import { loadAmiriFont, ARABIC_FONT_NAME } from "@/utils/fontLoader";
 import { toast } from "sonner";
 import { getPerformanceLevels } from "./PerformanceLevelsTab";
 import { getFooterSettings } from "./SettingsTab";
+import { getHeaderSettings } from "./HeaderSettingsTab";
 
 // Mock reports type
 interface Report {
@@ -58,6 +58,7 @@ const ReportsTab = ({ mockReports }: ReportsTabProps) => {
   const [selectedTeacher, setSelectedTeacher] = useState("all");
   const [selectedSubject, setSelectedSubject] = useState("all");
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isGeneratingDetailed, setIsGeneratingDetailed] = useState(false);
 
   // Filter reports based on selections
   const filteredReports = mockReports.filter(report => {
@@ -138,7 +139,6 @@ const ReportsTab = ({ mockReports }: ReportsTabProps) => {
       const tests = getTests();
       const students = getStudents();
       const teachers = getTeachers();
-      const classes = getClasses();
 
       let totalExcellent = 0, totalGood = 0, totalAverage = 0, totalLow = 0, totalFailed = 0;
 
@@ -224,30 +224,258 @@ const ReportsTab = ({ mockReports }: ReportsTabProps) => {
     }
   };
 
+  // Generate detailed students report
+  const generateDetailedStudentsReport = async () => {
+    setIsGeneratingDetailed(true);
+    try {
+      const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+
+      // Load Arabic font
+      try {
+        const fontBase64 = await loadAmiriFont();
+        doc.addFileToVFS("Amiri-Regular.ttf", fontBase64);
+        doc.addFont("Amiri-Regular.ttf", ARABIC_FONT_NAME, "normal");
+        doc.setFont(ARABIC_FONT_NAME);
+      } catch (error) {
+        console.error("Failed to load Arabic font:", error);
+        doc.setFont("helvetica");
+      }
+
+      const pageWidth = doc.internal.pageSize.width;
+      const pageHeight = doc.internal.pageSize.height;
+      const margin = 10;
+      const levels = getPerformanceLevels();
+      const footerSettings = getFooterSettings();
+      const headerSettings = getHeaderSettings();
+
+      // Get school info
+      const schoolName = localStorage.getItem("schoolName") || "المدرسة";
+      const schoolLogo = localStorage.getItem("schoolLogo");
+
+      const students = getStudents();
+      const tests = getTests();
+      const classes = getClasses();
+
+      // Helper to get performance level
+      const getLevel = (pct: number) => {
+        if (pct >= levels.excellent.min) return "ممتاز";
+        if (pct >= levels.good.min) return "جيد";
+        if (pct >= levels.average.min) return "متوسط";
+        if (pct >= levels.low.min) return "متدني";
+        return "راسب";
+      };
+
+      // Build student results data
+      const studentResults: any[] = [];
+
+      students.forEach(student => {
+        const cls = getClassById(student.classId);
+        const section = getSectionById(student.classId, student.sectionId);
+        
+        // Find all tests for this student
+        tests.forEach((test: any) => {
+          if (!test.results) return;
+          const result = test.results.find((r: any) => r.studentId === student.id);
+          if (result && !result.isAbsent) {
+            const subject = getSubjectById(test.subjectId);
+            const teacher = getTeacherById(test.teacherId);
+            studentResults.push({
+              studentName: student.name,
+              className: cls?.name || "-",
+              sectionName: section?.name || "-",
+              subjectName: subject?.name || "-",
+              teacherName: teacher?.name || "-",
+              testName: test.name,
+              score: result.totalScore || 0,
+              maxScore: test.questions?.reduce((sum: number, q: any) => sum + (q.maxScore || 0), 0) || 100,
+              percentage: result.percentage || 0,
+              level: getLevel(result.percentage || 0),
+              date: test.date || "-",
+            });
+          }
+        });
+      });
+
+      // Header function for each page
+      const addHeader = (yOffset: number = 0) => {
+        // Classic frame
+        doc.setDrawColor(80, 80, 80);
+        doc.setLineWidth(0.8);
+        doc.rect(margin, 8, pageWidth - margin * 2, 25);
+        doc.setLineWidth(0.3);
+        doc.rect(margin + 1, 9, pageWidth - margin * 2 - 2, 23);
+
+        // Right side
+        doc.setFontSize(8);
+        doc.setTextColor(0, 0, 0);
+        doc.text(headerSettings.rightLine1 || "دولة فلسطين", pageWidth - margin - 5, 14, { align: "right" });
+        doc.setFontSize(6);
+        doc.text(headerSettings.rightLine1En || "State of Palestine", pageWidth - margin - 5, 18, { align: "right" });
+        doc.setFontSize(7);
+        doc.text(headerSettings.rightLine2 || "وزارة التربية والتعليم", pageWidth - margin - 5, 22, { align: "right" });
+        doc.text(headerSettings.rightLine3 || "مديرية التربية والتعليم", pageWidth - margin - 5, 26, { align: "right" });
+
+        // Logo in center
+        if (schoolLogo) {
+          try {
+            doc.addImage(schoolLogo, "PNG", pageWidth / 2 - 6, 10, 12, 12);
+          } catch (e) {}
+        }
+        doc.setFontSize(7);
+        doc.text(schoolName, pageWidth / 2, 26, { align: "center" });
+
+        // Left side
+        doc.setFontSize(7);
+        doc.text(headerSettings.leftLine1 || "Ministry of Education", margin + 5, 14, { align: "left" });
+        doc.text(headerSettings.leftLine2 || "Directorate of Education", margin + 5, 18, { align: "left" });
+        if (headerSettings.leftLine3) {
+          doc.text(headerSettings.leftLine3, margin + 5, 22, { align: "left" });
+        }
+
+        // Title
+        doc.setFontSize(12);
+        doc.setTextColor(0, 100, 0);
+        doc.text("تقرير مفصل لنتائج جميع الطلاب", pageWidth / 2, 40 + yOffset, { align: "center" });
+        doc.setTextColor(0, 0, 0);
+
+        return 48 + yOffset;
+      };
+
+      let currentY = addHeader();
+
+      // Summary
+      doc.setFontSize(9);
+      doc.text(`إجمالي الطلاب: ${students.length} | إجمالي الاختبارات: ${tests.length} | إجمالي النتائج: ${studentResults.length}`, pageWidth / 2, currentY, { align: "center" });
+      currentY += 8;
+
+      // Group by class
+      const groupedByClass: { [key: string]: any[] } = {};
+      studentResults.forEach(r => {
+        const key = `${r.className} - ${r.sectionName}`;
+        if (!groupedByClass[key]) groupedByClass[key] = [];
+        groupedByClass[key].push(r);
+      });
+
+      Object.keys(groupedByClass).forEach((classKey, classIndex) => {
+        const classResults = groupedByClass[classKey];
+
+        // Check if we need a new page
+        if (currentY > pageHeight - 60) {
+          doc.addPage();
+          currentY = addHeader();
+        }
+
+        // Class header
+        doc.setFontSize(10);
+        doc.setTextColor(0, 0, 128);
+        doc.text(`${classKey}`, pageWidth - margin, currentY, { align: "right" });
+        doc.setTextColor(0, 0, 0);
+        currentY += 6;
+
+        // Table data
+        const tableData = classResults.map((r, i) => [
+          r.level,
+          r.percentage.toFixed(1) + "%",
+          `${r.score}/${r.maxScore}`,
+          r.teacherName,
+          r.subjectName,
+          r.testName,
+          r.studentName,
+          i + 1
+        ]);
+
+        doc.autoTable({
+          startY: currentY,
+          head: [["المستوى", "النسبة", "الدرجة", "المعلم", "المادة", "الاختبار", "اسم الطالب", "م"]],
+          body: tableData,
+          theme: "grid",
+          styles: { halign: "center", fontSize: 7, font: ARABIC_FONT_NAME, cellPadding: 1 },
+          headStyles: { fillColor: [50, 50, 50], textColor: [255, 255, 255], fontSize: 7 },
+          margin: { left: margin, right: margin },
+          didParseCell: (data: any) => {
+            if (data.section === "body" && data.column.index === 0) {
+              const level = data.cell.raw;
+              if (level === "ممتاز") data.cell.styles.textColor = [0, 128, 0];
+              else if (level === "جيد") data.cell.styles.textColor = [0, 100, 200];
+              else if (level === "متوسط") data.cell.styles.textColor = [200, 150, 0];
+              else if (level === "متدني") data.cell.styles.textColor = [200, 100, 0];
+              else data.cell.styles.textColor = [200, 0, 0];
+            }
+          }
+        });
+
+        currentY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 10 : currentY + 30;
+      });
+
+      // Footer on last page
+      const footerY = pageHeight - 10;
+      if (footerSettings.showCopyright && footerSettings.copyrightText) {
+        doc.setFontSize(7);
+        doc.setTextColor(100, 100, 100);
+        doc.text(footerSettings.copyrightText, pageWidth / 2, footerY, { align: "center" });
+      }
+
+      // Save
+      doc.save("تقرير_مفصل_جميع_الطلاب.pdf");
+      toast.success("تم إنشاء التقرير المفصل بنجاح");
+    } catch (error) {
+      console.error("Error generating detailed report:", error);
+      toast.error("حدث خطأ أثناء إنشاء التقرير");
+    } finally {
+      setIsGeneratingDetailed(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
-      {/* Generate Comprehensive Report */}
-      <Card className="border-2 border-purple-500">
-        <CardHeader className="bg-gradient-to-r from-purple-100 to-white border-b border-purple-500">
-          <CardTitle className="flex items-center gap-2">
-            <FileText className="h-5 w-5" />
-            تقرير شامل للمدرسة
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="pt-6">
-          <p className="text-muted-foreground mb-4">
-            أنشئ تقريراً شاملاً يتضمن جميع نتائج الطلاب والصفوف والمعلمين في ملف PDF واحد
-          </p>
-          <Button 
-            onClick={generateSchoolReport}
-            disabled={isGenerating}
-            className="bg-purple-600 hover:bg-purple-700"
-          >
-            <Download className="h-4 w-4 ml-2" />
-            {isGenerating ? "جاري الإنشاء..." : "إنشاء تقرير شامل PDF"}
-          </Button>
-        </CardContent>
-      </Card>
+      {/* Generate Reports Section */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Comprehensive Report */}
+        <Card className="border-2 border-purple-500">
+          <CardHeader className="bg-gradient-to-r from-purple-100 to-white border-b border-purple-500">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <FileText className="h-5 w-5" />
+              تقرير شامل للمدرسة
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-4">
+            <p className="text-sm text-muted-foreground mb-4">
+              تقرير ملخص يتضمن إحصائيات عامة وقائمة بجميع التقارير
+            </p>
+            <Button 
+              onClick={generateSchoolReport}
+              disabled={isGenerating}
+              className="bg-purple-600 hover:bg-purple-700 w-full"
+            >
+              <Download className="h-4 w-4 ml-2" />
+              {isGenerating ? "جاري الإنشاء..." : "إنشاء تقرير شامل PDF"}
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* Detailed Students Report */}
+        <Card className="border-2 border-blue-500">
+          <CardHeader className="bg-gradient-to-r from-blue-100 to-white border-b border-blue-500">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Users className="h-5 w-5" />
+              تقرير مفصل لجميع الطلاب
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-4">
+            <p className="text-sm text-muted-foreground mb-4">
+              تقرير يشمل جميع نتائج الطلاب مع الصفوف والمعلمين والمواد
+            </p>
+            <Button 
+              onClick={generateDetailedStudentsReport}
+              disabled={isGeneratingDetailed}
+              className="bg-blue-600 hover:bg-blue-700 w-full"
+            >
+              <Download className="h-4 w-4 ml-2" />
+              {isGeneratingDetailed ? "جاري الإنشاء..." : "إنشاء تقرير مفصل PDF"}
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
 
       <Card className="border-2 border-green-500">
         <CardHeader className="bg-gradient-to-r from-green-100 to-white border-b border-green-500">
