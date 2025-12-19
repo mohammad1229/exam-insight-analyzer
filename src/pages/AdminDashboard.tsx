@@ -26,6 +26,7 @@ import SubjectsTab from "@/components/admin/SubjectsTab";
 import StudentsTab from "@/components/admin/StudentsTab";
 import PerformanceLevelsTab from "@/components/admin/PerformanceLevelsTab";
 import HeaderSettingsTab from "@/components/admin/HeaderSettingsTab";
+import SummaryTab from "@/components/admin/SummaryTab";
 import ReportPreview from "@/components/ReportPreview";
 
 // Import utility functions
@@ -217,12 +218,13 @@ const AdminDashboard = () => {
         </div>
 
         <Tabs defaultValue="teachers" className="space-y-6">
-          <TabsList className="grid grid-cols-9 w-full mb-6">
+          <TabsList className="grid grid-cols-5 lg:grid-cols-10 w-full mb-6">
             <TabsTrigger value="teachers">المعلمين</TabsTrigger>
             <TabsTrigger value="students">الطلاب</TabsTrigger>
             <TabsTrigger value="classes">الصفوف</TabsTrigger>
             <TabsTrigger value="subjects">المواد</TabsTrigger>
             <TabsTrigger value="reports">التقارير</TabsTrigger>
+            <TabsTrigger value="summary">الملخص</TabsTrigger>
             <TabsTrigger value="statistics">الإحصائيات</TabsTrigger>
             <TabsTrigger value="levels">المستويات</TabsTrigger>
             <TabsTrigger value="header">الترويسة</TabsTrigger>
@@ -250,6 +252,10 @@ const AdminDashboard = () => {
           
           <TabsContent value="reports">
             <ReportsTab mockReports={mockReports} />
+          </TabsContent>
+
+          <TabsContent value="summary">
+            <SummaryTab />
           </TabsContent>
           
           <TabsContent value="statistics">

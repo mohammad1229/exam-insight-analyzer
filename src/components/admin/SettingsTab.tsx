@@ -4,10 +4,24 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Trash2, Image, Save, CheckCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { isElectron } from "@/services/electronService";
 import electronService from "@/services/electronService";
+
+// Footer settings helper
+export const getFooterSettings = () => {
+  const saved = localStorage.getItem("footerSettings");
+  if (saved) {
+    return JSON.parse(saved);
+  }
+  return {
+    copyrightText: "جميع الحقوق محفوظة",
+    footerNote: "",
+    showCopyright: true,
+  };
+};
 
 const SettingsTab = () => {
   const { toast } = useToast();
@@ -19,6 +33,11 @@ const SettingsTab = () => {
   const [directorateName, setDirectorateName] = useState("مديرية التربية والتعليم");
   const logoInputRef = useRef<HTMLInputElement>(null);
   const [isSaving, setIsSaving] = useState(false);
+
+  // Footer settings
+  const [copyrightText, setCopyrightText] = useState("جميع الحقوق محفوظة");
+  const [footerNote, setFooterNote] = useState("");
+  const [showCopyright, setShowCopyright] = useState(true);
 
   // Load data on component mount
   useEffect(() => {
@@ -52,6 +71,12 @@ const SettingsTab = () => {
       // Load logo
       const savedLogo = localStorage.getItem("schoolLogo");
       if (savedLogo) setSchoolLogo(savedLogo);
+
+      // Load footer settings
+      const footerSettings = getFooterSettings();
+      setCopyrightText(footerSettings.copyrightText);
+      setFooterNote(footerSettings.footerNote);
+      setShowCopyright(footerSettings.showCopyright);
     } catch (error) {
       console.error("Error loading data:", error);
       toast({
@@ -116,6 +141,14 @@ const SettingsTab = () => {
       localStorage.setItem("directorName", directorName);
       localStorage.setItem("ministryName", ministryName);
       localStorage.setItem("directorateName", directorateName);
+      
+      // Save footer settings
+      const footerSettings = {
+        copyrightText,
+        footerNote,
+        showCopyright,
+      };
+      localStorage.setItem("footerSettings", JSON.stringify(footerSettings));
       
       if (isElectron()) {
         await electronService.updateSystemSettings({
@@ -237,6 +270,46 @@ const SettingsTab = () => {
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground mt-1">الحد الأقصى 500 كيلوبايت - يظهر في وسط ترويسة جميع التقارير</p>
+            </div>
+          </div>
+
+          {/* Footer Settings Section */}
+          <div className="border-t border-gray-200 pt-6">
+            <h3 className="text-lg font-medium mb-4">إعدادات تذييل التقرير</h3>
+            <div className="grid grid-cols-1 gap-4">
+              <div>
+                <Label>نص حقوق النشر</Label>
+                <Input 
+                  value={copyrightText}
+                  onChange={(e) => setCopyrightText(e.target.value)}
+                  className="mt-1"
+                  placeholder="جميع الحقوق محفوظة"
+                />
+              </div>
+              
+              <div>
+                <Label>ملاحظة أو عبارة إضافية أسفل التقرير</Label>
+                <Textarea 
+                  value={footerNote}
+                  onChange={(e) => setFooterNote(e.target.value)}
+                  className="mt-1"
+                  placeholder="يمكنك كتابة أي ملاحظة أو عبارة تريد إظهارها أسفل التقرير..."
+                  rows={3}
+                />
+              </div>
+
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="showCopyright"
+                  checked={showCopyright}
+                  onChange={(e) => setShowCopyright(e.target.checked)}
+                  className="h-4 w-4"
+                />
+                <Label htmlFor="showCopyright" className="cursor-pointer">
+                  إظهار نص الحقوق في التقرير
+                </Label>
+              </div>
             </div>
           </div>
           
