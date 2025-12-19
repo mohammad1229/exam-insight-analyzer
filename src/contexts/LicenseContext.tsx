@@ -9,6 +9,7 @@ interface LicenseContextType {
   schoolId: string | null;
   schoolName: string | null;
   directorName: string | null;
+  schoolLogo: string | null;
   licenseKey: string | null;
   devicesUsed: number;
   maxDevices: number;

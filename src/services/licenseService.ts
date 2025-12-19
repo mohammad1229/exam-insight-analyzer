@@ -74,6 +74,7 @@ export const startTrial = async (schoolName: string) => {
       schoolId: school.id,
       schoolName,
       directorName: "",
+      schoolLogo: "",
       isTrial: true,
       remainingDays: 15,
       startDate: new Date().toISOString(),
@@ -123,6 +124,7 @@ export const activateLicense = async (licenseKey: string) => {
       schoolId: license?.school_id,
       schoolName: (license?.schools as any)?.name || "",
       directorName: (license?.schools as any)?.director_name || "",
+      schoolLogo: (license?.schools as any)?.logo_url || "",
       isTrial: result.is_trial,
       remainingDays: result.remaining_days,
       devicesUsed: result.devices_used,
@@ -177,12 +179,14 @@ export const checkLicenseValidity = async () => {
         stored.isTrial = result.is_trial;
         stored.schoolName = (license.schools as any)?.name || stored.schoolName;
         stored.directorName = (license.schools as any)?.director_name || stored.directorName;
+        stored.schoolLogo = (license.schools as any)?.logo_url || stored.schoolLogo || "";
         stored.schoolId = license.school_id || stored.schoolId;
         storeLicense(stored);
 
         // Update localStorage for UI components
         localStorage.setItem("schoolName", stored.schoolName || "");
         localStorage.setItem("directorName", stored.directorName || "");
+        localStorage.setItem("schoolLogo", stored.schoolLogo || "");
         localStorage.setItem("currentSchoolId", stored.schoolId || "");
       }
     }

@@ -10,7 +10,7 @@ import { Clock } from "lucide-react";
 const Navbar = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { schoolName } = useLicenseContext();
+  const { schoolName, schoolLogo } = useLicenseContext();
   const [currentTime, setCurrentTime] = useState(new Date());
 
   useEffect(() => {
@@ -47,6 +47,13 @@ const Navbar = () => {
     <nav className="bg-primary dark:bg-gray-900 text-primary-foreground p-4 shadow-md dir-rtl border-b border-primary-foreground/10">
       <div className="container mx-auto flex justify-between items-center">
         <div className="flex items-center space-x-4 space-x-reverse">
+          {schoolLogo && (
+            <img 
+              src={schoolLogo} 
+              alt="شعار المدرسة" 
+              className="h-10 w-10 rounded-full object-cover border-2 border-primary-foreground/30 shadow-sm"
+            />
+          )}
           <h1 className="text-xl font-bold">{schoolName || "نظام تحليل الاختبارات"}</h1>
           <span className="hidden md:inline text-sm opacity-90">نظام تحليل نتائج الاختبارات</span>
         </div>
