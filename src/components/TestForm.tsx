@@ -45,18 +45,33 @@ interface TestFormProps {
   }) => void;
 }
 
+const TEST_TYPES = [
+  { id: "exam", name: "امتحان رسمي" },
+  { id: "quiz", name: "اختبار قصير" },
+  { id: "homework", name: "واجب منزلي" },
+  { id: "worksheet", name: "ورقة عمل" },
+  { id: "manual", name: "إدخال يدوي" },
+  { id: "other", name: "أخرى" }
+];
+
 const TEST_QUESTION_TYPES = [
   { id: "اختيار من متعدد", name: "اختيار من متعدد" },
   { id: "صواب وخطأ", name: "صواب وخطأ" },
   { id: "مقالي", name: "مقالي" },
   { id: "تكميلي", name: "تكميلي" },
   { id: "مطابقة", name: "مطابقة" },
+  { id: "استماع", name: "استماع" },
+  { id: "قراءة", name: "قراءة" },
+  { id: "تدريبات", name: "تدريبات" },
+  { id: "إملاء", name: "إملاء" },
+  { id: "تعبير", name: "تعبير" },
   { id: "custom", name: "سؤال مخصص" }
 ];
 
 const TestForm: React.FC<TestFormProps> = ({ onFormDataChange }) => {
   const [name, setName] = useState("");
   const [type, setType] = useState("");
+  const [customType, setCustomType] = useState("");
   const [subjectId, setSubjectId] = useState("");
   const [teacherId, setTeacherId] = useState("");
   const [classId, setClassId] = useState("");
@@ -109,9 +124,10 @@ const TestForm: React.FC<TestFormProps> = ({ onFormDataChange }) => {
   }, [classId, availableClasses]);
 
   useEffect(() => {
+    const finalType = type === "other" ? customType : type;
     onFormDataChange({
       name,
-      type,
+      type: finalType,
       subjectId,
       teacherId,
       classId,
@@ -120,7 +136,7 @@ const TestForm: React.FC<TestFormProps> = ({ onFormDataChange }) => {
       questions,
       notes,
     });
-  }, [name, type, subjectId, teacherId, classId, sectionId, date, questions, notes]);
+  }, [name, type, customType, subjectId, teacherId, classId, sectionId, date, questions, notes]);
 
   const addQuestion = () => {
     if ((!questionType) || (questionType === "custom" && !customQuestionType)) {
@@ -174,13 +190,26 @@ const TestForm: React.FC<TestFormProps> = ({ onFormDataChange }) => {
                 <SelectValue placeholder="اختر نوع الاختبار" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="exam">امتحان رسمي</SelectItem>
-                <SelectItem value="quiz">اختبار قصير</SelectItem>
-                <SelectItem value="homework">واجب منزلي</SelectItem>
-                <SelectItem value="worksheet">ورقة عمل</SelectItem>
+                {TEST_TYPES.map((t) => (
+                  <SelectItem key={t.id} value={t.id}>
+                    {t.name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
+
+          {type === "other" && (
+            <div className="space-y-2">
+              <Label htmlFor="customType">نوع الاختبار المخصص</Label>
+              <Input
+                id="customType"
+                value={customType}
+                onChange={(e) => setCustomType(e.target.value)}
+                placeholder="أدخل نوع الاختبار"
+              />
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="subject">المادة</Label>
@@ -282,7 +311,7 @@ const TestForm: React.FC<TestFormProps> = ({ onFormDataChange }) => {
         <h3 className="text-lg font-medium">الأسئلة</h3>
         <Card>
           <CardContent className="p-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
               <div className="space-y-2">
                 <Label htmlFor="questionType">نوع السؤال</Label>
                 <Select value={questionType} onValueChange={setQuestionType}>

@@ -3,7 +3,17 @@ import { useNavigate } from "react-router-dom";
 import Navbar from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
+import { Eye, FileText, TrendingUp, Users } from "lucide-react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 // Import custom components
 import AdminLoginForm from "@/components/admin/AdminLoginForm";
@@ -14,10 +24,11 @@ import SettingsTab from "@/components/admin/SettingsTab";
 import ClassesTab from "@/components/admin/ClassesTab";
 import SubjectsTab from "@/components/admin/SubjectsTab";
 import StudentsTab from "@/components/admin/StudentsTab";
+import ReportPreview from "@/components/ReportPreview";
 
 // Import utility functions
 import { prepareMockReports, prepareChartData, Report } from "@/utils/reportUtils";
-import { getTeachers, saveTeachers, TeacherWithCredentials } from "@/services/dataService";
+import { getTeachers, saveTeachers, TeacherWithCredentials, getTests } from "@/services/dataService";
 
 const AdminDashboard = () => {
   const { toast } = useToast();
@@ -32,6 +43,11 @@ const AdminDashboard = () => {
   // Teachers management
   const [teachers, setTeachers] = useState<TeacherWithCredentials[]>([]);
   
+  // Tests and report preview
+  const [tests, setTests] = useState<any[]>([]);
+  const [selectedTest, setSelectedTest] = useState<any>(null);
+  const [showReportPreview, setShowReportPreview] = useState(false);
+  
   // Initialize teachers from dataService
   useEffect(() => {
     setTeachers(getTeachers());
@@ -41,6 +57,7 @@ const AdminDashboard = () => {
   useEffect(() => {
     const reports = prepareMockReports();
     setMockReports(reports);
+    setTests(getTests());
   }, []);
   
   // Update chart data when filters change
@@ -66,6 +83,14 @@ const AdminDashboard = () => {
     });
   };
 
+  const handleViewReport = (test: any) => {
+    setSelectedTest(test);
+    setShowReportPreview(true);
+  };
+
+  // Get recent tests (last 5)
+  const recentTests = tests.slice(-5).reverse();
+
   // Login form
   if (!isLoggedIn) {
     return <AdminLoginForm />;
@@ -87,6 +112,106 @@ const AdminDashboard = () => {
           >
             تسجيل الخروج
           </Button>
+        </div>
+
+        {/* Quick Stats and Recent Reports */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+          {/* Quick Stats */}
+          <Card className="border-2 border-green-500">
+            <CardHeader className="bg-green-50 pb-2">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <TrendingUp className="h-5 w-5" />
+                إحصائيات سريعة
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="text-center p-3 bg-blue-50 rounded-lg">
+                  <p className="text-2xl font-bold text-blue-600">{tests.length}</p>
+                  <p className="text-sm text-muted-foreground">اختبارات</p>
+                </div>
+                <div className="text-center p-3 bg-purple-50 rounded-lg">
+                  <p className="text-2xl font-bold text-purple-600">{teachers.length}</p>
+                  <p className="text-sm text-muted-foreground">معلمين</p>
+                </div>
+                <div className="text-center p-3 bg-green-50 rounded-lg">
+                  <p className="text-2xl font-bold text-green-600">
+                    {mockReports.length > 0 
+                      ? Math.round(mockReports.reduce((sum, r) => sum + r.passRate, 0) / mockReports.length)
+                      : 0}%
+                  </p>
+                  <p className="text-sm text-muted-foreground">نسبة النجاح</p>
+                </div>
+                <div className="text-center p-3 bg-orange-50 rounded-lg">
+                  <p className="text-2xl font-bold text-orange-600">{mockReports.length}</p>
+                  <p className="text-sm text-muted-foreground">تقارير</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Recent Reports */}
+          <Card className="lg:col-span-2 border-2 border-blue-500">
+            <CardHeader className="bg-blue-50 pb-2">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                آخر التقارير
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-4">
+              {recentTests.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>الاختبار</TableHead>
+                      <TableHead>المادة</TableHead>
+                      <TableHead>التاريخ</TableHead>
+                      <TableHead>نسبة النجاح</TableHead>
+                      <TableHead>عرض</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {recentTests.map((test) => {
+                      const report = mockReports.find(r => r.testId === test.id);
+                      return (
+                        <TableRow key={test.id} className="hover:bg-blue-50">
+                          <TableCell className="font-medium">{test.name}</TableCell>
+                          <TableCell>{report?.subjectName || "-"}</TableCell>
+                          <TableCell>{test.date}</TableCell>
+                          <TableCell>
+                            <span className={`px-2 py-1 rounded text-sm ${
+                              (report?.passRate || 0) >= 75 
+                                ? "bg-green-100 text-green-700" 
+                                : (report?.passRate || 0) >= 50 
+                                  ? "bg-yellow-100 text-yellow-700"
+                                  : "bg-red-100 text-red-700"
+                            }`}>
+                              {report?.passRate?.toFixed(1) || 0}%
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleViewReport(test)}
+                              className="text-blue-600 hover:bg-blue-50"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  <FileText className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                  <p>لا توجد تقارير حتى الآن</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
 
         <Tabs defaultValue="teachers" className="space-y-6">
@@ -126,7 +251,7 @@ const AdminDashboard = () => {
           <TabsContent value="statistics">
             <StatisticsTab 
               mockReports={mockReports}
-              testsCount={mockReports.length}
+              testsCount={tests.length}
               teachersCount={teachers.length}
               selectedClass={selectedClass}
               chartData={chartData}
@@ -138,6 +263,18 @@ const AdminDashboard = () => {
           </TabsContent>
         </Tabs>
       </main>
+
+      {/* Report Preview Dialog */}
+      {selectedTest && (
+        <ReportPreview
+          test={selectedTest}
+          open={showReportPreview}
+          onClose={() => {
+            setShowReportPreview(false);
+            setSelectedTest(null);
+          }}
+        />
+      )}
     </div>
   );
 };

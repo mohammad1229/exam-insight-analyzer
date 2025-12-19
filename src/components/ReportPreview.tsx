@@ -21,6 +21,15 @@ interface ReportPreviewProps {
   onClose: () => void;
 }
 
+// Performance levels configuration
+const PERFORMANCE_LEVELS = {
+  excellent: { min: 85, label: "ممتاز", color: [34, 197, 94] },      // Green
+  good: { min: 75, max: 84, label: "جيد", color: [59, 130, 246] },   // Blue
+  average: { min: 65, max: 74, label: "متوسط", color: [245, 158, 11] }, // Orange
+  low: { min: 50, max: 64, label: "متدني", color: [239, 68, 68] },   // Light Red
+  failed: { max: 49, label: "راسب", color: [220, 38, 38] }           // Dark Red
+};
+
 const ReportPreview: React.FC<ReportPreviewProps> = ({ test, open, onClose }) => {
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -54,9 +63,26 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({ test, open, onClose }) =>
     };
   };
 
+  const getTestTypeLabel = (type: string): string => {
+    const types: Record<string, string> = {
+      exam: "امتحان رسمي",
+      quiz: "اختبار قصير",
+      homework: "واجب منزلي",
+      worksheet: "ورقة عمل",
+      manual: "إدخال يدوي"
+    };
+    return types[type] || type;
+  };
+
   const calculateStats = () => {
     const presentStudents = test.results.filter((r: any) => !r.isAbsent);
-    const passedStudents = presentStudents.filter((r: any) => r.percentage >= 50);
+    const totalMaxScore = test.questions.reduce((sum: number, q: any) => sum + q.maxScore, 0);
+    
+    // New performance levels calculation
+    const excellentStudents = presentStudents.filter((r: any) => r.percentage >= 85);
+    const goodStudents = presentStudents.filter((r: any) => r.percentage >= 75 && r.percentage < 85);
+    const averageStudents = presentStudents.filter((r: any) => r.percentage >= 65 && r.percentage < 75);
+    const lowStudents = presentStudents.filter((r: any) => r.percentage >= 50 && r.percentage < 65);
     const failedStudents = presentStudents.filter((r: any) => r.percentage < 50);
     const absentStudents = test.results.filter((r: any) => r.isAbsent);
 
@@ -68,7 +94,7 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({ test, open, onClose }) =>
     const lowestTotal = totalScores.length > 0 ? Math.min(...totalScores) : 0;
     const avgScore = scores.length > 0 ? scores.reduce((sum: number, s: number) => sum + s, 0) / scores.length : 0;
     const avgTotal = totalScores.length > 0 ? totalScores.reduce((sum: number, s: number) => sum + s, 0) / totalScores.length : 0;
-    const passRate = presentStudents.length > 0 ? (passedStudents.length / presentStudents.length) * 100 : 0;
+    const passRate = presentStudents.length > 0 ? ((presentStudents.length - failedStudents.length) / presentStudents.length) * 100 : 0;
 
     // Calculate stats for each question
     const questionStats = test.questions.map((question: any, idx: number) => {
@@ -76,28 +102,34 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({ test, open, onClose }) =>
       
       presentStudents.forEach((result: any) => {
         const score = result.scores[question.id] || 0;
-        questionScores.push(score);
+        const percentage = (score / question.maxScore) * 100;
+        questionScores.push(percentage);
       });
 
-      const maxScore = question.maxScore;
-      const highLevel = questionScores.filter(s => s >= maxScore * 0.75).length;
-      const mediumLevel = questionScores.filter(s => s >= maxScore * 0.5 && s < maxScore * 0.75).length;
-      const lowLevel = questionScores.filter(s => s < maxScore * 0.5).length;
-      const questionTotal = questionScores.reduce((a, b) => a + b, 0);
-      const questionAvg = questionScores.length > 0 ? questionTotal / questionScores.length : 0;
-      const questionHighest = questionScores.length > 0 ? Math.max(...questionScores) : 0;
-      const questionLowest = questionScores.length > 0 ? Math.min(...questionScores) : 0;
+      const excellentCount = questionScores.filter(s => s >= 85).length;
+      const goodCount = questionScores.filter(s => s >= 75 && s < 85).length;
+      const averageCount = questionScores.filter(s => s >= 65 && s < 75).length;
+      const lowCount = questionScores.filter(s => s >= 50 && s < 65).length;
+      const failedCount = questionScores.filter(s => s < 50).length;
+      
+      const rawScores = presentStudents.map((r: any) => r.scores[question.id] || 0);
+      const questionTotal = rawScores.reduce((a: number, b: number) => a + b, 0);
+      const questionAvg = rawScores.length > 0 ? questionTotal / rawScores.length : 0;
+      const questionHighest = rawScores.length > 0 ? Math.max(...rawScores) : 0;
+      const questionLowest = rawScores.length > 0 ? Math.min(...rawScores) : 0;
       const questionPassRate = questionScores.length > 0 
-        ? (questionScores.filter(s => s >= maxScore * 0.5).length / questionScores.length) * 100 
+        ? (questionScores.filter(s => s >= 50).length / questionScores.length) * 100 
         : 0;
 
       return {
         questionNum: idx + 1,
         type: question.type,
         maxScore: question.maxScore,
-        highLevel,
-        mediumLevel,
-        lowLevel,
+        excellentCount,
+        goodCount,
+        averageCount,
+        lowCount,
+        failedCount,
         avgScore: questionAvg,
         highestScore: questionHighest,
         lowestScore: questionLowest,
@@ -109,8 +141,12 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({ test, open, onClose }) =>
       totalStudents: test.results.length,
       presentCount: presentStudents.length,
       absentCount: absentStudents.length,
-      passedCount: passedStudents.length,
+      excellentCount: excellentStudents.length,
+      goodCount: goodStudents.length,
+      averageCount: averageStudents.length,
+      lowCount: lowStudents.length,
       failedCount: failedStudents.length,
+      passedCount: presentStudents.length - failedStudents.length,
       highestScore,
       lowestScore,
       highestTotal,
@@ -119,6 +155,7 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({ test, open, onClose }) =>
       avgTotal,
       passRate,
       questionStats,
+      totalMaxScore,
     };
   };
 
@@ -126,12 +163,10 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({ test, open, onClose }) =>
     const { schoolName, directorName, ministryName, directorateName } = getSchoolInfo();
     const { className, sectionName, subjectName, teacherName } = getTestDetails();
     const stats = calculateStats();
-    const totalMaxScore = test.questions.reduce((sum: number, q: any) => sum + q.maxScore, 0);
 
-    // Use landscape for many questions
-    const isLandscape = test.questions.length > 4;
+    // Always use landscape for better fit with 50 students
     const doc = new jsPDF({ 
-      orientation: isLandscape ? "landscape" : "portrait", 
+      orientation: "landscape", 
       unit: "mm", 
       format: "a4" 
     });
@@ -149,9 +184,9 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({ test, open, onClose }) =>
 
     const pageWidth = doc.internal.pageSize.width;
     const pageHeight = doc.internal.pageSize.height;
-    const margin = 10;
+    const margin = 8;
 
-    // === HEADER SECTION ===
+    // === HEADER SECTION - Three Column Layout ===
     let currentY = 8;
 
     // Palestinian colors bar at top
@@ -161,34 +196,44 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({ test, open, onClose }) =>
     doc.rect(0, 2, pageWidth, 2, "F");
     doc.setFillColor(0, 128, 0);
     doc.rect(0, 4, pageWidth, 2, "F");
+    doc.setFillColor(206, 17, 38); // Red triangle
+    doc.triangle(0, 0, 0, 6, 15, 3, "F");
 
-    currentY = 12;
+    currentY = 10;
 
-    // Government header
-    doc.setFontSize(11);
+    // Three-column header
+    const leftCol = pageWidth - margin - 60;
+    const centerCol = pageWidth / 2;
+    const rightCol = margin + 60;
+
+    // Right side - Ministry info
+    doc.setFontSize(9);
     doc.setTextColor(0, 0, 0);
-    doc.text("دولة فلسطين", pageWidth / 2, currentY, { align: "center" });
-    currentY += 5;
-    doc.text("State of Palestine", pageWidth / 2, currentY, { align: "center" });
-    currentY += 5;
+    doc.text("دولة فلسطين", rightCol, currentY, { align: "center" });
+    doc.text("State of Palestine", rightCol, currentY + 4, { align: "center" });
+    doc.text(ministryName, rightCol, currentY + 8, { align: "center" });
+    doc.text(directorateName, rightCol, currentY + 12, { align: "center" });
+
+    // Center - Logo/Emblem area
+    doc.setFontSize(16);
+    doc.text("🇵🇸", centerCol, currentY + 6, { align: "center" });
     doc.setFontSize(10);
-    doc.text(ministryName, pageWidth / 2, currentY, { align: "center" });
-    currentY += 4;
-    doc.text("Ministry of Education", pageWidth / 2, currentY, { align: "center" });
-    currentY += 5;
-    doc.text(directorateName, pageWidth / 2, currentY, { align: "center" });
-    currentY += 5;
+    doc.text(schoolName, centerCol, currentY + 14, { align: "center" });
+
+    // Left side - School info
+    doc.setFontSize(9);
+    doc.text("Ministry of Education", leftCol, currentY + 4, { align: "center" });
+    doc.text("Directorate of Education", leftCol, currentY + 8, { align: "center" });
+
+    currentY = 30;
+
+    // Report Title with test type
+    const testTypeLabel = test.type ? ` (${getTestTypeLabel(test.type)})` : "";
     doc.setFontSize(12);
-    doc.text(schoolName, pageWidth / 2, currentY, { align: "center" });
-
-    currentY += 8;
-
-    // Report Title
-    doc.setFontSize(14);
     doc.setTextColor(0, 100, 0);
-    doc.text(`تحليل امتحان ${test.name}`, pageWidth / 2, currentY, { align: "center" });
+    doc.text(`تحليل امتحان ${test.name}${testTypeLabel}`, centerCol, currentY, { align: "center" });
     
-    currentY += 8;
+    currentY += 6;
 
     // === TEST INFO ROW ===
     doc.autoTable({
@@ -198,43 +243,39 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({ test, open, onClose }) =>
       theme: "grid",
       styles: { 
         halign: "center", 
-        fontSize: 9, 
-        cellPadding: 2, 
+        fontSize: 8, 
+        cellPadding: 1.5, 
         font: ARABIC_FONT_NAME 
       },
       headStyles: { 
         fillColor: [0, 100, 0], 
         textColor: [255, 255, 255], 
-        fontSize: 9 
+        fontSize: 8 
       },
       margin: { left: margin, right: margin },
     });
 
-    currentY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 5 : currentY + 20;
+    currentY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 3 : currentY + 15;
 
-    // === MAIN RESULTS TABLE ===
-    // Build dynamic headers: الرقم، اسم الطالب، [أسئلة]، المجموع، النسبة، ملاحظات
+    // === MAIN RESULTS TABLE - Optimized for 50 students ===
     const questionHeaders = test.questions.map((q: any) => q.type);
     const mainHeaders = ["ملاحظات", "النسبة", "المجموع", ...questionHeaders.reverse(), "اسم الطالب", "م"];
 
-    // Build data rows
     const mainTableData = test.results.map((result: any, index: number) => {
       const studentName = result.studentName || getStudentName(result.studentId);
       
       if (result.isAbsent) {
         const emptyScores = test.questions.map(() => "-");
-        return [
-          "غائب",
-          "-",
-          "-",
-          ...emptyScores.reverse(),
-          studentName,
-          index + 1
-        ];
+        return ["غائب", "-", "-", ...emptyScores.reverse(), studentName, index + 1];
       }
 
       const questionScores = test.questions.map((q: any) => result.scores[q.id] || 0);
-      const status = result.percentage >= 50 ? "" : "راسب";
+      let status = "";
+      if (result.percentage < 50) status = "راسب";
+      else if (result.percentage < 65) status = "متدني";
+      else if (result.percentage < 75) status = "متوسط";
+      else if (result.percentage < 85) status = "جيد";
+      else status = "ممتاز";
       
       return [
         status,
@@ -246,6 +287,11 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({ test, open, onClose }) =>
       ];
     });
 
+    // Calculate dynamic font size based on number of students
+    const studentCount = test.results.length;
+    const fontSize = studentCount > 40 ? 6 : studentCount > 30 ? 7 : 8;
+    const cellPadding = studentCount > 40 ? 0.8 : studentCount > 30 ? 1 : 1.5;
+
     doc.autoTable({
       startY: currentY,
       head: [mainHeaders],
@@ -253,30 +299,41 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({ test, open, onClose }) =>
       theme: "grid",
       styles: { 
         halign: "center", 
-        fontSize: 8, 
-        cellPadding: 1.5, 
+        fontSize: fontSize, 
+        cellPadding: cellPadding, 
         font: ARABIC_FONT_NAME,
         lineWidth: 0.1,
       },
       headStyles: { 
         fillColor: [0, 100, 0], 
         textColor: [255, 255, 255], 
-        fontSize: 8,
-        cellPadding: 2,
+        fontSize: fontSize,
+        cellPadding: 1.5,
       },
       columnStyles: {
-        0: { cellWidth: 18 }, // ملاحظات
-        1: { cellWidth: 14 }, // النسبة
-        2: { cellWidth: 14 }, // المجموع
+        0: { cellWidth: 14 },
+        1: { cellWidth: 12 },
+        2: { cellWidth: 12 },
       },
       margin: { left: margin, right: margin },
       didParseCell: (data: any) => {
-        // Color code failing students
         if (data.section === "body" && data.column.index === 0) {
           const text = data.cell.raw;
           if (text === "راسب") {
             data.cell.styles.fillColor = [255, 200, 200];
             data.cell.styles.textColor = [150, 0, 0];
+          } else if (text === "متدني") {
+            data.cell.styles.fillColor = [255, 230, 200];
+            data.cell.styles.textColor = [180, 80, 0];
+          } else if (text === "متوسط") {
+            data.cell.styles.fillColor = [255, 255, 200];
+            data.cell.styles.textColor = [150, 120, 0];
+          } else if (text === "جيد") {
+            data.cell.styles.fillColor = [200, 220, 255];
+            data.cell.styles.textColor = [0, 60, 150];
+          } else if (text === "ممتاز") {
+            data.cell.styles.fillColor = [200, 255, 200];
+            data.cell.styles.textColor = [0, 100, 0];
           } else if (text === "غائب") {
             data.cell.styles.fillColor = [240, 240, 240];
             data.cell.styles.textColor = [100, 100, 100];
@@ -285,44 +342,126 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({ test, open, onClose }) =>
       },
     });
 
-    currentY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 5 : currentY + 50;
+    currentY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 4 : currentY + 50;
 
-    // === STATISTICS TABLE ===
-    // Check if we need a new page
-    if (currentY > pageHeight - 80) {
+    // === STATISTICS SECTION - Side by Side ===
+    if (currentY > pageHeight - 60) {
       doc.addPage();
       currentY = 15;
     }
 
-    doc.setFontSize(11);
+    doc.setFontSize(10);
     doc.setTextColor(0, 0, 0);
-    doc.text("الإحصائيات التفصيلية", pageWidth / 2, currentY, { align: "center" });
-    currentY += 5;
+    doc.text("الإحصائيات التفصيلية", centerCol, currentY, { align: "center" });
+    currentY += 4;
 
-    // Build stats headers matching questions
+    // Stats table (left side)
+    const statsTableWidth = 80;
+    const chartStartX = margin + statsTableWidth + 10;
+
+    // Performance levels summary table
+    doc.autoTable({
+      startY: currentY,
+      head: [["النسبة", "العدد", "المستوى"]],
+      body: [
+        [`${((stats.excellentCount / stats.presentCount) * 100 || 0).toFixed(1)}%`, stats.excellentCount, "ممتاز (85%+)"],
+        [`${((stats.goodCount / stats.presentCount) * 100 || 0).toFixed(1)}%`, stats.goodCount, "جيد (75-84%)"],
+        [`${((stats.averageCount / stats.presentCount) * 100 || 0).toFixed(1)}%`, stats.averageCount, "متوسط (65-74%)"],
+        [`${((stats.lowCount / stats.presentCount) * 100 || 0).toFixed(1)}%`, stats.lowCount, "متدني (50-64%)"],
+        [`${((stats.failedCount / stats.presentCount) * 100 || 0).toFixed(1)}%`, stats.failedCount, "راسب (<50%)"],
+      ],
+      theme: "grid",
+      styles: { 
+        halign: "center", 
+        fontSize: 8, 
+        cellPadding: 1.5, 
+        font: ARABIC_FONT_NAME 
+      },
+      headStyles: { 
+        fillColor: [50, 50, 50], 
+        textColor: [255, 255, 255], 
+        fontSize: 8 
+      },
+      margin: { left: pageWidth - margin - statsTableWidth, right: margin },
+      tableWidth: statsTableWidth,
+      didParseCell: (data: any) => {
+        if (data.section === "body") {
+          const rowIndex = data.row.index;
+          if (rowIndex === 0) data.cell.styles.fillColor = [200, 255, 200]; // Excellent - Green
+          else if (rowIndex === 1) data.cell.styles.fillColor = [200, 220, 255]; // Good - Blue
+          else if (rowIndex === 2) data.cell.styles.fillColor = [255, 255, 200]; // Average - Yellow
+          else if (rowIndex === 3) data.cell.styles.fillColor = [255, 230, 200]; // Low - Orange
+          else if (rowIndex === 4) data.cell.styles.fillColor = [255, 200, 200]; // Failed - Red
+        }
+      },
+    });
+
+    // Draw bar chart on the left side
+    const chartY = currentY;
+    const chartHeight = 35;
+    const chartWidth = pageWidth - statsTableWidth - margin * 3 - 10;
+    const barWidth = chartWidth / 5 - 5;
+    
+    const levels = [
+      { count: stats.excellentCount, label: "ممتاز", color: [34, 197, 94] },
+      { count: stats.goodCount, label: "جيد", color: [59, 130, 246] },
+      { count: stats.averageCount, label: "متوسط", color: [245, 158, 11] },
+      { count: stats.lowCount, label: "متدني", color: [239, 68, 68] },
+      { count: stats.failedCount, label: "راسب", color: [220, 38, 38] },
+    ];
+
+    const maxCount = Math.max(...levels.map(l => l.count), 1);
+
+    // Chart border
+    doc.setDrawColor(150, 150, 150);
+    doc.setLineWidth(0.3);
+    doc.rect(margin, chartY, chartWidth, chartHeight);
+
+    // Draw bars
+    levels.forEach((level, i) => {
+      const barHeight = (level.count / maxCount) * (chartHeight - 10);
+      const barX = margin + 5 + i * (barWidth + 5);
+      const barY = chartY + chartHeight - barHeight - 5;
+
+      doc.setFillColor(level.color[0], level.color[1], level.color[2]);
+      doc.rect(barX, barY, barWidth, barHeight, "F");
+
+      // Label
+      doc.setFontSize(6);
+      doc.setTextColor(0, 0, 0);
+      doc.text(level.label, barX + barWidth / 2, chartY + chartHeight - 1, { align: "center" });
+      doc.text(String(level.count), barX + barWidth / 2, barY - 1, { align: "center" });
+    });
+
+    currentY = Math.max(
+      doc.lastAutoTable ? doc.lastAutoTable.finalY : currentY,
+      chartY + chartHeight
+    ) + 4;
+
+    // === DETAILED QUESTION STATISTICS ===
+    if (currentY > pageHeight - 40) {
+      doc.addPage();
+      currentY = 15;
+    }
+
     const statsHeaders = ["المجموع", ...test.questions.map((q: any) => q.type).reverse(), "البيان"];
     
-    // Calculate totals for statistics
-    const totalHighLevel = stats.questionStats.reduce((sum: number, q: any) => sum + q.highLevel, 0);
-    const totalMediumLevel = stats.questionStats.reduce((sum: number, q: any) => sum + q.mediumLevel, 0);
-    const totalLowLevel = stats.questionStats.reduce((sum: number, q: any) => sum + q.lowLevel, 0);
+    const totalExcellent = stats.questionStats.reduce((sum: number, q: any) => sum + q.excellentCount, 0);
+    const totalGood = stats.questionStats.reduce((sum: number, q: any) => sum + q.goodCount, 0);
+    const totalAverage = stats.questionStats.reduce((sum: number, q: any) => sum + q.averageCount, 0);
+    const totalLow = stats.questionStats.reduce((sum: number, q: any) => sum + q.lowCount, 0);
+    const totalFailed = stats.questionStats.reduce((sum: number, q: any) => sum + q.failedCount, 0);
 
     const statsData = [
-      // Max scores row
-      [totalMaxScore, ...test.questions.map((q: any) => q.maxScore).reverse(), "الدرجة العظمى"],
-      // High level
-      [totalHighLevel, ...stats.questionStats.map((q: any) => q.highLevel).reverse(), "مستوى عالي (75%+)"],
-      // Medium level
-      [totalMediumLevel, ...stats.questionStats.map((q: any) => q.mediumLevel).reverse(), "مستوى متوسط (50-74%)"],
-      // Low level
-      [totalLowLevel, ...stats.questionStats.map((q: any) => q.lowLevel).reverse(), "مستوى متدني (<50%)"],
-      // Average
+      [stats.totalMaxScore, ...test.questions.map((q: any) => q.maxScore).reverse(), "الدرجة العظمى"],
+      [totalExcellent, ...stats.questionStats.map((q: any) => q.excellentCount).reverse(), "ممتاز (85%+)"],
+      [totalGood, ...stats.questionStats.map((q: any) => q.goodCount).reverse(), "جيد (75-84%)"],
+      [totalAverage, ...stats.questionStats.map((q: any) => q.averageCount).reverse(), "متوسط (65-74%)"],
+      [totalLow, ...stats.questionStats.map((q: any) => q.lowCount).reverse(), "متدني (50-64%)"],
+      [totalFailed, ...stats.questionStats.map((q: any) => q.failedCount).reverse(), "راسب (<50%)"],
       [stats.avgTotal.toFixed(1), ...stats.questionStats.map((q: any) => q.avgScore.toFixed(1)).reverse(), "المتوسط"],
-      // Highest
       [stats.highestTotal, ...stats.questionStats.map((q: any) => q.highestScore).reverse(), "أعلى علامة"],
-      // Lowest
       [stats.lowestTotal, ...stats.questionStats.map((q: any) => q.lowestScore).reverse(), "أدنى علامة"],
-      // Pass rate
       [`${stats.passRate.toFixed(1)}%`, ...stats.questionStats.map((q: any) => `${q.passRate.toFixed(0)}%`).reverse(), "نسبة النجاح"],
     ];
 
@@ -333,42 +472,39 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({ test, open, onClose }) =>
       theme: "grid",
       styles: { 
         halign: "center", 
-        fontSize: 8, 
-        cellPadding: 1.5, 
+        fontSize: 7, 
+        cellPadding: 1, 
         font: ARABIC_FONT_NAME 
       },
       headStyles: { 
         fillColor: [0, 0, 0], 
         textColor: [255, 255, 255], 
-        fontSize: 8 
+        fontSize: 7 
       },
       margin: { left: margin, right: margin },
       didParseCell: (data: any) => {
-        // Color code levels
         if (data.section === "body") {
           const rowIndex = data.row.index;
-          if (rowIndex === 1) { // High level - green
-            data.cell.styles.fillColor = [200, 255, 200];
-          } else if (rowIndex === 2) { // Medium level - yellow
-            data.cell.styles.fillColor = [255, 255, 200];
-          } else if (rowIndex === 3) { // Low level - red
-            data.cell.styles.fillColor = [255, 200, 200];
-          }
+          if (rowIndex === 1) data.cell.styles.fillColor = [200, 255, 200];
+          else if (rowIndex === 2) data.cell.styles.fillColor = [200, 220, 255];
+          else if (rowIndex === 3) data.cell.styles.fillColor = [255, 255, 200];
+          else if (rowIndex === 4) data.cell.styles.fillColor = [255, 230, 200];
+          else if (rowIndex === 5) data.cell.styles.fillColor = [255, 200, 200];
         }
       },
     });
 
-    currentY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 5 : currentY + 40;
+    currentY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 3 : currentY + 30;
 
     // === SUMMARY BOX ===
-    if (currentY > pageHeight - 40) {
+    if (currentY > pageHeight - 25) {
       doc.addPage();
       currentY = 15;
     }
 
     doc.autoTable({
       startY: currentY,
-      head: [["نسبة النجاح العامة", "عدد الراسبين", "عدد الناجحين", "عدد الغائبين", "عدد الحاضرين", "عدد الطلاب"]],
+      head: [["نسبة النجاح", "راسب", "ناجح", "غائب", "حاضر", "المجموع"]],
       body: [[
         `${stats.passRate.toFixed(1)}%`,
         stats.failedCount,
@@ -380,14 +516,14 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({ test, open, onClose }) =>
       theme: "grid",
       styles: { 
         halign: "center", 
-        fontSize: 9, 
-        cellPadding: 2, 
+        fontSize: 8, 
+        cellPadding: 1.5, 
         font: ARABIC_FONT_NAME 
       },
       headStyles: { 
         fillColor: [100, 100, 100], 
         textColor: [255, 255, 255], 
-        fontSize: 9 
+        fontSize: 8 
       },
       margin: { left: margin, right: margin },
     });
@@ -397,24 +533,23 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({ test, open, onClose }) =>
     for (let i = 1; i <= pageCount; i++) {
       doc.setPage(i);
       
-      // Footer line
       doc.setDrawColor(0, 100, 0);
       doc.setLineWidth(0.5);
-      doc.line(margin, pageHeight - 18, pageWidth - margin, pageHeight - 18);
+      doc.line(margin, pageHeight - 12, pageWidth - margin, pageHeight - 12);
 
-      doc.setFontSize(9);
+      doc.setFontSize(8);
       doc.setTextColor(80, 80, 80);
-      doc.text(`مدير/ة المدرسة: ${directorName}`, pageWidth - margin, pageHeight - 12, { align: "right" });
-      doc.text(`نسبة النجاح العامة: ${stats.passRate.toFixed(1)}%`, pageWidth / 2, pageHeight - 12, { align: "center" });
-      doc.text(`صفحة ${i} من ${pageCount}`, margin, pageHeight - 12);
+      doc.text(`مدير/ة المدرسة: ${directorName}`, pageWidth - margin, pageHeight - 7, { align: "right" });
+      doc.text(`نسبة النجاح: ${stats.passRate.toFixed(1)}%`, centerCol, pageHeight - 7, { align: "center" });
+      doc.text(`صفحة ${i} من ${pageCount}`, margin, pageHeight - 7);
 
       // Palestinian flag bar at bottom
       doc.setFillColor(0, 0, 0);
-      doc.rect(0, pageHeight - 6, pageWidth, 2, "F");
+      doc.rect(0, pageHeight - 4, pageWidth, 1.3, "F");
       doc.setFillColor(255, 255, 255);
-      doc.rect(0, pageHeight - 4, pageWidth, 2, "F");
+      doc.rect(0, pageHeight - 2.7, pageWidth, 1.3, "F");
       doc.setFillColor(0, 128, 0);
-      doc.rect(0, pageHeight - 2, pageWidth, 2, "F");
+      doc.rect(0, pageHeight - 1.4, pageWidth, 1.4, "F");
     }
 
     return doc;
@@ -466,7 +601,7 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({ test, open, onClose }) =>
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-      <DialogContent className="max-w-5xl h-[90vh] flex flex-col p-0 gap-0">
+      <DialogContent className="max-w-6xl h-[95vh] flex flex-col p-0 gap-0">
         <DialogHeader className="p-4 border-b bg-gradient-to-r from-[#000000] via-[#008000] to-[#CE1126]">
           <DialogTitle className="text-white flex items-center gap-2">
             <FileText className="h-5 w-5" />
@@ -483,27 +618,30 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({ test, open, onClose }) =>
               </div>
             </div>
           ) : pdfUrl ? (
-            <iframe src={pdfUrl} className="w-full h-full border-0" title="PDF Preview" />
+            <iframe
+              src={pdfUrl}
+              className="w-full h-full"
+              title="معاينة التقرير"
+            />
           ) : (
             <div className="flex items-center justify-center h-full">
-              <p className="text-muted-foreground">لا يوجد معاينة متاحة</p>
+              <p className="text-muted-foreground">لا يمكن عرض التقرير</p>
             </div>
           )}
         </div>
 
-        <div className="p-4 border-t bg-muted/30 flex justify-between items-center gap-4">
-          <Button variant="outline" onClick={onClose} className="gap-2">
-            <X className="h-4 w-4" />
+        <div className="p-4 border-t flex justify-between items-center bg-muted/30">
+          <Button variant="outline" onClick={onClose}>
+            <X className="ml-2 h-4 w-4" />
             إغلاق
           </Button>
-
           <div className="flex gap-2">
-            <Button onClick={handlePrint} disabled={isLoading || !pdfUrl} className="gap-2 bg-[#008000] hover:bg-[#006600]">
-              <Printer className="h-4 w-4" />
+            <Button onClick={handlePrint} disabled={!pdfUrl}>
+              <Printer className="ml-2 h-4 w-4" />
               طباعة
             </Button>
-            <Button onClick={handleDownload} disabled={isLoading || !pdfUrl} className="gap-2 bg-[#CE1126] hover:bg-[#a80d1e]">
-              <Download className="h-4 w-4" />
+            <Button onClick={handleDownload} disabled={!pdfUrl} className="bg-[#008000] hover:bg-[#006000]">
+              <Download className="ml-2 h-4 w-4" />
               تحميل PDF
             </Button>
           </div>
