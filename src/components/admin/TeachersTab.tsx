@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -27,19 +27,18 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
 } from "@/components/ui/dialog";
-import { Trash2, Edit } from "lucide-react";
+import { Trash2, Edit, Plus, Upload, Download, FileSpreadsheet } from "lucide-react";
 import { 
   getClasses,
   getSubjects,
   getClassById,
   getSubjectById,
-  getTeachers,
   saveTeachers,
   TeacherWithCredentials
 } from "@/services/dataService";
 import { useEffect } from "react";
+import * as XLSX from "xlsx";
 
 interface TeachersTabProps {
   teachers: TeacherWithCredentials[];
@@ -48,6 +47,7 @@ interface TeachersTabProps {
 
 const TeachersTab = ({ teachers, setTeachers }: TeachersTabProps) => {
   const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [showAddTeacherModal, setShowAddTeacherModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingTeacher, setEditingTeacher] = useState<TeacherWithCredentials | null>(null);
@@ -155,6 +155,115 @@ const TeachersTab = ({ teachers, setTeachers }: TeachersTabProps) => {
       subjects: teacher.assignedSubjects
     });
     setShowEditModal(true);
+  };
+
+  // Excel upload handler
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const data = await file.arrayBuffer();
+      const workbook = XLSX.read(data);
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+      const jsonData = XLSX.utils.sheet_to_json(worksheet) as any[];
+
+      if (jsonData.length === 0) {
+        toast({
+          title: "خطأ",
+          description: "الملف فارغ أو غير صالح",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      let addedCount = 0;
+      const newTeachers = [...teachers];
+
+      jsonData.forEach((row, index) => {
+        const name = row["اسم المعلم"] || row["الاسم"] || row["name"];
+        const username = row["اسم المستخدم"] || row["username"];
+        const password = row["كلمة المرور"] || row["password"] || "12345";
+
+        if (!name || !username) return;
+
+        // Check if teacher already exists
+        const exists = newTeachers.some(t => t.username === username);
+        if (exists) return;
+
+        newTeachers.push({
+          id: `teacher_${Date.now()}_${index}`,
+          name: name.trim(),
+          username: username.trim(),
+          password: password,
+          subjects: [],
+          assignedSubjects: [],
+          assignedClasses: []
+        });
+        addedCount++;
+      });
+
+      if (addedCount > 0) {
+        setTeachers(newTeachers);
+        saveTeachers(newTeachers);
+        toast({
+          title: "تم الاستيراد",
+          description: `تم إضافة ${addedCount} معلم بنجاح (يرجى تعيين الصفوف والمواد لكل معلم)`,
+        });
+      } else {
+        toast({
+          title: "تنبيه",
+          description: "لم يتم العثور على بيانات جديدة للاستيراد",
+        });
+      }
+
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    } catch (error) {
+      console.error("Error importing file:", error);
+      toast({
+        title: "خطأ",
+        description: "حدث خطأ أثناء قراءة الملف",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Download template
+  const downloadTemplate = () => {
+    const templateData = [
+      { "اسم المعلم": "أحمد محمد", "اسم المستخدم": "ahmed", "كلمة المرور": "12345" },
+      { "اسم المعلم": "سارة علي", "اسم المستخدم": "sara", "كلمة المرور": "12345" },
+    ];
+
+    const ws = XLSX.utils.json_to_sheet(templateData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "المعلمين");
+    XLSX.writeFile(wb, "قالب_المعلمين.xlsx");
+
+    toast({
+      title: "تم التحميل",
+      description: "تم تحميل قالب ملف المعلمين",
+    });
+  };
+
+  // Export teachers
+  const exportTeachers = () => {
+    const exportData = teachers.map(teacher => ({
+      "اسم المعلم": teacher.name,
+      "اسم المستخدم": teacher.username,
+      "الصفوف": teacher.assignedClasses.map(id => getClassById(id)?.name || "").filter(Boolean).join("، "),
+      "المواد": teacher.assignedSubjects.map(id => getSubjectById(id)?.name || "").filter(Boolean).join("، "),
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "المعلمين");
+    XLSX.writeFile(wb, `المعلمين_${new Date().toLocaleDateString("ar")}.xlsx`);
+
+    toast({
+      title: "تم التصدير",
+      description: `تم تصدير ${teachers.length} معلم`,
+    });
   };
 
   const renderTeacherForm = (onSubmit: (data: z.infer<typeof teacherFormSchema>) => void, isEdit: boolean = false) => (
@@ -313,17 +422,47 @@ const TeachersTab = ({ teachers, setTeachers }: TeachersTabProps) => {
     <>
       <Card className="border-2 border-black mb-6">
         <CardHeader className="bg-gradient-to-r from-gray-100 to-white border-b border-black">
-          <CardTitle className="flex justify-between items-center">
+          <CardTitle className="flex justify-between items-center flex-wrap gap-2">
             <span>إدارة المعلمين</span>
-            <Button 
-              onClick={() => {
-                teacherForm.reset();
-                setShowAddTeacherModal(true);
-              }}
-              className="bg-green-600 hover:bg-green-700"
-            >
-              إضافة معلم جديد
-            </Button>
+            <div className="flex gap-2 flex-wrap">
+              <input
+                type="file"
+                ref={fileInputRef}
+                accept=".xlsx,.xls"
+                onChange={handleFileUpload}
+                className="hidden"
+              />
+              <Button
+                variant="outline"
+                onClick={downloadTemplate}
+                className="border-blue-500 text-blue-600 hover:bg-blue-50"
+              >
+                <Download className="ml-2 h-4 w-4" /> تحميل القالب
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => fileInputRef.current?.click()}
+                className="border-purple-500 text-purple-600 hover:bg-purple-50"
+              >
+                <Upload className="ml-2 h-4 w-4" /> رفع من Excel
+              </Button>
+              <Button
+                variant="outline"
+                onClick={exportTeachers}
+                className="border-orange-500 text-orange-600 hover:bg-orange-50"
+              >
+                <FileSpreadsheet className="ml-2 h-4 w-4" /> تصدير
+              </Button>
+              <Button 
+                onClick={() => {
+                  teacherForm.reset();
+                  setShowAddTeacherModal(true);
+                }}
+                className="bg-green-600 hover:bg-green-700"
+              >
+                <Plus className="ml-2 h-4 w-4" /> إضافة معلم
+              </Button>
+            </div>
           </CardTitle>
         </CardHeader>
         <CardContent className="pt-6">

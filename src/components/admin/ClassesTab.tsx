@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -19,12 +19,14 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Plus, Trash2, Edit } from "lucide-react";
+import { Plus, Trash2, Edit, Upload, Download, FileSpreadsheet } from "lucide-react";
 import { Class, Section } from "@/types";
 import { getClasses, saveClasses } from "@/services/dataService";
+import * as XLSX from "xlsx";
 
 const ClassesTab = () => {
   const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [classes, setClasses] = useState<Class[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -138,21 +140,159 @@ const ClassesTab = () => {
     }
   };
 
+  // Excel upload handler
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const data = await file.arrayBuffer();
+      const workbook = XLSX.read(data);
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+      const jsonData = XLSX.utils.sheet_to_json(worksheet) as any[];
+
+      if (jsonData.length === 0) {
+        toast({
+          title: "خطأ",
+          description: "الملف فارغ أو غير صالح",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      let addedCount = 0;
+      const newClasses = [...classes];
+
+      jsonData.forEach((row) => {
+        const className = row["اسم الصف"] || row["الصف"] || row["name"];
+        const sectionsStr = row["الشعب"] || row["sections"] || "";
+
+        if (!className) return;
+
+        // Check if class already exists
+        const existingClass = newClasses.find(c => c.name === className);
+        if (existingClass) return;
+
+        const sectionNames = sectionsStr.split(/[,،]/).map((s: string) => s.trim()).filter(Boolean);
+        const sections: Section[] = sectionNames.map((name: string, index: number) => ({
+          id: `s${index + 1}c${Date.now()}_${addedCount}`,
+          name,
+        }));
+
+        newClasses.push({
+          id: `c${Date.now()}_${addedCount}`,
+          name: className,
+          sections: sections.length > 0 ? sections : [{ id: `s1c${Date.now()}`, name: "أ" }],
+        });
+        addedCount++;
+      });
+
+      if (addedCount > 0) {
+        setClasses(newClasses);
+        saveClasses(newClasses);
+        toast({
+          title: "تم الاستيراد",
+          description: `تم إضافة ${addedCount} صف بنجاح`,
+        });
+      } else {
+        toast({
+          title: "تنبيه",
+          description: "لم يتم العثور على بيانات جديدة للاستيراد",
+        });
+      }
+
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    } catch (error) {
+      console.error("Error importing file:", error);
+      toast({
+        title: "خطأ",
+        description: "حدث خطأ أثناء قراءة الملف",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Download template
+  const downloadTemplate = () => {
+    const templateData = [
+      { "اسم الصف": "الصف الأول", "الشعب": "أ، ب، ج" },
+      { "اسم الصف": "الصف الثاني", "الشعب": "أ، ب" },
+    ];
+
+    const ws = XLSX.utils.json_to_sheet(templateData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "الصفوف");
+    XLSX.writeFile(wb, "قالب_الصفوف.xlsx");
+
+    toast({
+      title: "تم التحميل",
+      description: "تم تحميل قالب ملف الصفوف",
+    });
+  };
+
+  // Export classes
+  const exportClasses = () => {
+    const exportData = classes.map(cls => ({
+      "اسم الصف": cls.name,
+      "الشعب": cls.sections.map(s => s.name).join("، "),
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "الصفوف");
+    XLSX.writeFile(wb, `الصفوف_${new Date().toLocaleDateString("ar")}.xlsx`);
+
+    toast({
+      title: "تم التصدير",
+      description: `تم تصدير ${classes.length} صف`,
+    });
+  };
+
   return (
     <Card className="border-2 border-black">
       <CardHeader className="bg-gradient-to-r from-green-100 to-white border-b border-black">
-        <CardTitle className="flex justify-between items-center">
+        <CardTitle className="flex justify-between items-center flex-wrap gap-2">
           <span>إدارة الصفوف</span>
-          <Button
-            onClick={() => {
-              setNewClassName("");
-              setNewSections([""]);
-              setShowAddModal(true);
-            }}
-            className="bg-green-600 hover:bg-green-700"
-          >
-            <Plus className="ml-2 h-4 w-4" /> إضافة صف جديد
-          </Button>
+          <div className="flex gap-2 flex-wrap">
+            <input
+              type="file"
+              ref={fileInputRef}
+              accept=".xlsx,.xls"
+              onChange={handleFileUpload}
+              className="hidden"
+            />
+            <Button
+              variant="outline"
+              onClick={downloadTemplate}
+              className="border-blue-500 text-blue-600 hover:bg-blue-50"
+            >
+              <Download className="ml-2 h-4 w-4" /> تحميل القالب
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => fileInputRef.current?.click()}
+              className="border-purple-500 text-purple-600 hover:bg-purple-50"
+            >
+              <Upload className="ml-2 h-4 w-4" /> رفع من Excel
+            </Button>
+            <Button
+              variant="outline"
+              onClick={exportClasses}
+              className="border-orange-500 text-orange-600 hover:bg-orange-50"
+            >
+              <FileSpreadsheet className="ml-2 h-4 w-4" /> تصدير
+            </Button>
+            <Button
+              onClick={() => {
+                setNewClassName("");
+                setNewSections([""]);
+                setShowAddModal(true);
+              }}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              <Plus className="ml-2 h-4 w-4" /> إضافة صف
+            </Button>
+          </div>
         </CardTitle>
       </CardHeader>
       <CardContent className="pt-6">

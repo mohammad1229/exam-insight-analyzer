@@ -3,9 +3,22 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Save, FileText, Eye } from "lucide-react";
+import { Save, FileText, Eye, Plus, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+interface HeaderTextField {
+  id: string;
+  text: string;
+  position: "right" | "center" | "left";
+  isEnglish: boolean;
+}
 
 // Default header settings
 const DEFAULT_HEADER_SETTINGS = {
@@ -19,6 +32,9 @@ const DEFAULT_HEADER_SETTINGS = {
   leftLine1: "Ministry of Education",
   leftLine2: "Directorate of Education",
   leftLine3: "",
+  
+  // Custom fields
+  customFields: [] as HeaderTextField[],
 };
 
 export const getHeaderSettings = () => {
@@ -42,6 +58,7 @@ const HeaderSettingsTab = () => {
   const [leftLine1, setLeftLine1] = useState(DEFAULT_HEADER_SETTINGS.leftLine1);
   const [leftLine2, setLeftLine2] = useState(DEFAULT_HEADER_SETTINGS.leftLine2);
   const [leftLine3, setLeftLine3] = useState(DEFAULT_HEADER_SETTINGS.leftLine3);
+  const [customFields, setCustomFields] = useState<HeaderTextField[]>([]);
 
   // Load saved settings on mount
   useEffect(() => {
@@ -53,6 +70,7 @@ const HeaderSettingsTab = () => {
     setLeftLine1(settings.leftLine1 || DEFAULT_HEADER_SETTINGS.leftLine1);
     setLeftLine2(settings.leftLine2 || DEFAULT_HEADER_SETTINGS.leftLine2);
     setLeftLine3(settings.leftLine3 || DEFAULT_HEADER_SETTINGS.leftLine3);
+    setCustomFields(settings.customFields || []);
   }, []);
 
   const handleSave = () => {
@@ -66,6 +84,7 @@ const HeaderSettingsTab = () => {
       leftLine1,
       leftLine2,
       leftLine3,
+      customFields,
     };
 
     localStorage.setItem("headerSettings", JSON.stringify(settings));
@@ -78,8 +97,37 @@ const HeaderSettingsTab = () => {
     setIsSaving(false);
   };
 
+  const addCustomField = () => {
+    setCustomFields([
+      ...customFields,
+      {
+        id: `field_${Date.now()}`,
+        text: "",
+        position: "center",
+        isEnglish: false,
+      },
+    ]);
+  };
+
+  const updateCustomField = (id: string, updates: Partial<HeaderTextField>) => {
+    setCustomFields(
+      customFields.map((field) =>
+        field.id === id ? { ...field, ...updates } : field
+      )
+    );
+  };
+
+  const removeCustomField = (id: string) => {
+    setCustomFields(customFields.filter((field) => field.id !== id));
+  };
+
   const schoolLogo = localStorage.getItem("schoolLogo");
   const schoolName = localStorage.getItem("schoolName") || "اسم المدرسة";
+
+  // Group custom fields by position
+  const rightCustomFields = customFields.filter((f) => f.position === "right");
+  const centerCustomFields = customFields.filter((f) => f.position === "center");
+  const leftCustomFields = customFields.filter((f) => f.position === "left");
 
   return (
     <Card className="border-2 border-black">
@@ -180,6 +228,86 @@ const HeaderSettingsTab = () => {
           </div>
         </div>
 
+        {/* Custom Fields Section */}
+        <div className="mt-8 p-4 bg-purple-50 rounded-lg border-2 border-purple-200">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="font-bold text-lg text-purple-800">نصوص إضافية مخصصة</h3>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={addCustomField}
+              className="border-purple-500 text-purple-600 hover:bg-purple-100"
+            >
+              <Plus className="h-4 w-4 ml-2" /> إضافة نص
+            </Button>
+          </div>
+
+          {customFields.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-4">
+              لا توجد نصوص مخصصة. اضغط على "إضافة نص" لإضافة نص جديد.
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {customFields.map((field) => (
+                <div key={field.id} className="flex gap-3 items-start p-3 bg-white rounded border">
+                  <div className="flex-1">
+                    <Label className="text-xs mb-1">النص</Label>
+                    <Input
+                      value={field.text}
+                      onChange={(e) => updateCustomField(field.id, { text: e.target.value })}
+                      placeholder="أدخل النص..."
+                      dir={field.isEnglish ? "ltr" : "rtl"}
+                    />
+                  </div>
+                  <div className="w-32">
+                    <Label className="text-xs mb-1">الموقع</Label>
+                    <Select
+                      value={field.position}
+                      onValueChange={(value: "right" | "center" | "left") =>
+                        updateCustomField(field.id, { position: value })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="right">يمين</SelectItem>
+                        <SelectItem value="center">وسط</SelectItem>
+                        <SelectItem value="left">يسار</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="w-28">
+                    <Label className="text-xs mb-1">اللغة</Label>
+                    <Select
+                      value={field.isEnglish ? "en" : "ar"}
+                      onValueChange={(value) =>
+                        updateCustomField(field.id, { isEnglish: value === "en" })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ar">عربي</SelectItem>
+                        <SelectItem value="en">إنجليزي</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => removeCustomField(field.id)}
+                    className="text-red-500 hover:bg-red-50 mt-5"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         {/* Preview */}
         <div className="mt-8">
           <Button 
@@ -202,6 +330,11 @@ const HeaderSettingsTab = () => {
                     <p className="text-xs">{rightLine1En}</p>
                     <p>{rightLine2}</p>
                     <p>{rightLine3}</p>
+                    {rightCustomFields.map((f) => (
+                      <p key={f.id} className={f.isEnglish ? "text-xs" : ""} dir={f.isEnglish ? "ltr" : "rtl"}>
+                        {f.text}
+                      </p>
+                    ))}
                   </div>
 
                   {/* Center - Logo */}
@@ -214,6 +347,11 @@ const HeaderSettingsTab = () => {
                       </div>
                     )}
                     <p className="font-bold text-sm mt-1">{schoolName}</p>
+                    {centerCustomFields.map((f) => (
+                      <p key={f.id} className={`text-xs ${f.isEnglish ? "" : ""}`} dir={f.isEnglish ? "ltr" : "rtl"}>
+                        {f.text}
+                      </p>
+                    ))}
                   </div>
 
                   {/* Left - English */}
@@ -221,6 +359,11 @@ const HeaderSettingsTab = () => {
                     <p>{leftLine1}</p>
                     <p>{leftLine2}</p>
                     {leftLine3 && <p>{leftLine3}</p>}
+                    {leftCustomFields.map((f) => (
+                      <p key={f.id} className={f.isEnglish ? "text-xs" : ""} dir={f.isEnglish ? "ltr" : "rtl"}>
+                        {f.text}
+                      </p>
+                    ))}
                   </div>
                 </div>
               </div>
