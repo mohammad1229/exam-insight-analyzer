@@ -14,13 +14,193 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      backups: {
+        Row: {
+          backup_type: string
+          completed_at: string | null
+          created_at: string
+          created_by: string | null
+          file_path: string | null
+          file_size: number | null
+          id: string
+          school_id: string
+          status: string
+        }
+        Insert: {
+          backup_type?: string
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          file_path?: string | null
+          file_size?: number | null
+          id?: string
+          school_id: string
+          status?: string
+        }
+        Update: {
+          backup_type?: string
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          file_path?: string | null
+          file_size?: number | null
+          id?: string
+          school_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "backups_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      device_activations: {
+        Row: {
+          activated_at: string
+          device_id: string
+          device_info: Json | null
+          device_name: string | null
+          id: string
+          is_active: boolean
+          last_seen_at: string
+          license_id: string
+        }
+        Insert: {
+          activated_at?: string
+          device_id: string
+          device_info?: Json | null
+          device_name?: string | null
+          id?: string
+          is_active?: boolean
+          last_seen_at?: string
+          license_id: string
+        }
+        Update: {
+          activated_at?: string
+          device_id?: string
+          device_info?: Json | null
+          device_name?: string | null
+          id?: string
+          is_active?: boolean
+          last_seen_at?: string
+          license_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "device_activations_license_id_fkey"
+            columns: ["license_id"]
+            isOneToOne: false
+            referencedRelation: "licenses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      licenses: {
+        Row: {
+          created_at: string
+          expiry_date: string | null
+          id: string
+          is_active: boolean
+          is_trial: boolean
+          license_key: string
+          max_devices: number
+          school_id: string | null
+          start_date: string | null
+          trial_days: number | null
+          trial_start_date: string | null
+          updated_at: string
+          validity_months: number | null
+        }
+        Insert: {
+          created_at?: string
+          expiry_date?: string | null
+          id?: string
+          is_active?: boolean
+          is_trial?: boolean
+          license_key: string
+          max_devices?: number
+          school_id?: string | null
+          start_date?: string | null
+          trial_days?: number | null
+          trial_start_date?: string | null
+          updated_at?: string
+          validity_months?: number | null
+        }
+        Update: {
+          created_at?: string
+          expiry_date?: string | null
+          id?: string
+          is_active?: boolean
+          is_trial?: boolean
+          license_key?: string
+          max_devices?: number
+          school_id?: string | null
+          start_date?: string | null
+          trial_days?: number | null
+          trial_start_date?: string | null
+          updated_at?: string
+          validity_months?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "licenses_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      schools: {
+        Row: {
+          address: string | null
+          created_at: string
+          director_name: string | null
+          email: string | null
+          id: string
+          logo_url: string | null
+          name: string
+          phone: string | null
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          created_at?: string
+          director_name?: string | null
+          email?: string | null
+          id?: string
+          logo_url?: string | null
+          name: string
+          phone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          created_at?: string
+          director_name?: string | null
+          email?: string | null
+          id?: string
+          logo_url?: string | null
+          name?: string
+          phone?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      check_license_validity: {
+        Args: { p_device_id: string; p_license_key: string }
+        Returns: Json
+      }
+      generate_license_key: { Args: never; Returns: string }
     }
     Enums: {
       [_ in never]: never
