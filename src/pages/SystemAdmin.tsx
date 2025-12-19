@@ -688,28 +688,28 @@ const SystemAdmin = () => {
         </div>
         
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid grid-cols-6 w-full max-w-4xl mx-auto mb-6">
-            <TabsTrigger value="licenses" className="flex items-center gap-2">
+          <TabsList className="grid grid-cols-6 w-full max-w-4xl mx-auto mb-6 bg-gray-100 dark:bg-gray-800 p-1">
+            <TabsTrigger value="licenses" className="flex items-center gap-2 data-[state=active]:bg-green-600 data-[state=active]:text-white">
               <FileKey className="h-4 w-4" />
               التراخيص
             </TabsTrigger>
-            <TabsTrigger value="school-admins" className="flex items-center gap-2">
+            <TabsTrigger value="school-admins" className="flex items-center gap-2 data-[state=active]:bg-purple-600 data-[state=active]:text-white">
               <User className="h-4 w-4" />
               مدراء المدارس
             </TabsTrigger>
-            <TabsTrigger value="users" className="flex items-center gap-2">
+            <TabsTrigger value="users" className="flex items-center gap-2 data-[state=active]:bg-blue-600 data-[state=active]:text-white">
               <Users className="h-4 w-4" />
               المستخدمون
             </TabsTrigger>
-            <TabsTrigger value="updates" className="flex items-center gap-2">
+            <TabsTrigger value="updates" className="flex items-center gap-2 data-[state=active]:bg-orange-600 data-[state=active]:text-white">
               <Download className="h-4 w-4" />
               التحديثات
             </TabsTrigger>
-            <TabsTrigger value="results" className="flex items-center gap-2">
+            <TabsTrigger value="results" className="flex items-center gap-2 data-[state=active]:bg-teal-600 data-[state=active]:text-white">
               <Database className="h-4 w-4" />
               النتائج
             </TabsTrigger>
-            <TabsTrigger value="settings" className="flex items-center gap-2">
+            <TabsTrigger value="settings" className="flex items-center gap-2 data-[state=active]:bg-gray-700 data-[state=active]:text-white">
               <Settings className="h-4 w-4" />
               الإعدادات
             </TabsTrigger>
