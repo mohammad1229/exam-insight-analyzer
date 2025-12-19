@@ -38,6 +38,7 @@ const AdminDashboard = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [adminName, setAdminName] = useState("");
   
   // Filter states
   const [selectedClass, setSelectedClass] = useState("");
@@ -71,15 +72,18 @@ const AdminDashboard = () => {
   
   // Check if admin is already logged in
   useEffect(() => {
-    const adminLoggedIn = localStorage.getItem("adminLoggedIn");
-    if (adminLoggedIn === "true") {
+    const schoolAdminId = localStorage.getItem("schoolAdminId");
+    const schoolAdminName = localStorage.getItem("schoolAdminName");
+    if (schoolAdminId) {
       setIsLoggedIn(true);
+      setAdminName(schoolAdminName || "");
     }
   }, []);
   
   const handleLogout = () => {
     setIsLoggedIn(false);
-    localStorage.removeItem("adminLoggedIn");
+    localStorage.removeItem("schoolAdminId");
+    localStorage.removeItem("schoolAdminName");
     
     toast({
       title: "تم تسجيل الخروج",
@@ -107,7 +111,9 @@ const AdminDashboard = () => {
         <div className="flex justify-between items-center mb-8 pb-4 border-b-2 border-red-500">
           <div>
             <h1 className="text-3xl font-bold text-black">لوحة تحكم مدير المدرسة</h1>
-            <p className="text-muted-foreground">إدارة كاملة للمعلمين والطلاب والصفوف والمواد</p>
+            <p className="text-muted-foreground">
+              {adminName ? `مرحباً ${adminName}` : "إدارة كاملة للمعلمين والطلاب والصفوف والمواد"}
+            </p>
           </div>
           <Button 
             onClick={handleLogout}
