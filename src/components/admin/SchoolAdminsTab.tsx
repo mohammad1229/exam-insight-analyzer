@@ -209,6 +209,18 @@ const SchoolAdminsTab = () => {
     return licenses.filter((l: any) => l.school_id === schoolId);
   };
 
+  // Handle school selection and auto-select license
+  const handleSchoolChange = (schoolId: string) => {
+    const schoolLicenses = licenses.filter((l: any) => l.school_id === schoolId);
+    const activeLicense = schoolLicenses.find((l: any) => l.is_active) || schoolLicenses[0];
+    
+    setFormData({ 
+      ...formData, 
+      school_id: schoolId, 
+      license_id: activeLicense?.id || "" 
+    });
+  };
+
   return (
     <div className="space-y-6">
       <Card className="border-2 border-purple-500">
@@ -336,7 +348,7 @@ const SchoolAdminsTab = () => {
               <Label>المدرسة *</Label>
               <Select
                 value={formData.school_id}
-                onValueChange={(value) => setFormData({ ...formData, school_id: value, license_id: "" })}
+                onValueChange={handleSchoolChange}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="اختر المدرسة" />
