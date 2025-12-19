@@ -43,7 +43,7 @@ const LicenseActivation = ({ onActivate, onStartTrial, isLoading }: LicenseActiv
         <Button
           variant="outline"
           onClick={() => navigate("/system-admin")}
-          className="border-white/50 text-white hover:bg-white/10 flex items-center gap-2"
+          className="bg-white/90 border-gray-300 text-black hover:bg-white flex items-center gap-2"
         >
           <Settings className="h-4 w-4" />
           مسؤول النظام
