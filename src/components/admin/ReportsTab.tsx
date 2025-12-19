@@ -454,6 +454,172 @@ const ReportsTab = ({ mockReports }: ReportsTabProps) => {
         currentY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 10 : currentY + 30;
       });
 
+      // ===== STATISTICAL SUMMARY SECTION =====
+      // Check if we need a new page for summary
+      if (currentY > pageHeight - 80) {
+        doc.addPage();
+        currentY = 20;
+      }
+
+      // Calculate statistics
+      const totalResults = studentResults.length;
+      const excellentCount = studentResults.filter(r => r.level === "ممتاز").length;
+      const goodCount = studentResults.filter(r => r.level === "جيد").length;
+      const averageCount = studentResults.filter(r => r.level === "متوسط").length;
+      const lowCount = studentResults.filter(r => r.level === "متدني").length;
+      const failedCount = studentResults.filter(r => r.level === "راسب").length;
+
+      const excellentPct = totalResults > 0 ? ((excellentCount / totalResults) * 100).toFixed(1) : "0";
+      const goodPct = totalResults > 0 ? ((goodCount / totalResults) * 100).toFixed(1) : "0";
+      const averagePct = totalResults > 0 ? ((averageCount / totalResults) * 100).toFixed(1) : "0";
+      const lowPct = totalResults > 0 ? ((lowCount / totalResults) * 100).toFixed(1) : "0";
+      const failedPct = totalResults > 0 ? ((failedCount / totalResults) * 100).toFixed(1) : "0";
+
+      const avgPercentage = totalResults > 0 
+        ? (studentResults.reduce((sum, r) => sum + r.percentage, 0) / totalResults).toFixed(1) 
+        : "0";
+
+      const passCount = excellentCount + goodCount + averageCount;
+      const passRate = totalResults > 0 ? ((passCount / totalResults) * 100).toFixed(1) : "0";
+
+      // Summary Title
+      doc.setFillColor(0, 100, 0);
+      doc.rect(margin, currentY, pageWidth - margin * 2, 8, "F");
+      doc.setFontSize(11);
+      doc.setTextColor(255, 255, 255);
+      doc.text("الملخص الإحصائي", pageWidth / 2, currentY + 5.5, { align: "center" });
+      currentY += 12;
+
+      // Summary Stats Table
+      doc.autoTable({
+        startY: currentY,
+        head: [["نسبة النجاح", "متوسط الدرجات", "إجمالي النتائج", "عدد الطلاب", "عدد الاختبارات"]],
+        body: [[
+          `${passRate}%`,
+          `${avgPercentage}%`,
+          totalResults,
+          new Set(studentResults.map(r => r.studentName)).size,
+          new Set(studentResults.map(r => r.testName)).size
+        ]],
+        theme: "grid",
+        styles: { halign: "center", fontSize: 9, font: ARABIC_FONT_NAME },
+        headStyles: { fillColor: [50, 50, 50], textColor: [255, 255, 255] },
+        margin: { left: margin, right: margin },
+      });
+
+      currentY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 6 : currentY + 20;
+
+      // Performance Levels Distribution
+      doc.setFontSize(10);
+      doc.setTextColor(0, 0, 0);
+      doc.text("توزيع المستويات:", pageWidth - margin, currentY, { align: "right" });
+      currentY += 5;
+
+      doc.autoTable({
+        startY: currentY,
+        head: [["النسبة المئوية", "العدد", "المستوى"]],
+        body: [
+          [`${excellentPct}%`, excellentCount, "ممتاز"],
+          [`${goodPct}%`, goodCount, "جيد"],
+          [`${averagePct}%`, averageCount, "متوسط"],
+          [`${lowPct}%`, lowCount, "متدني"],
+          [`${failedPct}%`, failedCount, "راسب"],
+        ],
+        theme: "grid",
+        styles: { halign: "center", fontSize: 9, font: ARABIC_FONT_NAME },
+        headStyles: { fillColor: [80, 80, 80], textColor: [255, 255, 255] },
+        margin: { left: pageWidth / 2 - 30, right: pageWidth / 2 - 30 },
+        tableWidth: 60,
+        didParseCell: (data: any) => {
+          if (data.section === "body" && data.column.index === 2) {
+            const level = data.cell.raw;
+            if (level === "ممتاز") data.cell.styles.textColor = [0, 128, 0];
+            else if (level === "جيد") data.cell.styles.textColor = [0, 100, 200];
+            else if (level === "متوسط") data.cell.styles.textColor = [200, 150, 0];
+            else if (level === "متدني") data.cell.styles.textColor = [200, 100, 0];
+            else data.cell.styles.textColor = [200, 0, 0];
+          }
+        }
+      });
+
+      currentY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 8 : currentY + 30;
+
+      // Visual bar representation
+      const barWidth = pageWidth - margin * 4;
+      const barHeight = 10;
+      const barY = currentY;
+      
+      doc.setFontSize(8);
+      doc.text("التمثيل البياني للمستويات:", pageWidth - margin, barY - 3, { align: "right" });
+
+      let barX = margin * 2;
+      
+      // Draw bar segments
+      if (totalResults > 0) {
+        // Excellent - Green
+        const excellentWidth = (excellentCount / totalResults) * barWidth;
+        if (excellentWidth > 0) {
+          doc.setFillColor(0, 180, 0);
+          doc.rect(barX, barY, excellentWidth, barHeight, "F");
+          barX += excellentWidth;
+        }
+
+        // Good - Blue
+        const goodWidth = (goodCount / totalResults) * barWidth;
+        if (goodWidth > 0) {
+          doc.setFillColor(0, 120, 200);
+          doc.rect(barX, barY, goodWidth, barHeight, "F");
+          barX += goodWidth;
+        }
+
+        // Average - Yellow
+        const averageWidth = (averageCount / totalResults) * barWidth;
+        if (averageWidth > 0) {
+          doc.setFillColor(220, 180, 0);
+          doc.rect(barX, barY, averageWidth, barHeight, "F");
+          barX += averageWidth;
+        }
+
+        // Low - Orange
+        const lowWidth = (lowCount / totalResults) * barWidth;
+        if (lowWidth > 0) {
+          doc.setFillColor(230, 130, 0);
+          doc.rect(barX, barY, lowWidth, barHeight, "F");
+          barX += lowWidth;
+        }
+
+        // Failed - Red
+        const failedWidth = (failedCount / totalResults) * barWidth;
+        if (failedWidth > 0) {
+          doc.setFillColor(220, 50, 50);
+          doc.rect(barX, barY, failedWidth, barHeight, "F");
+        }
+      }
+
+      // Bar border
+      doc.setDrawColor(100, 100, 100);
+      doc.rect(margin * 2, barY, barWidth, barHeight);
+
+      // Legend
+      currentY = barY + barHeight + 6;
+      const legendItems = [
+        { label: "ممتاز", color: [0, 180, 0] },
+        { label: "جيد", color: [0, 120, 200] },
+        { label: "متوسط", color: [220, 180, 0] },
+        { label: "متدني", color: [230, 130, 0] },
+        { label: "راسب", color: [220, 50, 50] },
+      ];
+
+      let legendX = pageWidth / 2 + 50;
+      doc.setFontSize(7);
+      legendItems.forEach((item, i) => {
+        doc.setFillColor(item.color[0], item.color[1], item.color[2]);
+        doc.rect(legendX, currentY, 4, 4, "F");
+        doc.setTextColor(0, 0, 0);
+        doc.text(item.label, legendX - 2, currentY + 3, { align: "right" });
+        legendX -= 25;
+      });
+
       // Footer on last page
       const footerY = pageHeight - 10;
       if (footerSettings.showCopyright && footerSettings.copyrightText) {
@@ -463,7 +629,7 @@ const ReportsTab = ({ mockReports }: ReportsTabProps) => {
       }
 
       // Save
-      doc.save("تقرير_مفصل_جميع_الطلاب.pdf");
+      doc.save("تقرير_مفصل_الطلاب.pdf");
       toast.success("تم إنشاء التقرير المفصل بنجاح");
     } catch (error) {
       console.error("Error generating detailed report:", error);
