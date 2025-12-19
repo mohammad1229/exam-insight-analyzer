@@ -271,6 +271,38 @@ export const renewLicense = async (
   }
 };
 
+// Initialize empty database for a new school
+export const initializeSchoolDatabase = (schoolId: string) => {
+  // Create empty data structures for the new school
+  const emptyData = {
+    students: [],
+    classes: [],
+    subjects: [],
+    teachers: [],
+    tests: [],
+    school: {
+      id: schoolId,
+      name: "",
+      director_name: "",
+      logo: "",
+      address: "",
+      phone: "",
+      email: ""
+    }
+  };
+
+  // Save empty data with school ID prefix
+  Object.entries(emptyData).forEach(([key, value]) => {
+    const storageKey = `${schoolId}_${key}`;
+    // Only initialize if not already exists
+    if (!localStorage.getItem(storageKey)) {
+      localStorage.setItem(storageKey, JSON.stringify(value));
+    }
+  });
+
+  console.log(`Initialized empty database for school: ${schoolId}`);
+};
+
 // Create school
 export const createSchool = async (schoolData: {
   name: string;
@@ -286,6 +318,10 @@ export const createSchool = async (schoolData: {
     .single();
 
   if (error) throw error;
+
+  // Initialize empty database for the new school
+  initializeSchoolDatabase(data.id);
+
   return data;
 };
 
@@ -453,19 +489,23 @@ export const verifySchoolAdminLogin = async (username: string, password: string)
   return { success: true, admin: data };
 };
 
-// Delete license
+// Delete license completely
 export const deleteLicense = async (licenseId: string) => {
   try {
-    // First deactivate all device activations for this license
-    await supabase
+    // First delete all device activations for this license
+    const { error: deviceError } = await supabase
       .from("device_activations")
-      .update({ is_active: false })
+      .delete()
       .eq("license_id", licenseId);
 
-    // Then deactivate the license
+    if (deviceError) {
+      console.error("Error deleting device activations:", deviceError);
+    }
+
+    // Then delete the license
     const { error } = await supabase
       .from("licenses")
-      .update({ is_active: false })
+      .delete()
       .eq("id", licenseId);
 
     if (error) throw error;
