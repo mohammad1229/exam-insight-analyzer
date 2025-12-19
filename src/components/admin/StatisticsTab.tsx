@@ -1,5 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
+import { getPerformanceLevels } from "./PerformanceLevelsTab";
 
 interface StatisticsTabProps {
   mockReports: {
@@ -25,13 +26,16 @@ interface StatisticsTabProps {
   }[];
 }
 
-// Performance level colors
-const LEVEL_COLORS = {
-  excellent: "#22c55e",  // Green
-  good: "#3b82f6",       // Blue
-  average: "#f59e0b",    // Orange
-  low: "#ef4444",        // Light Red
-  failed: "#dc2626"      // Dark Red
+// Get performance levels from settings
+const getLevelColors = () => {
+  const levels = getPerformanceLevels();
+  return {
+    excellent: levels.excellent.color,
+    good: levels.good.color,
+    average: levels.average.color,
+    low: levels.low.color,
+    failed: levels.failed.color
+  };
 };
 
 const StatisticsTab = ({ 
@@ -41,24 +45,28 @@ const StatisticsTab = ({
   selectedClass,
   chartData 
 }: StatisticsTabProps) => {
+  // Get current performance levels from settings
+  const levels = getPerformanceLevels();
+  const LEVEL_COLORS = getLevelColors();
+
   // Calculate average pass rate
   const avgPassRate = mockReports.length > 0
     ? Math.round(mockReports.reduce((sum, r) => sum + r.passRate, 0) / mockReports.length)
     : 0;
 
-  // Calculate performance levels distribution (mock data based on pass rates)
-  const excellentCount = mockReports.filter(r => r.passRate >= 85).length;
-  const goodCount = mockReports.filter(r => r.passRate >= 75 && r.passRate < 85).length;
-  const averageCount = mockReports.filter(r => r.passRate >= 65 && r.passRate < 75).length;
-  const lowCount = mockReports.filter(r => r.passRate >= 50 && r.passRate < 65).length;
-  const failedCount = mockReports.filter(r => r.passRate < 50).length;
+  // Calculate performance levels distribution using dynamic settings
+  const excellentCount = mockReports.filter(r => r.passRate >= levels.excellent.min).length;
+  const goodCount = mockReports.filter(r => r.passRate >= levels.good.min && r.passRate < levels.excellent.min).length;
+  const averageCount = mockReports.filter(r => r.passRate >= levels.average.min && r.passRate < levels.good.min).length;
+  const lowCount = mockReports.filter(r => r.passRate >= levels.low.min && r.passRate < levels.average.min).length;
+  const failedCount = mockReports.filter(r => r.passRate < levels.low.min).length;
 
   const performanceLevelsData = [
-    { name: "ممتاز (85%+)", value: excellentCount, color: LEVEL_COLORS.excellent },
-    { name: "جيد (75-84%)", value: goodCount, color: LEVEL_COLORS.good },
-    { name: "متوسط (65-74%)", value: averageCount, color: LEVEL_COLORS.average },
-    { name: "متدني (50-64%)", value: lowCount, color: LEVEL_COLORS.low },
-    { name: "راسب (<50%)", value: failedCount, color: LEVEL_COLORS.failed },
+    { name: `ممتاز (${levels.excellent.min}%+)`, value: excellentCount, color: LEVEL_COLORS.excellent },
+    { name: `جيد (${levels.good.min}-${levels.excellent.min - 1}%)`, value: goodCount, color: LEVEL_COLORS.good },
+    { name: `متوسط (${levels.average.min}-${levels.good.min - 1}%)`, value: averageCount, color: LEVEL_COLORS.average },
+    { name: `متدني (${levels.low.min}-${levels.average.min - 1}%)`, value: lowCount, color: LEVEL_COLORS.low },
+    { name: `راسب (<${levels.low.min}%)`, value: failedCount, color: LEVEL_COLORS.failed },
   ];
 
   const barChartData = [

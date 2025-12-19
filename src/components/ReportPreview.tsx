@@ -21,13 +21,43 @@ interface ReportPreviewProps {
   onClose: () => void;
 }
 
-// Performance levels configuration
-const PERFORMANCE_LEVELS = {
-  excellent: { min: 85, label: "ممتاز", color: [34, 197, 94] },      // Green
-  good: { min: 75, max: 84, label: "جيد", color: [59, 130, 246] },   // Blue
-  average: { min: 65, max: 74, label: "متوسط", color: [245, 158, 11] }, // Orange
-  low: { min: 50, max: 64, label: "متدني", color: [239, 68, 68] },   // Light Red
-  failed: { max: 49, label: "راسب", color: [220, 38, 38] }           // Dark Red
+// Get performance levels from settings
+const getPerformanceLevels = () => {
+  const saved = localStorage.getItem("performanceLevels");
+  if (saved) {
+    const levels = JSON.parse(saved);
+    return {
+      excellent: { min: levels.excellent.min, label: "ممتاز", color: [34, 197, 94] },
+      good: { min: levels.good.min, max: levels.excellent.min - 1, label: "جيد", color: [59, 130, 246] },
+      average: { min: levels.average.min, max: levels.good.min - 1, label: "متوسط", color: [245, 158, 11] },
+      low: { min: levels.low.min, max: levels.average.min - 1, label: "متدني", color: [239, 68, 68] },
+      failed: { max: levels.low.min - 1, label: "راسب", color: [220, 38, 38] }
+    };
+  }
+  return {
+    excellent: { min: 85, label: "ممتاز", color: [34, 197, 94] },
+    good: { min: 75, max: 84, label: "جيد", color: [59, 130, 246] },
+    average: { min: 65, max: 74, label: "متوسط", color: [245, 158, 11] },
+    low: { min: 50, max: 64, label: "متدني", color: [239, 68, 68] },
+    failed: { max: 49, label: "راسب", color: [220, 38, 38] }
+  };
+};
+
+// Get header settings
+const getHeaderSettings = () => {
+  const saved = localStorage.getItem("headerSettings");
+  if (saved) {
+    return JSON.parse(saved);
+  }
+  return {
+    rightLine1: "دولة فلسطين",
+    rightLine1En: "State of Palestine",
+    rightLine2: "وزارة التربية والتعليم العالي",
+    rightLine3: "مديرية التربية والتعليم",
+    leftLine1: "Ministry of Education",
+    leftLine2: "Directorate of Education",
+    leftLine3: "",
+  };
 };
 
 const ReportPreview: React.FC<ReportPreviewProps> = ({ test, open, onClose }) => {
@@ -75,15 +105,16 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({ test, open, onClose }) =>
   };
 
   const calculateStats = () => {
+    const levels = getPerformanceLevels();
     const presentStudents = test.results.filter((r: any) => !r.isAbsent);
     const totalMaxScore = test.questions.reduce((sum: number, q: any) => sum + q.maxScore, 0);
     
-    // New performance levels calculation
-    const excellentStudents = presentStudents.filter((r: any) => r.percentage >= 85);
-    const goodStudents = presentStudents.filter((r: any) => r.percentage >= 75 && r.percentage < 85);
-    const averageStudents = presentStudents.filter((r: any) => r.percentage >= 65 && r.percentage < 75);
-    const lowStudents = presentStudents.filter((r: any) => r.percentage >= 50 && r.percentage < 65);
-    const failedStudents = presentStudents.filter((r: any) => r.percentage < 50);
+    // Dynamic performance levels calculation
+    const excellentStudents = presentStudents.filter((r: any) => r.percentage >= levels.excellent.min);
+    const goodStudents = presentStudents.filter((r: any) => r.percentage >= levels.good.min && r.percentage < levels.excellent.min);
+    const averageStudents = presentStudents.filter((r: any) => r.percentage >= levels.average.min && r.percentage < levels.good.min);
+    const lowStudents = presentStudents.filter((r: any) => r.percentage >= levels.low.min && r.percentage < levels.average.min);
+    const failedStudents = presentStudents.filter((r: any) => r.percentage < levels.low.min);
     const absentStudents = test.results.filter((r: any) => r.isAbsent);
 
     const scores = presentStudents.map((r: any) => r.percentage);
@@ -186,20 +217,20 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({ test, open, onClose }) =>
     const pageHeight = doc.internal.pageSize.height;
     const margin = 8;
 
-    // === HEADER SECTION - Three Column Layout ===
+    // === HEADER SECTION - Classic Frame Layout ===
     let currentY = 8;
 
-    // Palestinian colors bar at top
-    doc.setFillColor(0, 0, 0);
-    doc.rect(0, 0, pageWidth, 2, "F");
-    doc.setFillColor(255, 255, 255);
-    doc.rect(0, 2, pageWidth, 2, "F");
-    doc.setFillColor(0, 128, 0);
-    doc.rect(0, 4, pageWidth, 2, "F");
-    doc.setFillColor(206, 17, 38); // Red triangle
-    doc.triangle(0, 0, 0, 6, 15, 3, "F");
+    // Classic double-line frame border at top
+    doc.setDrawColor(80, 80, 80);
+    doc.setLineWidth(0.8);
+    doc.rect(margin, 6, pageWidth - margin * 2, 22);
+    doc.setLineWidth(0.3);
+    doc.rect(margin + 1, 7, pageWidth - margin * 2 - 2, 20);
 
-    currentY = 10;
+    currentY = 12;
+
+    // Get header settings
+    const headerSettings = getHeaderSettings();
 
     // Three-column header
     const leftCol = pageWidth - margin - 60;
@@ -209,23 +240,32 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({ test, open, onClose }) =>
     // Right side - Ministry info
     doc.setFontSize(9);
     doc.setTextColor(0, 0, 0);
-    doc.text("دولة فلسطين", rightCol, currentY, { align: "center" });
-    doc.text("State of Palestine", rightCol, currentY + 4, { align: "center" });
-    doc.text(ministryName, rightCol, currentY + 8, { align: "center" });
-    doc.text(directorateName, rightCol, currentY + 12, { align: "center" });
+    doc.text(headerSettings.rightLine1, rightCol, currentY, { align: "center" });
+    doc.text(headerSettings.rightLine1En, rightCol, currentY + 4, { align: "center" });
+    doc.text(headerSettings.rightLine2 || ministryName, rightCol, currentY + 8, { align: "center" });
+    doc.text(headerSettings.rightLine3 || directorateName, rightCol, currentY + 12, { align: "center" });
 
-    // Center - Logo/Emblem area
-    doc.setFontSize(16);
-    doc.text("🇵🇸", centerCol, currentY + 6, { align: "center" });
+    // Center - Logo/School Name
+    const schoolLogo = getSchoolInfo().schoolLogo;
+    if (schoolLogo) {
+      try {
+        doc.addImage(schoolLogo, "PNG", centerCol - 8, currentY - 2, 16, 16);
+      } catch (e) {
+        // If logo fails, just show school name
+      }
+    }
     doc.setFontSize(10);
     doc.text(schoolName, centerCol, currentY + 14, { align: "center" });
 
-    // Left side - School info
+    // Left side - English info
     doc.setFontSize(9);
-    doc.text("Ministry of Education", leftCol, currentY + 4, { align: "center" });
-    doc.text("Directorate of Education", leftCol, currentY + 8, { align: "center" });
+    doc.text(headerSettings.leftLine1, leftCol, currentY + 4, { align: "center" });
+    doc.text(headerSettings.leftLine2, leftCol, currentY + 8, { align: "center" });
+    if (headerSettings.leftLine3) {
+      doc.text(headerSettings.leftLine3, leftCol, currentY + 12, { align: "center" });
+    }
 
-    currentY = 30;
+    currentY = 32;
 
     // Report Title with test type
     const testTypeLabel = test.type ? ` (${getTestTypeLabel(test.type)})` : "";
