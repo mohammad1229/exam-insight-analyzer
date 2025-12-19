@@ -20,6 +20,7 @@ const Index = () => {
     isTrial,
     remainingDays,
     schoolName,
+    directorName,
     showExpiryWarning,
     activateLicense,
     startTrialLicense,
@@ -166,6 +167,12 @@ const Index = () => {
                   <div className="text-lg">
                     <span className="text-muted-foreground">المدرسة: </span>
                     <span className="font-bold text-primary">{schoolName}</span>
+                  </div>
+                )}
+                {directorName && (
+                  <div className="text-base">
+                    <span className="text-muted-foreground">المدير: </span>
+                    <span className="font-semibold text-foreground">{directorName}</span>
                   </div>
                 )}
                 <div className="text-sm">
