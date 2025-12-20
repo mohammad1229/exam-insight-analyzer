@@ -160,28 +160,32 @@ const Index = () => {
           </div>
 
           {/* School and license info */}
-          <Card className="border-2 border-primary/50 bg-card/80 dark:bg-gray-800/80 backdrop-blur max-w-md mx-auto">
+          <Card className="border-2 border-blue-500 bg-blue-50/90 dark:bg-blue-900/30 backdrop-blur max-w-md mx-auto shadow-lg">
             <CardContent className="pt-6 pb-6">
-              <div className="space-y-3 text-right">
-                {schoolName && (
-                  <div className="text-lg">
-                    <span className="text-muted-foreground">المدرسة: </span>
-                    <span className="font-bold text-primary">{schoolName}</span>
-                  </div>
-                )}
-                {directorName && (
-                  <div className="text-base">
-                    <span className="text-muted-foreground">المدير: </span>
-                    <span className="font-semibold text-foreground">{directorName}</span>
-                  </div>
-                )}
-                <div className="text-sm">
+              <div className="space-y-4 text-center">
+                {/* School Name - Always show */}
+                <div className="text-xl">
+                  <span className="text-blue-600 dark:text-blue-300 font-bold">
+                    {schoolName || "اسم المدرسة غير محدد"}
+                  </span>
+                </div>
+
+                {/* Director Name - Always show */}
+                <div className="text-base border-t border-blue-200 dark:border-blue-700 pt-3">
+                  <span className="text-muted-foreground">مدير المدرسة: </span>
+                  <span className="font-semibold text-foreground">
+                    {directorName || "غير محدد"}
+                  </span>
+                </div>
+
+                {/* License Status */}
+                <div className="text-sm border-t border-blue-200 dark:border-blue-700 pt-3 flex items-center justify-center gap-3">
                   <span className={`px-3 py-1 rounded-full ${
                     isTrial ? 'bg-yellow-100 dark:bg-yellow-900/50 text-yellow-800 dark:text-yellow-200' : 'bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-200'
                   }`}>
                     {isTrial ? `فترة تجريبية` : "ترخيص مفعل"}
                   </span>
-                  <span className="mr-2 text-muted-foreground">
+                  <span className="text-muted-foreground">
                     متبقي <span className="font-bold text-primary">{remainingDays}</span> يوم
                   </span>
                 </div>
