@@ -19,11 +19,6 @@ import {
 } from "@/components/ui/table";
 import { Label } from "@/components/ui/label";
 import { FileText, Download, Users, Filter, Eye, Edit2, Trash2 } from "lucide-react";
-import { 
-  classesData, 
-  subjectsData,
-  teachersData,
-} from "@/data/mockData";
 import { getTests, getStudents, getClasses, getTeachers, getSubjects, getClassById, getSectionById, getSubjectById, getTeacherById, deleteTest, updateTest } from "@/services/dataService";
 import { jsPDF } from "jspdf";
 import "jspdf-autotable";
@@ -828,7 +823,7 @@ const ReportsTab = ({ mockReports }: ReportsTabProps) => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">جميع الصفوف</SelectItem>
-                  {classesData.map(cls => (
+                  {allClasses.map(cls => (
                     <SelectItem key={cls.id} value={cls.name}>
                       {cls.name}
                     </SelectItem>
@@ -845,7 +840,7 @@ const ReportsTab = ({ mockReports }: ReportsTabProps) => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">جميع المعلمين</SelectItem>
-                  {teachersData.map(teacher => (
+                  {allTeachers.map(teacher => (
                     <SelectItem key={teacher.id} value={teacher.name}>
                       {teacher.name}
                     </SelectItem>
@@ -862,7 +857,7 @@ const ReportsTab = ({ mockReports }: ReportsTabProps) => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">جميع المواد</SelectItem>
-                  {subjectsData.map(subject => (
+                  {allSubjects.map(subject => (
                     <SelectItem key={subject.id} value={subject.name}>
                       {subject.name}
                     </SelectItem>

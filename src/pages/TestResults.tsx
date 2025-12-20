@@ -155,14 +155,14 @@ const TestResults = () => {
       })),
     };
     
-    // Save to dataService (localStorage)
+    // Save to dataService (localStorage) - shared with admin dashboard
     addTest(testData);
     
     toast({
-      title: asDraft ? "تم حفظ المسودة" : "تم حفظ النتائج",
+      title: asDraft ? "تم حفظ المسودة" : "تم حفظ النتائج وإرسالها للمدير",
       description: asDraft 
         ? "تم حفظ بيانات الاختبار كمسودة" 
-        : "تم حفظ نتائج الاختبار بنجاح",
+        : "تم حفظ نتائج الاختبار بنجاح وأصبحت متاحة في لوحة تحكم المدير",
     });
     
     return testData;
