@@ -31,6 +31,8 @@ export interface TeacherWithCredentials extends Teacher {
   password: string;
   assignedClasses: string[];
   assignedSubjects: string[];
+  must_change_password?: boolean;
+  role?: 'teacher' | 'senior_teacher';
 }
 
 // Initialize data from localStorage or use defaults

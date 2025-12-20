@@ -158,6 +158,33 @@ export type Database = {
           },
         ]
       }
+      permissions: {
+        Row: {
+          created_at: string
+          id: string
+          is_granted: boolean
+          permission_key: string
+          user_id: string
+          user_type: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_granted?: boolean
+          permission_key: string
+          user_id: string
+          user_type: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_granted?: boolean
+          permission_key?: string
+          user_id?: string
+          user_type?: string
+        }
+        Relationships: []
+      }
       school_admins: {
         Row: {
           created_at: string
@@ -167,6 +194,7 @@ export type Database = {
           is_active: boolean
           last_login_at: string | null
           license_id: string | null
+          must_change_password: boolean
           password_hash: string
           phone: string | null
           school_id: string | null
@@ -181,6 +209,7 @@ export type Database = {
           is_active?: boolean
           last_login_at?: string | null
           license_id?: string | null
+          must_change_password?: boolean
           password_hash: string
           phone?: string | null
           school_id?: string | null
@@ -195,6 +224,7 @@ export type Database = {
           is_active?: boolean
           last_login_at?: string | null
           license_id?: string | null
+          must_change_password?: boolean
           password_hash?: string
           phone?: string | null
           school_id?: string | null
@@ -325,16 +355,59 @@ export type Database = {
         }
         Relationships: []
       }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          updated_at: string
+          user_id: string
+          user_type: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          updated_at?: string
+          user_id: string
+          user_type: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          updated_at?: string
+          user_id?: string
+          user_type?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      change_admin_password: {
+        Args: { p_admin_id: string; p_new_password: string }
+        Returns: Json
+      }
       check_license_validity: {
         Args: { p_device_id: string; p_license_key: string }
         Returns: Json
       }
       generate_license_key: { Args: never; Returns: string }
+      has_permission: {
+        Args: { _permission_key: string; _user_id: string; _user_type: string }
+        Returns: boolean
+      }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+          _user_type: string
+        }
+        Returns: boolean
+      }
       hash_password: { Args: { p_password: string }; Returns: string }
       verify_admin_login: {
         Args: { p_password: string; p_username: string }
@@ -342,7 +415,7 @@ export type Database = {
       }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "super_admin" | "school_admin" | "teacher"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -469,6 +542,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["super_admin", "school_admin", "teacher"],
+    },
   },
 } as const
