@@ -56,7 +56,28 @@ serve(async (req) => {
       );
     }
 
-    if (action === "delete" || action === "deactivate") {
+    if (action === "delete") {
+      // Delete device activations first
+      await supabase
+        .from("device_activations")
+        .delete()
+        .eq("license_id", licenseId);
+
+      // Delete the license completely
+      const { error: deleteError } = await supabase
+        .from("licenses")
+        .delete()
+        .eq("id", licenseId);
+
+      if (deleteError) throw deleteError;
+
+      return new Response(
+        JSON.stringify({ success: true }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+      );
+    }
+
+    if (action === "deactivate") {
       const { error: updateError } = await supabase
         .from("licenses")
         .update({ is_active: false, updated_at: new Date().toISOString() })
