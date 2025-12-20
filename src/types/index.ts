@@ -36,27 +36,44 @@ export interface Question {
 
 export interface TestResult {
   id: string;
-  testId: string;
-  studentId: string;
-  isAbsent: boolean;
+  testId?: string;
+  test_id?: string;
+  studentId?: string;
+  student_id?: string;
+  studentName?: string;
+  isAbsent?: boolean;
+  is_absent?: boolean;
   scores: { [questionId: string]: number };
-  totalScore: number;
+  totalScore?: number;
+  total_score?: number;
   percentage: number;
+  students?: { name: string };
 }
 
 export interface Test {
   id: string;
   name: string;
-  type: string;
-  subjectId: string;
-  teacherId: string;
-  classId: string;
-  sectionId: string;
-  date: string;
+  type?: string;
+  test_type?: string;
+  subjectId?: string;
+  subject_id?: string;
+  teacherId?: string;
+  teacher_id?: string;
+  classId?: string;
+  class_id?: string;
+  sectionId?: string;
+  section_id?: string;
+  date?: string;
+  test_date?: string;
   questions: Question[];
-  results: TestResult[];
-  notes: string;
-  draft: boolean;
+  results?: TestResult[];
+  notes?: string;
+  draft?: boolean;
+  is_draft?: boolean;
+  subjects?: { name: string };
+  teachers?: { name: string };
+  classes?: { name: string };
+  sections?: { name: string };
 }
 
 export interface School {
