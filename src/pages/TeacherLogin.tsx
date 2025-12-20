@@ -173,14 +173,24 @@ const TeacherLogin = () => {
       }
 
       if (teacher) {
+        // Get classes and subjects from the API response
+        const teacherClasses = teacher.classes || [];
+        const teacherSubjects = teacher.subjects || [];
+        
+        console.log("Teacher login - classes:", teacherClasses);
+        console.log("Teacher login - subjects:", teacherSubjects);
+        
         // Store teacher info before checking password change
         localStorage.setItem(
           "loggedInTeacher",
           JSON.stringify({
             id: teacher.id,
             name: teacher.name,
-            assignedClasses: teacher.classes || [],
-            assignedSubjects: teacher.subjects || [],
+            // Store both naming conventions for compatibility
+            classes: teacherClasses,
+            subjects: teacherSubjects,
+            assignedClasses: teacherClasses,
+            assignedSubjects: teacherSubjects,
             role: teacher.role || "teacher",
           })
         );
@@ -213,8 +223,8 @@ const TeacherLogin = () => {
   };
 
   const completeTeacherLogin = (teacher: any) => {
-    const assignedClasses = teacher.assignedClasses || teacher.classes || [];
-    const assignedSubjects = teacher.assignedSubjects || teacher.subjects || [];
+    const teacherClasses = teacher.assignedClasses || teacher.classes || [];
+    const teacherSubjects = teacher.assignedSubjects || teacher.subjects || [];
 
     // Store teacher info in localStorage for session management
     localStorage.setItem(
@@ -222,8 +232,11 @@ const TeacherLogin = () => {
       JSON.stringify({
         id: teacher.id,
         name: teacher.name,
-        assignedClasses,
-        assignedSubjects,
+        // Store both naming conventions for compatibility
+        classes: teacherClasses,
+        subjects: teacherSubjects,
+        assignedClasses: teacherClasses,
+        assignedSubjects: teacherSubjects,
         role: teacher.role || "teacher",
       })
     );
