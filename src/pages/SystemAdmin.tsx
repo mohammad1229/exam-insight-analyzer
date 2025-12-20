@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,18 +24,19 @@ import SystemBackupTab from "@/components/admin/SystemBackupTab";
 import SchoolsDataTab from "@/components/admin/SchoolsDataTab";
 import WisdomsTab from "@/components/admin/WisdomsTab";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-
+import { supabase } from "@/integrations/supabase/client";
+import { useSessionTimeout, clearSensitiveData } from "@/hooks/useSessionTimeout";
 const SystemAdmin = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("licenses");
+  const [currentAdmin, setCurrentAdmin] = useState<any>(null);
   
-  // System admin credentials state
-  const [sysUsername, setSysUsername] = useState("mohammad");
-  const [sysPassword, setSysPassword] = useState("12345");
+  // No more hardcoded credentials - using server-side authentication
   
   // Users management
   const [users, setUsers] = useState<any[]>([]);
@@ -70,21 +71,38 @@ const SystemAdmin = () => {
   const [selectedTest, setSelectedTest] = useState<any>(null);
   const [results, setResults] = useState<any[]>([]);
   
+  // Handle logout with session cleanup
+  const handleLogout = useCallback(() => {
+    clearSensitiveData();
+    setIsLoggedIn(false);
+    setCurrentAdmin(null);
+    toast({
+      title: "تم تسجيل الخروج",
+      description: "تم تسجيل خروجك من النظام بنجاح",
+    });
+  }, [toast]);
+
+  // Session timeout hook
+  useSessionTimeout(isLoggedIn, handleLogout);
+
   useEffect(() => {
-    // Check if system admin is logged in
-    const sysAdminLoggedIn = localStorage.getItem("sysAdminLoggedIn");
-    if (sysAdminLoggedIn === "true") {
-      setIsLoggedIn(true);
-      loadData();
-    }
-    
-    // For Electron: Get system settings
-    if (isElectron()) {
-      electronService.getSystemSettings().then((settings) => {
-        if (settings.adminUsername) {
-          setSysUsername(settings.adminUsername);
+    // Check if system admin is logged in via session storage (more secure)
+    const session = sessionStorage.getItem("sysAdminSession");
+    if (session) {
+      try {
+        const sessionData = JSON.parse(session);
+        // Check if session is still valid (not expired)
+        if (sessionData.expiry && new Date(sessionData.expiry) > new Date()) {
+          setIsLoggedIn(true);
+          setCurrentAdmin(sessionData.admin);
+          loadData();
+        } else {
+          // Session expired, clear it
+          sessionStorage.removeItem("sysAdminSession");
         }
-      });
+      } catch (e) {
+        sessionStorage.removeItem("sysAdminSession");
+      }
     }
   }, []);
   
@@ -318,34 +336,61 @@ const SystemAdmin = () => {
     }
   };
   
-  const handleLogin = () => {
-    // Default system admin credentials (these would be stored securely in a real app)
-    if (username === sysUsername && password === sysPassword) {
-      localStorage.setItem("sysAdminLoggedIn", "true");
+  const handleLogin = async () => {
+    if (!username || !password) {
+      toast({
+        title: "خطأ",
+        description: "يرجى إدخال اسم المستخدم وكلمة المرور",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    
+    try {
+      // Use server-side authentication
+      const { data, error } = await supabase.functions.invoke('system-admin-auth', {
+        body: { action: 'login', username, password }
+      });
+
+      if (error || !data?.success) {
+        toast({
+          title: "فشل تسجيل الدخول",
+          description: data?.error || "اسم المستخدم أو كلمة المرور غير صحيحة",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Store session in sessionStorage (clears on tab close)
+      sessionStorage.setItem("sysAdminSession", JSON.stringify({
+        admin: data.admin,
+        expiry: data.sessionExpiry,
+        token: data.sessionToken
+      }));
+
       setIsLoggedIn(true);
+      setCurrentAdmin(data.admin);
+      setUsername("");
+      setPassword("");
       
       toast({
         title: "تم تسجيل الدخول بنجاح",
-        description: "مرحباً بك في لوحة تحكم مسؤول النظام",
+        description: `مرحباً ${data.admin.fullName}`,
       });
       
       loadData();
-    } else {
+    } catch (error: any) {
+      console.error("Login error:", error);
       toast({
         title: "فشل تسجيل الدخول",
-        description: "اسم المستخدم أو كلمة المرور غير صحيحة",
+        description: "حدث خطأ أثناء تسجيل الدخول",
         variant: "destructive",
       });
+    } finally {
+      setIsLoading(false);
     }
-  };
-  
-  const handleLogout = () => {
-    localStorage.removeItem("sysAdminLoggedIn");
-    setIsLoggedIn(false);
-    toast({
-      title: "تم تسجيل الخروج",
-      description: "تم تسجيل خروجك من النظام بنجاح",
-    });
   };
   
   // Generate a license key
@@ -419,29 +464,10 @@ const SystemAdmin = () => {
   };
   
   const handleUpdateSystemAdmin = async () => {
-    try {
-      if (isElectron()) {
-        await electronService.db.query(
-          "INSERT OR REPLACE INTO systemSettings (key, value) VALUES (?, ?), (?, ?)",
-          ["adminUsername", sysUsername, "adminPassword", sysPassword]
-        );
-      }
-      
-      // Update in localStorage for both web and Electron environments
-      localStorage.setItem("sysAdminCredentials", JSON.stringify({ username: sysUsername, password: sysPassword }));
-      
-      toast({
-        title: "تم تحديث البيانات",
-        description: "تم تحديث بيانات مسؤول النظام بنجاح",
-      });
-    } catch (error) {
-      console.error("Error updating system admin:", error);
-      toast({
-        title: "خطأ في تحديث البيانات",
-        description: "حدث خطأ أثناء تحديث بيانات مسؤول النظام",
-        variant: "destructive",
-      });
-    }
+    toast({
+      title: "معلومة",
+      description: "لتغيير بيانات مسؤول النظام، يرجى التواصل مع الدعم الفني",
+    });
   };
   
   const handleAddUser = async () => {
@@ -1159,30 +1185,17 @@ const SystemAdmin = () => {
                 </CardHeader>
                 <CardContent className="pt-6">
                   <div className="space-y-6">
-                    <div className="space-y-2">
-                      <Label htmlFor="sysUsername">اسم مستخدم مسؤول النظام</Label>
-                      <Input 
-                        id="sysUsername" 
-                        value={sysUsername}
-                        onChange={(e) => setSysUsername(e.target.value)}
-                      />
+                    <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                      <p className="text-sm text-green-800">
+                        ✓ يتم تأمين بيانات مسؤول النظام في قاعدة البيانات
+                      </p>
+                      <p className="text-xs text-green-600 mt-1">
+                        اسم المستخدم الافتراضي: sysadmin
+                      </p>
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="sysPassword">كلمة المرور</Label>
-                      <Input 
-                        id="sysPassword" 
-                        type="password" 
-                        value={sysPassword}
-                        onChange={(e) => setSysPassword(e.target.value)}
-                      />
-                    </div>
-                    <Button 
-                      className="bg-[#E84c3d] hover:bg-red-700"
-                      onClick={handleUpdateSystemAdmin}
-                    >
-                      <Lock className="h-4 w-4 ml-2" />
-                      حفظ التغييرات
-                    </Button>
+                    <p className="text-sm text-muted-foreground">
+                      لتغيير كلمة المرور، يرجى التواصل مع الدعم الفني
+                    </p>
                   </div>
                 </CardContent>
               </Card>
