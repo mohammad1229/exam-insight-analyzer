@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowRight, Users, GraduationCap, BookOpen, FileText, TrendingUp, Calendar } from "lucide-react";
-import { getStudents, getTeachers, getClasses, getTests, getSubjects } from "@/services/dataService";
+import { getStudents, getTeachers, getClasses, getTests, getSubjects, isTeacherOnly } from "@/services/dataService";
 import { useLicenseContext } from "@/contexts/LicenseContext";
 import LicenseBanner from "@/components/LicenseBanner";
 import AnimatedBackground from "@/components/AnimatedBackground";
@@ -17,6 +17,13 @@ const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'
 const SchoolStatistics = () => {
   const navigate = useNavigate();
   const { schoolName } = useLicenseContext();
+  
+  // منع المعلمين من الوصول لهذه الصفحة
+  useEffect(() => {
+    if (isTeacherOnly()) {
+      navigate('/dashboard');
+    }
+  }, [navigate]);
   const [stats, setStats] = useState({
     totalStudents: 0,
     totalTeachers: 0,
