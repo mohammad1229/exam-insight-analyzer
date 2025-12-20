@@ -20,6 +20,7 @@ import UpdatesManagement from "@/components/admin/UpdatesManagement";
 import SchoolAdminsTab from "@/components/admin/SchoolAdminsTab";
 import DefaultDataSettings from "@/components/admin/DefaultDataSettings";
 import ImportSchoolData from "@/components/admin/ImportSchoolData";
+import SystemBackupTab from "@/components/admin/SystemBackupTab";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 const SystemAdmin = () => {
@@ -690,7 +691,7 @@ const SystemAdmin = () => {
         </div>
         
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid grid-cols-6 w-full max-w-4xl mx-auto mb-6 bg-gray-100 dark:bg-gray-800 p-1">
+          <TabsList className="grid grid-cols-7 w-full max-w-5xl mx-auto mb-6 bg-gray-100 dark:bg-gray-800 p-1">
             <TabsTrigger value="licenses" className="flex items-center gap-2 data-[state=active]:bg-green-600 data-[state=active]:text-white">
               <FileKey className="h-4 w-4" />
               التراخيص
@@ -706,6 +707,10 @@ const SystemAdmin = () => {
             <TabsTrigger value="updates" className="flex items-center gap-2 data-[state=active]:bg-orange-600 data-[state=active]:text-white">
               <Download className="h-4 w-4" />
               التحديثات
+            </TabsTrigger>
+            <TabsTrigger value="backup" className="flex items-center gap-2 data-[state=active]:bg-cyan-600 data-[state=active]:text-white">
+              <Cloud className="h-4 w-4" />
+              النسخ الاحتياطي
             </TabsTrigger>
             <TabsTrigger value="results" className="flex items-center gap-2 data-[state=active]:bg-teal-600 data-[state=active]:text-white">
               <Database className="h-4 w-4" />
@@ -1017,6 +1022,11 @@ const SystemAdmin = () => {
           {/* Updates Tab */}
           <TabsContent value="updates">
             <UpdatesManagement />
+          </TabsContent>
+
+          {/* Backup Tab */}
+          <TabsContent value="backup">
+            <SystemBackupTab />
           </TabsContent>
           
           {/* Results Tab */}
