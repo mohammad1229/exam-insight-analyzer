@@ -293,10 +293,7 @@ const AdminDashboard = () => {
           </TabsList>
           
           <TabsContent value="teachers">
-            <TeachersTab 
-              teachers={teachers}
-              setTeachers={setTeachers}
-            />
+            <TeachersTab />
           </TabsContent>
 
           <TabsContent value="students">

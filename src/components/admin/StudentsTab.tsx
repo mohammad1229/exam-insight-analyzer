@@ -26,62 +26,75 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Trash2, Edit, Upload, Download, FileSpreadsheet } from "lucide-react";
-import { Student, Class, Section } from "@/types";
-import { getStudents, saveStudents, getClasses, getClassById, getSectionById } from "@/services/dataService";
+import { Plus, Trash2, Edit, Upload, Download, FileSpreadsheet, Loader2 } from "lucide-react";
+import { 
+  getClassesDB, 
+  getStudentsDB, 
+  addStudentDB, 
+  updateStudentDB, 
+  deleteStudentDB,
+  bulkAddStudentsDB,
+  DBClass,
+  DBStudent 
+} from "@/services/databaseService";
 import * as XLSX from "xlsx";
 
 const StudentsTab = () => {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [students, setStudents] = useState<Student[]>([]);
-  const [classes, setClasses] = useState<Class[]>([]);
+  const [students, setStudents] = useState<DBStudent[]>([]);
+  const [classes, setClasses] = useState<DBClass[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [editingStudent, setEditingStudent] = useState<Student | null>(null);
+  const [editingStudent, setEditingStudent] = useState<DBStudent | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
   
   const [newStudentName, setNewStudentName] = useState("");
   const [selectedClassId, setSelectedClassId] = useState("");
   const [selectedSectionId, setSelectedSectionId] = useState("");
-  const [sections, setSections] = useState<Section[]>([]);
   
   // Filter states
   const [filterClassId, setFilterClassId] = useState("");
   const [filterSectionId, setFilterSectionId] = useState("");
-  const [filterSections, setFilterSections] = useState<Section[]>([]);
 
   useEffect(() => {
-    setStudents(getStudents());
-    setClasses(getClasses());
+    loadData();
   }, []);
 
-  useEffect(() => {
-    if (selectedClassId) {
-      const cls = getClassById(selectedClassId);
-      setSections(cls?.sections || []);
-      setSelectedSectionId("");
-    } else {
-      setSections([]);
+  const loadData = async () => {
+    setIsLoading(true);
+    try {
+      const [classesData, studentsData] = await Promise.all([
+        getClassesDB(),
+        getStudentsDB()
+      ]);
+      setClasses(classesData);
+      setStudents(studentsData);
+    } catch (error: any) {
+      console.error("Error loading data:", error);
+      toast({
+        title: "خطأ",
+        description: "فشل في تحميل البيانات",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
     }
-  }, [selectedClassId]);
+  };
 
-  useEffect(() => {
-    if (filterClassId) {
-      const cls = getClassById(filterClassId);
-      setFilterSections(cls?.sections || []);
-    } else {
-      setFilterSections([]);
-      setFilterSectionId("");
-    }
-  }, [filterClassId]);
+  const getSectionsForClass = (classId: string) => {
+    const cls = classes.find(c => c.id === classId);
+    return cls?.sections || [];
+  };
 
   const filteredStudents = students.filter(s => {
-    if (filterClassId && filterClassId !== "all" && s.classId !== filterClassId) return false;
-    if (filterSectionId && filterSectionId !== "all" && s.sectionId !== filterSectionId) return false;
+    if (filterClassId && filterClassId !== "all" && s.class_id !== filterClassId) return false;
+    if (filterSectionId && filterSectionId !== "all" && s.section_id !== filterSectionId) return false;
     return true;
   });
 
-  const handleAddStudent = () => {
+  const handleAddStudent = async () => {
     if (!newStudentName.trim() || !selectedClassId || !selectedSectionId) {
       toast({
         title: "خطأ",
@@ -91,67 +104,95 @@ const StudentsTab = () => {
       return;
     }
 
-    const newStudent: Student = {
-      id: `st${Date.now()}`,
-      name: newStudentName.trim(),
-      classId: selectedClassId,
-      sectionId: selectedSectionId,
-    };
+    setIsSaving(true);
+    try {
+      const newStudent = await addStudentDB({
+        name: newStudentName.trim(),
+        class_id: selectedClassId,
+        section_id: selectedSectionId,
+      });
 
-    const updatedStudents = [...students, newStudent];
-    setStudents(updatedStudents);
-    saveStudents(updatedStudents);
+      setStudents([...students, newStudent]);
 
-    toast({
-      title: "تمت الإضافة",
-      description: `تم إضافة ${newStudentName} بنجاح`,
-    });
+      toast({
+        title: "تمت الإضافة",
+        description: `تم إضافة ${newStudentName} بنجاح`,
+      });
 
-    resetForm();
-    setShowAddModal(false);
+      resetForm();
+      setShowAddModal(false);
+    } catch (error: any) {
+      toast({
+        title: "خطأ",
+        description: error.message || "فشل في إضافة الطالب",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const handleEditStudent = () => {
+  const handleEditStudent = async () => {
     if (!editingStudent || !newStudentName.trim() || !selectedClassId || !selectedSectionId) return;
 
-    const updatedStudents = students.map(s =>
-      s.id === editingStudent.id
-        ? { ...s, name: newStudentName.trim(), classId: selectedClassId, sectionId: selectedSectionId }
-        : s
-    );
+    setIsSaving(true);
+    try {
+      await updateStudentDB(editingStudent.id, {
+        name: newStudentName.trim(),
+        class_id: selectedClassId,
+        section_id: selectedSectionId,
+      });
 
-    setStudents(updatedStudents);
-    saveStudents(updatedStudents);
+      setStudents(students.map(s =>
+        s.id === editingStudent.id
+          ? { ...s, name: newStudentName.trim(), class_id: selectedClassId, section_id: selectedSectionId }
+          : s
+      ));
 
-    toast({
-      title: "تم التحديث",
-      description: `تم تحديث بيانات ${newStudentName} بنجاح`,
-    });
+      toast({
+        title: "تم التحديث",
+        description: `تم تحديث بيانات ${newStudentName} بنجاح`,
+      });
 
-    setEditingStudent(null);
-    resetForm();
-    setShowEditModal(false);
+      setEditingStudent(null);
+      resetForm();
+      setShowEditModal(false);
+    } catch (error: any) {
+      toast({
+        title: "خطأ",
+        description: error.message || "فشل في تحديث الطالب",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const handleDeleteStudent = (studentId: string) => {
+  const handleDeleteStudent = async (studentId: string) => {
     const studentToDelete = students.find(s => s.id === studentId);
-    const updatedStudents = students.filter(s => s.id !== studentId);
-    setStudents(updatedStudents);
-    saveStudents(updatedStudents);
+    
+    try {
+      await deleteStudentDB(studentId);
+      setStudents(students.filter(s => s.id !== studentId));
 
-    toast({
-      title: "تم الحذف",
-      description: `تم حذف ${studentToDelete?.name || "الطالب"} بنجاح`,
-    });
+      toast({
+        title: "تم الحذف",
+        description: `تم حذف ${studentToDelete?.name || "الطالب"} بنجاح`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "خطأ",
+        description: error.message || "فشل في حذف الطالب",
+        variant: "destructive",
+      });
+    }
   };
 
-  const openEditModal = (student: Student) => {
+  const openEditModal = (student: DBStudent) => {
     setEditingStudent(student);
     setNewStudentName(student.name);
-    setSelectedClassId(student.classId);
-    const cls = getClassById(student.classId);
-    setSections(cls?.sections || []);
-    setTimeout(() => setSelectedSectionId(student.sectionId), 100);
+    setSelectedClassId(student.class_id);
+    setTimeout(() => setSelectedSectionId(student.section_id), 100);
     setShowEditModal(true);
   };
 
@@ -159,7 +200,6 @@ const StudentsTab = () => {
     setNewStudentName("");
     setSelectedClassId("");
     setSelectedSectionId("");
-    setSections([]);
   };
 
   // Excel upload handler
@@ -182,10 +222,10 @@ const StudentsTab = () => {
         return;
       }
 
-      const newStudents: Student[] = [];
+      const newStudentsData: { name: string; class_id: string; section_id: string }[] = [];
       let skippedCount = 0;
 
-      jsonData.forEach((row, index) => {
+      jsonData.forEach((row) => {
         const name = row["اسم الطالب"] || row["الاسم"] || row["name"];
         const className = row["الصف"] || row["class"];
         const sectionName = row["الشعبة"] || row["section"];
@@ -203,7 +243,7 @@ const StudentsTab = () => {
         }
 
         // Find section by name
-        const section = cls.sections.find(s => s.name === sectionName || s.name.includes(sectionName));
+        const section = cls.sections?.find(s => s.name === sectionName || s.name.includes(sectionName));
         if (!section) {
           skippedCount++;
           return;
@@ -211,27 +251,25 @@ const StudentsTab = () => {
 
         // Check if student already exists
         const exists = students.some(s => 
-          s.name === name && s.classId === cls.id && s.sectionId === section.id
+          s.name === name && s.class_id === cls.id && s.section_id === section.id
         );
 
         if (!exists) {
-          newStudents.push({
-            id: `st${Date.now()}_${index}`,
+          newStudentsData.push({
             name: name.trim(),
-            classId: cls.id,
-            sectionId: section.id,
+            class_id: cls.id,
+            section_id: section.id,
           });
         }
       });
 
-      if (newStudents.length > 0) {
-        const updatedStudents = [...students, ...newStudents];
-        setStudents(updatedStudents);
-        saveStudents(updatedStudents);
+      if (newStudentsData.length > 0) {
+        const addedStudents = await bulkAddStudentsDB(newStudentsData);
+        setStudents([...students, ...addedStudents]);
 
         toast({
           title: "تم الاستيراد",
-          description: `تم إضافة ${newStudents.length} طالب بنجاح${skippedCount > 0 ? ` (تم تخطي ${skippedCount} سجل)` : ""}`,
+          description: `تم إضافة ${addedStudents.length} طالب بنجاح${skippedCount > 0 ? ` (تم تخطي ${skippedCount} سجل)` : ""}`,
         });
       } else {
         toast({
@@ -241,7 +279,6 @@ const StudentsTab = () => {
         });
       }
 
-      // Reset file input
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
@@ -276,8 +313,8 @@ const StudentsTab = () => {
   // Export students
   const exportStudents = () => {
     const exportData = filteredStudents.map(student => {
-      const cls = getClassById(student.classId);
-      const section = getSectionById(student.classId, student.sectionId);
+      const cls = classes.find(c => c.id === student.class_id);
+      const section = cls?.sections?.find(s => s.id === student.section_id);
       return {
         "اسم الطالب": student.name,
         "الصف": cls?.name || "",
@@ -295,6 +332,26 @@ const StudentsTab = () => {
       description: `تم تصدير ${filteredStudents.length} طالب`,
     });
   };
+
+  const getClassName = (classId: string) => {
+    return classes.find(c => c.id === classId)?.name || "-";
+  };
+
+  const getSectionName = (classId: string, sectionId: string) => {
+    const cls = classes.find(c => c.id === classId);
+    return cls?.sections?.find(s => s.id === sectionId)?.name || "-";
+  };
+
+  if (isLoading) {
+    return (
+      <Card className="border-2 border-black">
+        <CardContent className="flex items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          <span className="mr-2 text-muted-foreground">جاري تحميل الطلاب...</span>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card className="border-2 border-black">
@@ -347,7 +404,7 @@ const StudentsTab = () => {
         <div className="flex gap-4 mb-6">
           <div className="flex-1">
             <Label>تصفية حسب الصف</Label>
-            <Select value={filterClassId} onValueChange={setFilterClassId}>
+            <Select value={filterClassId} onValueChange={(val) => { setFilterClassId(val); setFilterSectionId(""); }}>
               <SelectTrigger>
                 <SelectValue placeholder="جميع الصفوف" />
               </SelectTrigger>
@@ -367,7 +424,7 @@ const StudentsTab = () => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">جميع الشعب</SelectItem>
-                {filterSections.map(section => (
+                {getSectionsForClass(filterClassId).map(section => (
                   <SelectItem key={section.id} value={section.id}>{section.name}</SelectItem>
                 ))}
               </SelectContent>
@@ -392,37 +449,33 @@ const StudentsTab = () => {
           </TableHeader>
           <TableBody>
             {filteredStudents.length > 0 ? (
-              filteredStudents.map((student, index) => {
-                const cls = getClassById(student.classId);
-                const section = getSectionById(student.classId, student.sectionId);
-                return (
-                  <TableRow key={student.id} className="hover:bg-green-50">
-                    <TableCell>{index + 1}</TableCell>
-                    <TableCell className="font-medium">{student.name}</TableCell>
-                    <TableCell>{cls?.name || "-"}</TableCell>
-                    <TableCell>{section?.name || "-"}</TableCell>
-                    <TableCell>
-                      <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => openEditModal(student)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="text-red-500 hover:bg-red-50"
-                          onClick={() => handleDeleteStudent(student.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                );
-              })
+              filteredStudents.map((student, index) => (
+                <TableRow key={student.id} className="hover:bg-green-50">
+                  <TableCell>{index + 1}</TableCell>
+                  <TableCell className="font-medium">{student.name}</TableCell>
+                  <TableCell>{getClassName(student.class_id)}</TableCell>
+                  <TableCell>{getSectionName(student.class_id, student.section_id)}</TableCell>
+                  <TableCell>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => openEditModal(student)}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-red-500 hover:bg-red-50"
+                        onClick={() => handleDeleteStudent(student.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))
             ) : (
               <TableRow>
                 <TableCell colSpan={5} className="text-center py-6">
@@ -451,7 +504,7 @@ const StudentsTab = () => {
             </div>
             <div>
               <Label>الصف</Label>
-              <Select value={selectedClassId} onValueChange={setSelectedClassId}>
+              <Select value={selectedClassId} onValueChange={(val) => { setSelectedClassId(val); setSelectedSectionId(""); }}>
                 <SelectTrigger>
                   <SelectValue placeholder="اختر الصف" />
                 </SelectTrigger>
@@ -469,7 +522,7 @@ const StudentsTab = () => {
                   <SelectValue placeholder={selectedClassId ? "اختر الشعبة" : "اختر الصف أولاً"} />
                 </SelectTrigger>
                 <SelectContent>
-                  {sections.map(section => (
+                  {getSectionsForClass(selectedClassId).map(section => (
                     <SelectItem key={section.id} value={section.id}>{section.name}</SelectItem>
                   ))}
                 </SelectContent>
@@ -477,10 +530,11 @@ const StudentsTab = () => {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddModal(false)}>
+            <Button variant="outline" onClick={() => setShowAddModal(false)} disabled={isSaving}>
               إلغاء
             </Button>
-            <Button onClick={handleAddStudent} className="bg-green-600 hover:bg-green-700">
+            <Button onClick={handleAddStudent} className="bg-green-600 hover:bg-green-700" disabled={isSaving}>
+              {isSaving && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}
               إضافة
             </Button>
           </DialogFooter>
@@ -503,7 +557,7 @@ const StudentsTab = () => {
             </div>
             <div>
               <Label>الصف</Label>
-              <Select value={selectedClassId} onValueChange={setSelectedClassId}>
+              <Select value={selectedClassId} onValueChange={(val) => { setSelectedClassId(val); setSelectedSectionId(""); }}>
                 <SelectTrigger>
                   <SelectValue placeholder="اختر الصف" />
                 </SelectTrigger>
@@ -521,7 +575,7 @@ const StudentsTab = () => {
                   <SelectValue placeholder="اختر الشعبة" />
                 </SelectTrigger>
                 <SelectContent>
-                  {sections.map(section => (
+                  {getSectionsForClass(selectedClassId).map(section => (
                     <SelectItem key={section.id} value={section.id}>{section.name}</SelectItem>
                   ))}
                 </SelectContent>
@@ -529,10 +583,11 @@ const StudentsTab = () => {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowEditModal(false)}>
+            <Button variant="outline" onClick={() => setShowEditModal(false)} disabled={isSaving}>
               إلغاء
             </Button>
-            <Button onClick={handleEditStudent} className="bg-green-600 hover:bg-green-700">
+            <Button onClick={handleEditStudent} className="bg-green-600 hover:bg-green-700" disabled={isSaving}>
+              {isSaving && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}
               حفظ التغييرات
             </Button>
           </DialogFooter>
