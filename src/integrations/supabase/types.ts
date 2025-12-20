@@ -335,6 +335,7 @@ export type Database = {
         Returns: Json
       }
       generate_license_key: { Args: never; Returns: string }
+      hash_password: { Args: { p_password: string }; Returns: string }
       verify_admin_login: {
         Args: { p_password: string; p_username: string }
         Returns: Json
