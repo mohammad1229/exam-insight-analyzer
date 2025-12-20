@@ -9,6 +9,7 @@ import { Trash2, Image, Save, CheckCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { isElectron } from "@/services/electronService";
 import electronService from "@/services/electronService";
+import { useLicenseContext } from "@/contexts/LicenseContext";
 
 // Footer settings helper
 export const getFooterSettings = () => {
@@ -25,7 +26,8 @@ export const getFooterSettings = () => {
 
 const SettingsTab = () => {
   const { toast } = useToast();
-  const [schoolName, setSchoolName] = useState("مدرسة النجاح الثانوية");
+  const { schoolName: licenseSchoolName, directorName: licenseDirectorName } = useLicenseContext();
+  const [schoolName, setSchoolName] = useState("");
   const [academicYear, setAcademicYear] = useState("2023-2024");
   const [directorName, setDirectorName] = useState("");
   const [schoolLogo, setSchoolLogo] = useState<string>("");
@@ -42,20 +44,24 @@ const SettingsTab = () => {
   // Load data on component mount
   useEffect(() => {
     loadInitialData();
-  }, []);
+  }, [licenseSchoolName, licenseDirectorName]);
 
   const loadInitialData = async () => {
     try {
-      // Load school settings
+      // Load school settings - fallback to license data
       const settingsStr = localStorage.getItem("schoolSettings");
       if (settingsStr) {
         const settings = JSON.parse(settingsStr);
-        setSchoolName(settings.name || "مدرسة النجاح الثانوية");
+        setSchoolName(settings.name || licenseSchoolName || "");
         setAcademicYear(settings.academicYear || "2023-2024");
-        setDirectorName(settings.directorName || "");
+        setDirectorName(settings.directorName || licenseDirectorName || "");
         setSchoolLogo(settings.logo || "");
         setMinistryName(settings.ministryName || "وزارة التربية والتعليم العالي");
         setDirectorateName(settings.directorateName || "مديرية التربية والتعليم");
+      } else {
+        // Use license data as defaults
+        setSchoolName(licenseSchoolName || "");
+        setDirectorName(licenseDirectorName || "");
       }
       
       // Also load from legacy keys
@@ -79,11 +85,9 @@ const SettingsTab = () => {
       setShowCopyright(footerSettings.showCopyright);
     } catch (error) {
       console.error("Error loading data:", error);
-      toast({
-        title: "خطأ في تحميل البيانات",
-        description: "حدث خطأ أثناء محاولة تحميل البيانات",
-        variant: "destructive",
-      });
+      // Use license data as fallback
+      setSchoolName(licenseSchoolName || "");
+      setDirectorName(licenseDirectorName || "");
     }
   };
   

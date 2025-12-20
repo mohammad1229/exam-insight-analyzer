@@ -86,6 +86,14 @@ export const useLicense = () => {
           showExpiryWarning: showWarning,
         });
 
+        // Store school info in localStorage for other components
+        if (stored.schoolName) {
+          localStorage.setItem("licenseSchoolName", stored.schoolName);
+        }
+        if (stored.directorName) {
+          localStorage.setItem("licenseDirectorName", stored.directorName);
+        }
+
         // Show warning notification if expiring soon
         if (showWarning) {
           toast({
@@ -144,12 +152,14 @@ export const useLicense = () => {
         
         setState(newState);
 
-        // Store in localStorage for Welcome page
+        // Store in localStorage for Welcome page and other components
         if (result.licenseInfo.schoolName) {
           localStorage.setItem("schoolName", result.licenseInfo.schoolName);
+          localStorage.setItem("licenseSchoolName", result.licenseInfo.schoolName);
         }
         if (result.licenseInfo.directorName) {
           localStorage.setItem("directorName", result.licenseInfo.directorName);
+          localStorage.setItem("licenseDirectorName", result.licenseInfo.directorName);
         }
 
         toast({

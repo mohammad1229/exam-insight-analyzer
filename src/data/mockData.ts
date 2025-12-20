@@ -1,9 +1,18 @@
 import { Student, Teacher, Class, Section, Subject, Question, TestResult, Test, School } from "@/types";
 
+// Get school name from license or localStorage
+const getSchoolName = () => {
+  return localStorage.getItem("licenseSchoolName") || "اسم المدرسة";
+};
+
+const getDirectorName = () => {
+  return localStorage.getItem("licenseDirectorName") || "";
+};
+
 export const schoolData: School = {
   id: "school1",
-  name: "مدرسة النجاح الأساسية",
-  principal: "أحمد محمود"
+  name: getSchoolName(),
+  principal: getDirectorName()
 };
 
 export const teachersData: Teacher[] = [

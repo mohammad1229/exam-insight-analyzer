@@ -84,6 +84,19 @@ serve(async (req) => {
       }
 
       // ========== SECTIONS ==========
+      case "getSections": {
+        const { data: sections, error } = await supabase
+          .from("sections")
+          .select("*")
+          .eq("school_id", schoolId)
+          .order("display_order", { ascending: true });
+        
+        if (error) throw error;
+        return new Response(JSON.stringify({ success: true, data: sections }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
       case "addSection": {
         const { data: newSection, error } = await supabase
           .from("sections")

@@ -133,6 +133,10 @@ export const deleteClassDB = async (id: string): Promise<void> => {
 };
 
 // ========== SECTIONS ==========
+export const getSectionsDB = async (): Promise<DBSection[]> => {
+  return await callSchoolDataAPI('getSections');
+};
+
 export const addSectionDB = async (classId: string, name: string): Promise<DBSection> => {
   return await callSchoolDataAPI('addSection', { class_id: classId, name });
 };
