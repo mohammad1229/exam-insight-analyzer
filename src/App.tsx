@@ -9,7 +9,6 @@ import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
 import Reports from "./pages/Reports";
 import TestResults from "./pages/TestResults";
-import Admin from "./pages/Admin";
 import AdminDashboard from "./pages/AdminDashboard";
 import TeacherLogin from "./pages/TeacherLogin";
 import SystemAdmin from "./pages/SystemAdmin";
@@ -32,7 +31,6 @@ function App() {
           <Route path="/reports" element={<Reports />} />
           <Route path="/reports/:testId" element={<Reports />} />
           <Route path="/test-results" element={<TestResults />} />
-          <Route path="/admin" element={<Admin />} />
           <Route path="/admin-dashboard" element={<AdminDashboard />} />
           <Route path="/teacher-login" element={<TeacherLogin />} />
           <Route path="/system-admin" element={<SystemAdmin />} />

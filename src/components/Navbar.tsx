@@ -77,7 +77,7 @@ const Navbar = () => {
             variant="secondary" 
             size="sm"
             className="dark:bg-gray-800 dark:text-white dark:hover:bg-gray-700"
-            onClick={() => navigate("/admin")}
+            onClick={() => navigate("/admin-dashboard")}
           >
             لوحة التحكم
           </Button>

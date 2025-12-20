@@ -202,7 +202,7 @@ const Index = () => {
               variant="outline" 
               size="lg"
               className="border-primary text-primary hover:bg-primary hover:text-primary-foreground dark:border-red-400 dark:text-red-400"
-              onClick={() => navigate("/admin")}
+              onClick={() => navigate("/admin-dashboard")}
             >
               لوحة تحكم المدير
             </Button>
