@@ -243,8 +243,19 @@ export const verifyTeacherLoginDB = async (username: string, password: string): 
   teacher?: any;
 }> => {
   try {
-    const result = await callSchoolDataAPI('verifyTeacherLogin', { username, password });
-    return { success: true, ...result };
+    // Use the special action that doesn't require schoolId
+    const { data: result, error } = await supabase.functions.invoke('school-data', {
+      body: { action: 'verifyTeacherLoginByUsername', schoolId: 'none', data: { username, password } }
+    });
+
+    if (error) throw error;
+    
+    if (result.success && result.teacher?.school_id) {
+      // Set the school ID for future requests
+      localStorage.setItem("currentSchoolId", result.teacher.school_id);
+    }
+    
+    return result;
   } catch (error: any) {
     return { success: false, error: error.message };
   }

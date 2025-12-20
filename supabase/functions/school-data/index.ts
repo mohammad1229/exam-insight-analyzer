@@ -614,6 +614,96 @@ serve(async (req) => {
         });
       }
 
+      // ========== UPDATE SCHOOL ==========
+      case "updateSchool": {
+        const { error } = await supabase
+          .from("schools")
+          .update({
+            name: data.name,
+            director_name: data.director_name,
+            logo_url: data.logo_url,
+            phone: data.phone,
+            email: data.email,
+            address: data.address
+          })
+          .eq("id", schoolId);
+        
+        if (error) throw error;
+        return new Response(JSON.stringify({ success: true }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // ========== GET SCHOOL ==========
+      case "getSchool": {
+        const { data: school, error } = await supabase
+          .from("schools")
+          .select("*")
+          .eq("id", schoolId)
+          .single();
+        
+        if (error) throw error;
+        return new Response(JSON.stringify({ success: true, data: school }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // ========== VERIFY TEACHER LOGIN BY USERNAME ONLY ==========
+      case "verifyTeacherLoginByUsername": {
+        // Search for teacher by username across all schools
+        const { data: teacher, error } = await supabase
+          .from("teachers")
+          .select("*, teacher_subjects(subject_id), teacher_classes(class_id)")
+          .eq("username", data.username)
+          .eq("is_active", true)
+          .maybeSingle();
+        
+        if (error) throw error;
+        if (!teacher) {
+          return new Response(JSON.stringify({ success: false, error: "اسم المستخدم أو كلمة المرور غير صحيحة" }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        // Check password (base64 or bcrypt)
+        const expectedBase64 = btoa(data.password);
+        let isValid = false;
+        
+        if (teacher.password_hash.startsWith('$2a$') || teacher.password_hash.startsWith('$2b$')) {
+          // bcrypt - not supported client-side, so fail
+          isValid = false;
+        } else {
+          isValid = teacher.password_hash === expectedBase64;
+        }
+
+        if (!isValid) {
+          return new Response(JSON.stringify({ success: false, error: "اسم المستخدم أو كلمة المرور غير صحيحة" }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        // Update last login
+        await supabase.from("teachers").update({ last_login_at: new Date().toISOString() }).eq("id", teacher.id);
+
+        return new Response(JSON.stringify({ 
+          success: true, 
+          must_change_password: teacher.must_change_password,
+          teacher: {
+            id: teacher.id,
+            name: teacher.name,
+            username: teacher.username,
+            email: teacher.email,
+            phone: teacher.phone,
+            role: teacher.role,
+            school_id: teacher.school_id,
+            subjects: teacher.teacher_subjects?.map((ts: any) => ts.subject_id) || [],
+            classes: teacher.teacher_classes?.map((tc: any) => tc.class_id) || []
+          }
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
       // ========== INITIALIZE SCHOOL DATA ==========
       case "initializeSchoolData": {
         // Add default classes with sections
