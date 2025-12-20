@@ -1,10 +1,26 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import * as bcrypt from "https://deno.land/x/bcrypt@v0.4.1/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+// Helper function to hash passwords with bcrypt
+async function hashPassword(password: string): Promise<string> {
+  return await bcrypt.hash(password, 10);
+}
+
+// Helper function to verify passwords (supports both bcrypt and legacy base64)
+async function verifyPassword(password: string, hash: string): Promise<boolean> {
+  // Check if it's a bcrypt hash
+  if (hash.startsWith('$2a$') || hash.startsWith('$2b$')) {
+    return await bcrypt.compare(password, hash);
+  }
+  // Legacy base64 comparison - will migrate on next password update
+  return btoa(password) === hash;
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -269,14 +285,21 @@ serve(async (req) => {
           .order("name", { ascending: true });
         
         if (error) throw error;
-        return new Response(JSON.stringify({ success: true, data: teachers }), {
+        
+        // Remove password_hash from response for security
+        const sanitizedTeachers = teachers?.map(t => {
+          const { password_hash, ...rest } = t;
+          return rest;
+        });
+        
+        return new Response(JSON.stringify({ success: true, data: sanitizedTeachers }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
       case "addTeacher": {
-        // Use base64 encoding for password
-        const passwordHash = btoa(data.password);
+        // Use bcrypt for password hashing
+        const passwordHash = await hashPassword(data.password);
         
         const { data: newTeacher, error } = await supabase
           .from("teachers")
@@ -313,7 +336,9 @@ serve(async (req) => {
           await supabase.from("teacher_classes").insert(classAssignments);
         }
 
-        return new Response(JSON.stringify({ success: true, data: newTeacher }), {
+        // Remove password_hash from response
+        const { password_hash, ...sanitizedTeacher } = newTeacher;
+        return new Response(JSON.stringify({ success: true, data: sanitizedTeacher }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
@@ -329,7 +354,8 @@ serve(async (req) => {
         };
         
         if (data.password) {
-          updates.password_hash = btoa(data.password);
+          // Use bcrypt for password hashing
+          updates.password_hash = await hashPassword(data.password);
         }
         
         if (data.must_change_password !== undefined) {
@@ -400,21 +426,19 @@ serve(async (req) => {
           });
         }
 
-        // Check password (base64 or bcrypt)
-        const expectedBase64 = btoa(data.password);
-        let isValid = false;
-        
-        if (teacher.password_hash.startsWith('$2a$') || teacher.password_hash.startsWith('$2b$')) {
-          // bcrypt - need to compare differently, but for now we'll allow base64
-          isValid = false;
-        } else {
-          isValid = teacher.password_hash === expectedBase64;
-        }
+        // Verify password using bcrypt (supports legacy base64)
+        const isValid = await verifyPassword(data.password, teacher.password_hash);
 
         if (!isValid) {
           return new Response(JSON.stringify({ success: false, error: "اسم المستخدم أو كلمة المرور غير صحيحة" }), {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
+        }
+
+        // If using legacy base64, migrate to bcrypt
+        if (!teacher.password_hash.startsWith('$2a$') && !teacher.password_hash.startsWith('$2b$')) {
+          const newHash = await hashPassword(data.password);
+          await supabase.from("teachers").update({ password_hash: newHash }).eq("id", teacher.id);
         }
 
         // Update last login
@@ -665,21 +689,19 @@ serve(async (req) => {
           });
         }
 
-        // Check password (base64 or bcrypt)
-        const expectedBase64 = btoa(data.password);
-        let isValid = false;
-        
-        if (teacher.password_hash.startsWith('$2a$') || teacher.password_hash.startsWith('$2b$')) {
-          // bcrypt - not supported client-side, so fail
-          isValid = false;
-        } else {
-          isValid = teacher.password_hash === expectedBase64;
-        }
+        // Verify password using bcrypt (supports legacy base64)
+        const isValid = await verifyPassword(data.password, teacher.password_hash);
 
         if (!isValid) {
           return new Response(JSON.stringify({ success: false, error: "اسم المستخدم أو كلمة المرور غير صحيحة" }), {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
+        }
+
+        // If using legacy base64, migrate to bcrypt
+        if (!teacher.password_hash.startsWith('$2a$') && !teacher.password_hash.startsWith('$2b$')) {
+          const newHash = await hashPassword(data.password);
+          await supabase.from("teachers").update({ password_hash: newHash }).eq("id", teacher.id);
         }
 
         // Update last login
@@ -790,16 +812,16 @@ serve(async (req) => {
 
         // Verify current password if not forced
         if (!data.isForced && data.currentPassword) {
-          const expectedBase64 = btoa(data.currentPassword);
-          if (teacher.password_hash !== expectedBase64) {
+          const isValid = await verifyPassword(data.currentPassword, teacher.password_hash);
+          if (!isValid) {
             return new Response(JSON.stringify({ success: false, error: "كلمة المرور الحالية غير صحيحة" }), {
               headers: { ...corsHeaders, "Content-Type": "application/json" },
             });
           }
         }
 
-        // Update password
-        const newPasswordHash = btoa(data.newPassword);
+        // Update password with bcrypt
+        const newPasswordHash = await hashPassword(data.newPassword);
         const { error: updateError } = await supabase
           .from("teachers")
           .update({ 
