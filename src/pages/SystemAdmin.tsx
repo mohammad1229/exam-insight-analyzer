@@ -772,7 +772,7 @@ const SystemAdmin = () => {
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="validityMonths">مدة الصلاحية (بالأشهر)</Label>
-                      <Select defaultValue="12">
+                      <Select value={validityMonths} onValueChange={setValidityMonths}>
                         <SelectTrigger>
                           <SelectValue placeholder="اختر المدة" />
                         </SelectTrigger>
@@ -787,7 +787,7 @@ const SystemAdmin = () => {
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="maxDevices">عدد الأجهزة المسموحة</Label>
-                      <Select defaultValue="1">
+                      <Select value={maxDevices} onValueChange={setMaxDevices}>
                         <SelectTrigger>
                           <SelectValue placeholder="اختر العدد" />
                         </SelectTrigger>

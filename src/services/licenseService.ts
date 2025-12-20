@@ -239,26 +239,36 @@ export const createLicenseWithSchool = async (
   }
 };
 
-// Get all schools
+// Get all schools - uses edge function to bypass RLS
 export const getSchools = async () => {
-  const { data, error } = await supabase
-    .from("schools")
-    .select("*, licenses(*)")
-    .order("created_at", { ascending: false });
+  try {
+    const { data, error } = await supabase.functions.invoke('get-admin-data', {
+      body: { action: 'getSchools' }
+    });
 
-  if (error) throw error;
-  return data;
+    if (error) throw error;
+    if (!data.success) throw new Error(data.error);
+    return data.data;
+  } catch (error: any) {
+    console.error("Error getting schools:", error);
+    return [];
+  }
 };
 
-// Get all licenses
+// Get all licenses - uses edge function to bypass RLS
 export const getLicenses = async () => {
-  const { data, error } = await supabase
-    .from("licenses")
-    .select("*, schools(*), device_activations(*)")
-    .order("created_at", { ascending: false });
+  try {
+    const { data, error } = await supabase.functions.invoke('get-admin-data', {
+      body: { action: 'getLicenses' }
+    });
 
-  if (error) throw error;
-  return data;
+    if (error) throw error;
+    if (!data.success) throw new Error(data.error);
+    return data.data;
+  } catch (error: any) {
+    console.error("Error getting licenses:", error);
+    return [];
+  }
 };
 
 // Renew license - uses edge function
@@ -428,18 +438,23 @@ export interface SchoolAdmin {
   licenses?: { license_key: string; is_active: boolean };
 }
 
-// Get all school admins
+// Get all school admins - uses edge function to bypass RLS
 export const getSchoolAdmins = async () => {
-  const { data, error } = await supabase
-    .from("school_admins")
-    .select("*, schools(name, director_name), licenses(license_key, is_active)")
-    .order("created_at", { ascending: false });
+  try {
+    const { data, error } = await supabase.functions.invoke('get-admin-data', {
+      body: { action: 'getSchoolAdmins' }
+    });
 
-  if (error) throw error;
-  return data;
+    if (error) throw error;
+    if (!data.success) throw new Error(data.error);
+    return data.data;
+  } catch (error: any) {
+    console.error("Error getting school admins:", error);
+    return [];
+  }
 };
 
-// Create school admin with secure password hashing
+// Create school admin with secure password hashing - uses edge function
 export const createSchoolAdmin = async (adminData: {
   school_id: string;
   license_id?: string;
@@ -458,31 +473,27 @@ export const createSchoolAdmin = async (adminData: {
     throw new Error('فشل في تشفير كلمة المرور');
   }
 
-  const password_hash = hashResponse.data?.hash;
+  const passwordHash = hashResponse.data?.hash;
   
-  if (!password_hash) {
+  if (!passwordHash) {
     throw new Error('فشل في تشفير كلمة المرور');
   }
 
-  const { data, error } = await supabase
-    .from("school_admins")
-    .insert({
-      school_id: adminData.school_id,
-      license_id: adminData.license_id || null,
-      username: adminData.username,
-      password_hash,
-      full_name: adminData.full_name,
-      email: adminData.email || null,
-      phone: adminData.phone || null,
-    })
-    .select("*, schools(name, director_name), licenses(license_key, is_active)")
-    .single();
+  // Use edge function to create admin
+  const { data, error } = await supabase.functions.invoke('get-admin-data', {
+    body: { 
+      action: 'createSchoolAdmin',
+      adminData,
+      passwordHash
+    }
+  });
 
   if (error) throw error;
-  return data;
+  if (!data.success) throw new Error(data.error);
+  return data.data;
 };
 
-// Update school admin with secure password hashing
+// Update school admin with secure password hashing - uses edge function
 export const updateSchoolAdmin = async (
   adminId: string,
   updates: {
@@ -512,25 +523,31 @@ export const updateSchoolAdmin = async (
     delete updateData.password;
   }
 
-  const { data, error } = await supabase
-    .from("school_admins")
-    .update(updateData)
-    .eq("id", adminId)
-    .select("*, schools(name, director_name), licenses(license_key, is_active)")
-    .single();
+  // Use edge function to update admin
+  const { data, error } = await supabase.functions.invoke('get-admin-data', {
+    body: { 
+      action: 'updateSchoolAdmin',
+      adminId,
+      updateData
+    }
+  });
 
   if (error) throw error;
-  return data;
+  if (!data.success) throw new Error(data.error);
+  return data.data;
 };
 
-// Delete school admin
+// Delete school admin - uses edge function
 export const deleteSchoolAdmin = async (adminId: string) => {
-  const { error } = await supabase
-    .from("school_admins")
-    .delete()
-    .eq("id", adminId);
+  const { data, error } = await supabase.functions.invoke('get-admin-data', {
+    body: { 
+      action: 'deleteSchoolAdmin',
+      adminId
+    }
+  });
 
   if (error) throw error;
+  if (!data.success) throw new Error(data.error);
   return { success: true };
 };
 
