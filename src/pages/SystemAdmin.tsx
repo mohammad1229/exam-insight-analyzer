@@ -14,7 +14,7 @@ import electronService from "@/services/electronService";
 import { Database, FileKey, Lock, Settings, User, Users, RefreshCw, BarChart3, Cloud, Download, Copy, Trash2, School } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { getLicenses, renewLicense, getSchools, generateLicense, deleteLicense, createSchool } from "@/services/licenseService";
+import { getLicenses, renewLicense, getSchools, generateLicense, deleteLicense, createLicenseWithSchool } from "@/services/licenseService";
 import { downloadBackup, getBackups, createAutomaticBackup } from "@/services/backupService";
 import UpdatesManagement from "@/components/admin/UpdatesManagement";
 import SchoolAdminsTab from "@/components/admin/SchoolAdminsTab";
@@ -378,14 +378,10 @@ const SystemAdmin = () => {
         return newLicense.key;
       }
 
-      // Web (Lovable Cloud): create school + license in database
-      const createdSchool = await createSchool({
-        name: schoolName,
-        director_name: directorName || undefined,
-      });
-
-      const result = await generateLicense(
-        createdSchool.id,
+      // Web (Lovable Cloud): create school + license using edge function
+      const result = await createLicenseWithSchool(
+        schoolName,
+        directorName || "",
         parseInt(validityMonths || "12"),
         parseInt(maxDevices || "1")
       );

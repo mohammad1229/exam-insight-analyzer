@@ -43,35 +43,23 @@ export const clearLicense = () => {
 // Start trial
 export const startTrial = async (schoolName: string) => {
   try {
-    // Create school
-    const { data: school, error: schoolError } = await supabase
-      .from("schools")
-      .insert({ name: schoolName })
-      .select()
-      .single();
+    // Use edge function to create school and license
+    const { data, error } = await supabase.functions.invoke('create-license', {
+      body: { 
+        schoolName, 
+        directorName: "",
+        validityMonths: 0,
+        maxDevices: 1,
+        isTrial: true
+      }
+    });
 
-    if (schoolError) throw schoolError;
-
-    // Generate trial license
-    const { data: licenseKey } = await supabase.rpc("generate_license_key");
-
-    const { data: license, error: licenseError } = await supabase
-      .from("licenses")
-      .insert({
-        license_key: licenseKey,
-        school_id: school.id,
-        is_trial: true,
-        trial_start_date: new Date().toISOString(),
-        trial_days: 15,
-      })
-      .select()
-      .single();
-
-    if (licenseError) throw licenseError;
+    if (error) throw error;
+    if (!data.success) throw new Error(data.error);
 
     const licenseInfo = {
-      licenseKey,
-      schoolId: school.id,
+      licenseKey: data.licenseKey,
+      schoolId: data.school.id,
       schoolName,
       directorName: "",
       schoolLogo: "",
@@ -85,7 +73,7 @@ export const startTrial = async (schoolName: string) => {
     // Store school name in localStorage for Welcome page
     localStorage.setItem("schoolName", schoolName);
     localStorage.setItem("directorName", "");
-    localStorage.setItem("currentSchoolId", school.id);
+    localStorage.setItem("currentSchoolId", data.school.id);
     
     return { success: true, licenseInfo };
   } catch (error: any) {
@@ -198,37 +186,55 @@ export const checkLicenseValidity = async () => {
   }
 };
 
-// Generate new license (admin only)
+// Generate new license (admin only) - uses edge function
 export const generateLicense = async (
   schoolId: string,
   validityMonths: number,
   maxDevices: number
 ) => {
   try {
-    const { data: licenseKey } = await supabase.rpc("generate_license_key");
-
-    const expiryDate = new Date();
-    expiryDate.setMonth(expiryDate.getMonth() + validityMonths);
-
-    const { data: license, error } = await supabase
-      .from("licenses")
-      .insert({
-        license_key: licenseKey,
-        school_id: schoolId,
-        is_trial: false,
-        validity_months: validityMonths,
-        start_date: new Date().toISOString(),
-        expiry_date: expiryDate.toISOString(),
-        max_devices: maxDevices,
-      })
-      .select()
-      .single();
+    // This function is kept for backward compatibility
+    // New license creation should go through createLicenseWithSchool
+    const { data, error } = await supabase.functions.invoke('manage-license', {
+      body: { action: 'create', schoolId, validityMonths, maxDevices }
+    });
 
     if (error) throw error;
+    if (!data.success) throw new Error(data.error);
 
-    return { success: true, license, licenseKey };
+    return { success: true, license: data.license, licenseKey: data.licenseKey };
   } catch (error: any) {
     console.error("Error generating license:", error);
+    return { success: false, error: error.message };
+  }
+};
+
+// Create license with new school (admin only) - uses edge function
+export const createLicenseWithSchool = async (
+  schoolName: string,
+  directorName: string,
+  validityMonths: number,
+  maxDevices: number,
+  email?: string,
+  phone?: string,
+  address?: string
+) => {
+  try {
+    const { data, error } = await supabase.functions.invoke('create-license', {
+      body: { schoolName, directorName, validityMonths, maxDevices, email, phone, address }
+    });
+
+    if (error) throw error;
+    if (!data.success) throw new Error(data.error);
+
+    return { 
+      success: true, 
+      school: data.school, 
+      license: data.license, 
+      licenseKey: data.licenseKey 
+    };
+  } catch (error: any) {
+    console.error("Error creating license:", error);
     return { success: false, error: error.message };
   }
 };
@@ -255,37 +261,20 @@ export const getLicenses = async () => {
   return data;
 };
 
-// Renew license
+// Renew license - uses edge function
 export const renewLicense = async (
   licenseId: string,
   additionalMonths: number
 ) => {
   try {
-    const { data: license } = await supabase
-      .from("licenses")
-      .select("*")
-      .eq("id", licenseId)
-      .single();
-
-    if (!license) throw new Error("License not found");
-
-    const currentExpiry = license.expiry_date
-      ? new Date(license.expiry_date)
-      : new Date();
-    const newExpiry = new Date(currentExpiry);
-    newExpiry.setMonth(newExpiry.getMonth() + additionalMonths);
-
-    const { error } = await supabase
-      .from("licenses")
-      .update({
-        expiry_date: newExpiry.toISOString(),
-        is_trial: false,
-      })
-      .eq("id", licenseId);
+    const { data, error } = await supabase.functions.invoke('manage-license', {
+      body: { action: 'renew', licenseId, renewMonths: additionalMonths }
+    });
 
     if (error) throw error;
+    if (!data.success) throw new Error(data.error);
 
-    return { success: true, newExpiry };
+    return { success: true, newExpiry: data.newExpiry };
   } catch (error: any) {
     console.error("Error renewing license:", error);
     return { success: false, error: error.message };
@@ -361,7 +350,7 @@ export const initializeSchoolDatabase = (schoolId: string, schoolName: string, d
   console.log(`Initialized database for school: ${schoolId} (with defaults: ${withDefaults})`);
 };
 
-// Create school
+// Create school - uses edge function
 export const createSchool = async (schoolData: {
   name: string;
   director_name?: string;
@@ -369,18 +358,23 @@ export const createSchool = async (schoolData: {
   phone?: string;
   address?: string;
 }) => {
-  const { data, error } = await supabase
-    .from("schools")
-    .insert(schoolData)
-    .select()
-    .single();
+  // Use createLicenseWithSchool for creating schools with licenses
+  const result = await createLicenseWithSchool(
+    schoolData.name,
+    schoolData.director_name || "",
+    12, // default 12 months
+    1,  // default 1 device
+    schoolData.email,
+    schoolData.phone,
+    schoolData.address
+  );
 
-  if (error) throw error;
+  if (!result.success) throw new Error(result.error);
 
   // Initialize database with default data for the new school
-  initializeSchoolDatabase(data.id, schoolData.name, schoolData.director_name || "", true);
+  initializeSchoolDatabase(result.school.id, schoolData.name, schoolData.director_name || "", true);
 
-  return data;
+  return result.school;
 };
 
 // Update school
@@ -592,26 +586,16 @@ export const verifySchoolAdminLogin = async (username: string, password: string)
   }
 };
 
-// Delete license completely
+// Delete/Deactivate license - uses edge function
 export const deleteLicense = async (licenseId: string) => {
   try {
-    // First delete all device activations for this license
-    const { error: deviceError } = await supabase
-      .from("device_activations")
-      .delete()
-      .eq("license_id", licenseId);
-
-    if (deviceError) {
-      console.error("Error deleting device activations:", deviceError);
-    }
-
-    // Then delete the license
-    const { error } = await supabase
-      .from("licenses")
-      .delete()
-      .eq("id", licenseId);
+    const { data, error } = await supabase.functions.invoke('manage-license', {
+      body: { action: 'deactivate', licenseId }
+    });
 
     if (error) throw error;
+    if (!data.success) throw new Error(data.error);
+
     return { success: true };
   } catch (error: any) {
     console.error("Error deleting license:", error);
