@@ -6,8 +6,12 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Simple base64 encoding for password (no bcrypt)
+function encodePassword(password: string): string {
+  return btoa(password);
+}
+
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -22,29 +26,18 @@ serve(async (req) => {
       );
     }
 
-    // Create Supabase client with service role
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-    // Hash the password using the database function
-    const { data: hashResult, error: hashError } = await supabase.rpc("hash_password", {
-      p_password: password,
-    });
-
-    if (hashError) {
-      console.error("Hash error:", hashError);
-      return new Response(
-        JSON.stringify({ error: "Failed to hash password" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    // Simple base64 encoding
+    const encodedPassword = encodePassword(password);
 
     // If admin_id is provided, update the admin's password
     if (admin_id) {
+      const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+      const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+      const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
       const { error: updateError } = await supabase
         .from("school_admins")
-        .update({ password_hash: hashResult })
+        .update({ password_hash: encodedPassword })
         .eq("id", admin_id);
 
       if (updateError) {
@@ -62,7 +55,7 @@ serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ hash: hashResult }),
+      JSON.stringify({ hash: encodedPassword }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
