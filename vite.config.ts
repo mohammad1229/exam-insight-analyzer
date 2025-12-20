@@ -30,24 +30,25 @@ export default defineConfig(({ mode }) => ({
         dir: 'rtl',
         icons: [
           {
-            src: '/pwa-192x192.png',
+            src: '/pwa-192x192.svg',
             sizes: '192x192',
-            type: 'image/png'
+            type: 'image/svg+xml'
           },
           {
-            src: '/pwa-512x512.png',
+            src: '/pwa-512x512.svg',
             sizes: '512x512',
-            type: 'image/png'
+            type: 'image/svg+xml'
           },
           {
-            src: '/pwa-512x512.png',
+            src: '/pwa-512x512.svg',
             sizes: '512x512',
-            type: 'image/png',
+            type: 'image/svg+xml',
             purpose: 'any maskable'
           }
         ]
       },
       workbox: {
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5MB
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2,ttf}'],
         runtimeCaching: [
           {
@@ -57,7 +58,7 @@ export default defineConfig(({ mode }) => ({
               cacheName: 'supabase-cache',
               expiration: {
                 maxEntries: 100,
-                maxAgeSeconds: 60 * 60 * 24 // 24 hours
+                maxAgeSeconds: 60 * 60 * 24
               },
               cacheableResponse: {
                 statuses: [0, 200]
@@ -72,7 +73,7 @@ export default defineConfig(({ mode }) => ({
               cacheName: 'google-fonts-cache',
               expiration: {
                 maxEntries: 10,
-                maxAgeSeconds: 60 * 60 * 24 * 365 // 1 year
+                maxAgeSeconds: 60 * 60 * 24 * 365
               },
               cacheableResponse: {
                 statuses: [0, 200]
@@ -88,18 +89,23 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
-  // Configuration for Electron integration
   build: {
     outDir: "dist",
     emptyOutDir: true,
     sourcemap: true,
-    // Electron-specific settings to work with both web and desktop
+    chunkSizeWarningLimit: 4000,
     rollupOptions: {
       input: {
         main: path.resolve(__dirname, "index.html"),
       },
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom', 'react-router-dom'],
+          charts: ['recharts'],
+          ui: ['@radix-ui/react-dialog', '@radix-ui/react-tabs', '@radix-ui/react-select']
+        }
+      }
     },
   },
-  // Allows use of Node.js APIs in renderer process when running in Electron
   base: mode === 'production' ? './' : '/',
 }));
