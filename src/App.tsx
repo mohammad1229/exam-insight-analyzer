@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { LicenseProvider } from "@/contexts/LicenseContext";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { initializeBackupScheduler } from "@/services/backupService";
+import WisdomBanner from "@/components/WisdomBanner";
 import Welcome from "./pages/Welcome";
 import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
@@ -21,9 +22,16 @@ function App() {
     initializeBackupScheduler();
   }, []);
 
+  // Check if we should show wisdom banner (not on index/welcome pages)
+  const shouldShowWisdomBanner = () => {
+    const path = window.location.pathname;
+    return path !== "/" && path !== "/welcome" && path !== "/system-admin";
+  };
+
   return (
     <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
       <LicenseProvider>
+        {shouldShowWisdomBanner() && <WisdomBanner />}
         <Routes>
           <Route path="/welcome" element={<Welcome />} />
           <Route path="/" element={<Index />} />
