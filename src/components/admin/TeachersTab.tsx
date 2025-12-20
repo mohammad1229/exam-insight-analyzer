@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -28,36 +28,31 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Trash2, Edit, Plus, Upload, Download, FileSpreadsheet } from "lucide-react";
+import { Trash2, Edit, Plus, Upload, Download, FileSpreadsheet, Loader2 } from "lucide-react";
 import { 
-  getClasses,
-  getSubjects,
-  getClassById,
-  getSubjectById,
-  saveTeachers,
-  TeacherWithCredentials
-} from "@/services/dataService";
-import { useEffect } from "react";
+  getClassesDB, 
+  getSubjectsDB, 
+  getTeachersDB,
+  addTeacherDB, 
+  updateTeacherDB, 
+  deleteTeacherDB,
+  DBClass,
+  DBSubject,
+  DBTeacher 
+} from "@/services/databaseService";
 import * as XLSX from "xlsx";
 
-interface TeachersTabProps {
-  teachers: TeacherWithCredentials[];
-  setTeachers: React.Dispatch<React.SetStateAction<TeacherWithCredentials[]>>;
-}
-
-const TeachersTab = ({ teachers, setTeachers }: TeachersTabProps) => {
+const TeachersTab = () => {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [teachers, setTeachers] = useState<DBTeacher[]>([]);
+  const [classes, setClasses] = useState<DBClass[]>([]);
+  const [subjects, setSubjects] = useState<DBSubject[]>([]);
   const [showAddTeacherModal, setShowAddTeacherModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [editingTeacher, setEditingTeacher] = useState<TeacherWithCredentials | null>(null);
-  const [classes, setClasses] = useState(getClasses());
-  const [subjects, setSubjects] = useState(getSubjects());
-  
-  useEffect(() => {
-    setClasses(getClasses());
-    setSubjects(getSubjects());
-  }, [showAddTeacherModal, showEditModal]);
+  const [editingTeacher, setEditingTeacher] = useState<DBTeacher | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
   
   const teacherFormSchema = z.object({
     name: z.string().min(3, { message: "يجب أن يحتوي الاسم على 3 أحرف على الأقل" }),
@@ -78,81 +73,137 @@ const TeachersTab = ({ teachers, setTeachers }: TeachersTabProps) => {
     }
   });
 
-  // Add new teacher
-  const handleAddTeacher = (data: z.infer<typeof teacherFormSchema>) => {
-    const newTeacher: TeacherWithCredentials = {
-      id: `teacher_${Date.now()}`,
-      name: data.name,
-      username: data.username,
-      password: data.password,
-      subjects: data.subjects,
-      assignedSubjects: data.subjects,
-      assignedClasses: data.classes
-    };
-    
-    const updatedTeachers = [...teachers, newTeacher];
-    setTeachers(updatedTeachers);
-    saveTeachers(updatedTeachers);
-    
-    toast({
-      title: "تمت إضافة المعلم بنجاح",
-      description: `تم إنشاء حساب للمعلم ${data.name} بنجاح`,
-    });
-    
-    teacherForm.reset();
-    setShowAddTeacherModal(false);
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    setIsLoading(true);
+    try {
+      const [classesData, subjectsData, teachersData] = await Promise.all([
+        getClassesDB(),
+        getSubjectsDB(),
+        getTeachersDB()
+      ]);
+      setClasses(classesData);
+      setSubjects(subjectsData);
+      setTeachers(teachersData);
+    } catch (error: any) {
+      console.error("Error loading data:", error);
+      toast({
+        title: "خطأ",
+        description: "فشل في تحميل البيانات",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleEditTeacher = (data: z.infer<typeof teacherFormSchema>) => {
+  const getTeacherSubjects = (teacher: DBTeacher): string[] => {
+    return teacher.teacher_subjects?.map(ts => ts.subject_id) || [];
+  };
+
+  const getTeacherClasses = (teacher: DBTeacher): string[] => {
+    return teacher.teacher_classes?.map(tc => tc.class_id) || [];
+  };
+
+  // Add new teacher
+  const handleAddTeacher = async (data: z.infer<typeof teacherFormSchema>) => {
+    setIsSaving(true);
+    try {
+      const newTeacher = await addTeacherDB({
+        name: data.name,
+        username: data.username,
+        password: data.password,
+        subjects: data.subjects,
+        classes: data.classes,
+        must_change_password: true,
+      });
+      
+      setTeachers([...teachers, newTeacher]);
+      
+      toast({
+        title: "تمت إضافة المعلم بنجاح",
+        description: `تم إنشاء حساب للمعلم ${data.name} بنجاح`,
+      });
+      
+      teacherForm.reset();
+      setShowAddTeacherModal(false);
+    } catch (error: any) {
+      toast({
+        title: "خطأ",
+        description: error.message || "فشل في إضافة المعلم",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleEditTeacher = async (data: z.infer<typeof teacherFormSchema>) => {
     if (!editingTeacher) return;
     
-    const updatedTeachers = teachers.map(t => 
-      t.id === editingTeacher.id 
-        ? {
-            ...t,
-            name: data.name,
-            username: data.username,
-            password: data.password,
-            subjects: data.subjects,
-            assignedSubjects: data.subjects,
-            assignedClasses: data.classes
-          }
-        : t
-    );
-    
-    setTeachers(updatedTeachers);
-    saveTeachers(updatedTeachers);
-    
-    toast({
-      title: "تم تحديث المعلم بنجاح",
-      description: `تم تحديث بيانات المعلم ${data.name}`,
-    });
-    
-    teacherForm.reset();
-    setEditingTeacher(null);
-    setShowEditModal(false);
+    setIsSaving(true);
+    try {
+      await updateTeacherDB(editingTeacher.id, {
+        name: data.name,
+        username: data.username,
+        password: data.password,
+        subjects: data.subjects,
+        classes: data.classes,
+      });
+      
+      // Reload to get updated data
+      await loadData();
+      
+      toast({
+        title: "تم تحديث المعلم بنجاح",
+        description: `تم تحديث بيانات المعلم ${data.name}`,
+      });
+      
+      teacherForm.reset();
+      setEditingTeacher(null);
+      setShowEditModal(false);
+    } catch (error: any) {
+      toast({
+        title: "خطأ",
+        description: error.message || "فشل في تحديث المعلم",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const handleDeleteTeacher = (teacherId: string) => {
+  const handleDeleteTeacher = async (teacherId: string) => {
     const teacherToDelete = teachers.find(t => t.id === teacherId);
-    const updatedTeachers = teachers.filter(t => t.id !== teacherId);
-    setTeachers(updatedTeachers);
-    saveTeachers(updatedTeachers);
     
-    toast({
-      title: "تم حذف المعلم",
-      description: `تم حذف المعلم ${teacherToDelete?.name || ""} بنجاح`,
-    });
+    try {
+      await deleteTeacherDB(teacherId);
+      setTeachers(teachers.filter(t => t.id !== teacherId));
+      
+      toast({
+        title: "تم حذف المعلم",
+        description: `تم حذف المعلم ${teacherToDelete?.name || ""} بنجاح`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "خطأ",
+        description: error.message || "فشل في حذف المعلم",
+        variant: "destructive",
+      });
+    }
   };
 
-  const openEditModal = (teacher: TeacherWithCredentials) => {
+  const openEditModal = (teacher: DBTeacher) => {
     setEditingTeacher(teacher);
     teacherForm.reset({
       name: teacher.name,
       username: teacher.username,
-      password: teacher.password,
-      classes: teacher.assignedClasses,
-      subjects: teacher.assignedSubjects
+      password: "",
+      classes: getTeacherClasses(teacher),
+      subjects: getTeacherSubjects(teacher),
     });
     setShowEditModal(true);
   };
@@ -178,34 +229,37 @@ const TeachersTab = ({ teachers, setTeachers }: TeachersTabProps) => {
       }
 
       let addedCount = 0;
-      const newTeachers = [...teachers];
+      const newTeachers: DBTeacher[] = [];
 
-      jsonData.forEach((row, index) => {
+      for (const row of jsonData) {
         const name = row["اسم المعلم"] || row["الاسم"] || row["name"];
         const username = row["اسم المستخدم"] || row["username"];
         const password = row["كلمة المرور"] || row["password"] || "12345";
 
-        if (!name || !username) return;
+        if (!name || !username) continue;
 
         // Check if teacher already exists
-        const exists = newTeachers.some(t => t.username === username);
-        if (exists) return;
+        const exists = teachers.some(t => t.username === username);
+        if (exists) continue;
 
-        newTeachers.push({
-          id: `teacher_${Date.now()}_${index}`,
-          name: name.trim(),
-          username: username.trim(),
-          password: password,
-          subjects: [],
-          assignedSubjects: [],
-          assignedClasses: []
-        });
-        addedCount++;
-      });
+        try {
+          const newTeacher = await addTeacherDB({
+            name: name.trim(),
+            username: username.trim(),
+            password: password,
+            subjects: [],
+            classes: [],
+            must_change_password: true,
+          });
+          newTeachers.push(newTeacher);
+          addedCount++;
+        } catch (error) {
+          console.error("Error adding teacher:", name, error);
+        }
+      }
 
       if (addedCount > 0) {
-        setTeachers(newTeachers);
-        saveTeachers(newTeachers);
+        setTeachers([...teachers, ...newTeachers]);
         toast({
           title: "تم الاستيراد",
           description: `تم إضافة ${addedCount} معلم بنجاح (يرجى تعيين الصفوف والمواد لكل معلم)`,
@@ -251,8 +305,8 @@ const TeachersTab = ({ teachers, setTeachers }: TeachersTabProps) => {
     const exportData = teachers.map(teacher => ({
       "اسم المعلم": teacher.name,
       "اسم المستخدم": teacher.username,
-      "الصفوف": teacher.assignedClasses.map(id => getClassById(id)?.name || "").filter(Boolean).join("، "),
-      "المواد": teacher.assignedSubjects.map(id => getSubjectById(id)?.name || "").filter(Boolean).join("، "),
+      "الصفوف": getTeacherClasses(teacher).map(id => classes.find(c => c.id === id)?.name || "").filter(Boolean).join("، "),
+      "المواد": getTeacherSubjects(teacher).map(id => subjects.find(s => s.id === id)?.name || "").filter(Boolean).join("، "),
     }));
 
     const ws = XLSX.utils.json_to_sheet(exportData);
@@ -310,7 +364,7 @@ const TeachersTab = ({ teachers, setTeachers }: TeachersTabProps) => {
           name="password"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>كلمة المرور</FormLabel>
+              <FormLabel>{isEdit ? "كلمة المرور الجديدة (اتركها فارغة للإبقاء على القديمة)" : "كلمة المرور"}</FormLabel>
               <FormControl>
                 <Input 
                   type="password"
@@ -404,19 +458,33 @@ const TeachersTab = ({ teachers, setTeachers }: TeachersTabProps) => {
               isEdit ? setShowEditModal(false) : setShowAddTeacherModal(false);
             }}
             className="ml-2"
+            disabled={isSaving}
           >
             إلغاء
           </Button>
           <Button 
             type="submit" 
             className="bg-green-600 hover:bg-green-700"
+            disabled={isSaving}
           >
+            {isSaving && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}
             {isEdit ? "حفظ التغييرات" : "إضافة المعلم"}
           </Button>
         </div>
       </form>
     </Form>
   );
+
+  if (isLoading) {
+    return (
+      <Card className="border-2 border-black">
+        <CardContent className="flex items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          <span className="mr-2 text-muted-foreground">جاري تحميل المعلمين...</span>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <>
@@ -484,10 +552,10 @@ const TeachersTab = ({ teachers, setTeachers }: TeachersTabProps) => {
                     <TableCell>{teacher.username}</TableCell>
                     <TableCell>
                       <div className="flex flex-wrap gap-1">
-                        {teacher.assignedClasses.map(classId => {
-                          const cls = getClassById(classId);
+                        {getTeacherClasses(teacher).map(classId => {
+                          const cls = classes.find(c => c.id === classId);
                           return cls ? (
-                            <span key={classId} className="bg-green-100 px-2 py-0.5 rounded text-sm">
+                            <span key={classId} className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs">
                               {cls.name}
                             </span>
                           ) : null;
@@ -496,10 +564,10 @@ const TeachersTab = ({ teachers, setTeachers }: TeachersTabProps) => {
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-wrap gap-1">
-                        {teacher.assignedSubjects.map(subjectId => {
-                          const subject = getSubjectById(subjectId);
+                        {getTeacherSubjects(teacher).map(subjectId => {
+                          const subject = subjects.find(s => s.id === subjectId);
                           return subject ? (
-                            <span key={subjectId} className="bg-red-100 px-2 py-0.5 rounded text-sm">
+                            <span key={subjectId} className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs">
                               {subject.name}
                             </span>
                           ) : null;
@@ -508,16 +576,16 @@ const TeachersTab = ({ teachers, setTeachers }: TeachersTabProps) => {
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-2">
-                        <Button 
-                          variant="outline" 
+                        <Button
+                          variant="outline"
                           size="sm"
                           onClick={() => openEditModal(teacher)}
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
+                        <Button
+                          variant="outline"
+                          size="sm"
                           className="text-red-500 hover:bg-red-50"
                           onClick={() => handleDeleteTeacher(teacher.id)}
                         >
@@ -530,7 +598,7 @@ const TeachersTab = ({ teachers, setTeachers }: TeachersTabProps) => {
               ) : (
                 <TableRow>
                   <TableCell colSpan={5} className="text-center py-6">
-                    لا يوجد معلمين حالياً
+                    لا يوجد معلمين مضافين
                   </TableCell>
                 </TableRow>
               )}
@@ -538,14 +606,14 @@ const TeachersTab = ({ teachers, setTeachers }: TeachersTabProps) => {
           </Table>
         </CardContent>
       </Card>
-      
+
       {/* Add Teacher Modal */}
       <Dialog open={showAddTeacherModal} onOpenChange={setShowAddTeacherModal}>
         <DialogContent className="dir-rtl max-w-2xl">
           <DialogHeader>
             <DialogTitle>إضافة معلم جديد</DialogTitle>
           </DialogHeader>
-          {renderTeacherForm(handleAddTeacher)}
+          {renderTeacherForm(handleAddTeacher, false)}
         </DialogContent>
       </Dialog>
 

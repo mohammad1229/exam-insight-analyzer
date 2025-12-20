@@ -19,25 +19,49 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Plus, Trash2, Edit, Upload, Download, FileSpreadsheet } from "lucide-react";
-import { Subject } from "@/types";
-import { getSubjects, saveSubjects } from "@/services/dataService";
+import { Plus, Trash2, Edit, Upload, Download, FileSpreadsheet, Loader2 } from "lucide-react";
+import { 
+  getSubjectsDB, 
+  addSubjectDB, 
+  updateSubjectDB, 
+  deleteSubjectDB,
+  DBSubject 
+} from "@/services/databaseService";
 import * as XLSX from "xlsx";
 
 const SubjectsTab = () => {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [subjects, setSubjects] = useState<DBSubject[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [editingSubject, setEditingSubject] = useState<Subject | null>(null);
+  const [editingSubject, setEditingSubject] = useState<DBSubject | null>(null);
   const [newSubjectName, setNewSubjectName] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    setSubjects(getSubjects());
+    loadSubjects();
   }, []);
 
-  const handleAddSubject = () => {
+  const loadSubjects = async () => {
+    setIsLoading(true);
+    try {
+      const data = await getSubjectsDB();
+      setSubjects(data);
+    } catch (error: any) {
+      console.error("Error loading subjects:", error);
+      toast({
+        title: "خطأ",
+        description: "فشل في تحميل المواد",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleAddSubject = async () => {
     if (!newSubjectName.trim()) {
       toast({
         title: "خطأ",
@@ -47,57 +71,80 @@ const SubjectsTab = () => {
       return;
     }
 
-    const newSubject: Subject = {
-      id: `sub${Date.now()}`,
-      name: newSubjectName.trim(),
-    };
+    setIsSaving(true);
+    try {
+      const newSubject = await addSubjectDB(newSubjectName.trim());
+      setSubjects([...subjects, newSubject]);
 
-    const updatedSubjects = [...subjects, newSubject];
-    setSubjects(updatedSubjects);
-    saveSubjects(updatedSubjects);
+      toast({
+        title: "تمت الإضافة",
+        description: `تم إضافة ${newSubjectName} بنجاح`,
+      });
 
-    toast({
-      title: "تمت الإضافة",
-      description: `تم إضافة ${newSubjectName} بنجاح`,
-    });
-
-    setNewSubjectName("");
-    setShowAddModal(false);
+      setNewSubjectName("");
+      setShowAddModal(false);
+    } catch (error: any) {
+      toast({
+        title: "خطأ",
+        description: error.message || "فشل في إضافة المادة",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const handleEditSubject = () => {
+  const handleEditSubject = async () => {
     if (!editingSubject || !newSubjectName.trim()) return;
 
-    const updatedSubjects = subjects.map(s =>
-      s.id === editingSubject.id ? { ...s, name: newSubjectName.trim() } : s
-    );
+    setIsSaving(true);
+    try {
+      await updateSubjectDB(editingSubject.id, newSubjectName.trim());
+      
+      setSubjects(subjects.map(s =>
+        s.id === editingSubject.id ? { ...s, name: newSubjectName.trim() } : s
+      ));
 
-    setSubjects(updatedSubjects);
-    saveSubjects(updatedSubjects);
+      toast({
+        title: "تم التحديث",
+        description: `تم تحديث ${newSubjectName} بنجاح`,
+      });
 
-    toast({
-      title: "تم التحديث",
-      description: `تم تحديث ${newSubjectName} بنجاح`,
-    });
-
-    setEditingSubject(null);
-    setNewSubjectName("");
-    setShowEditModal(false);
+      setEditingSubject(null);
+      setNewSubjectName("");
+      setShowEditModal(false);
+    } catch (error: any) {
+      toast({
+        title: "خطأ",
+        description: error.message || "فشل في تحديث المادة",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const handleDeleteSubject = (subjectId: string) => {
+  const handleDeleteSubject = async (subjectId: string) => {
     const subjectToDelete = subjects.find(s => s.id === subjectId);
-    const updatedSubjects = subjects.filter(s => s.id !== subjectId);
-    setSubjects(updatedSubjects);
-    saveSubjects(updatedSubjects);
+    
+    try {
+      await deleteSubjectDB(subjectId);
+      setSubjects(subjects.filter(s => s.id !== subjectId));
 
-    toast({
-      title: "تم الحذف",
-      description: `تم حذف ${subjectToDelete?.name || "المادة"} بنجاح`,
-    });
+      toast({
+        title: "تم الحذف",
+        description: `تم حذف ${subjectToDelete?.name || "المادة"} بنجاح`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "خطأ",
+        description: error.message || "فشل في حذف المادة",
+        variant: "destructive",
+      });
+    }
   };
 
-  const openEditModal = (subject: Subject) => {
+  const openEditModal = (subject: DBSubject) => {
     setEditingSubject(subject);
     setNewSubjectName(subject.name);
     setShowEditModal(true);
@@ -124,27 +171,28 @@ const SubjectsTab = () => {
       }
 
       let addedCount = 0;
-      const newSubjects = [...subjects];
+      const newSubjects: DBSubject[] = [];
 
-      jsonData.forEach((row, index) => {
+      for (const row of jsonData) {
         const subjectName = row["اسم المادة"] || row["المادة"] || row["name"];
 
-        if (!subjectName) return;
+        if (!subjectName) continue;
 
         // Check if subject already exists
-        const exists = newSubjects.some(s => s.name === subjectName);
-        if (exists) return;
+        const exists = subjects.some(s => s.name === subjectName);
+        if (exists) continue;
 
-        newSubjects.push({
-          id: `sub${Date.now()}_${index}`,
-          name: subjectName.trim(),
-        });
-        addedCount++;
-      });
+        try {
+          const newSubject = await addSubjectDB(subjectName.trim());
+          newSubjects.push(newSubject);
+          addedCount++;
+        } catch (error) {
+          console.error("Error adding subject:", subjectName, error);
+        }
+      }
 
       if (addedCount > 0) {
-        setSubjects(newSubjects);
-        saveSubjects(newSubjects);
+        setSubjects([...subjects, ...newSubjects]);
         toast({
           title: "تم الاستيراد",
           description: `تم إضافة ${addedCount} مادة بنجاح`,
@@ -202,6 +250,17 @@ const SubjectsTab = () => {
       description: `تم تصدير ${subjects.length} مادة`,
     });
   };
+
+  if (isLoading) {
+    return (
+      <Card className="border-2 border-black">
+        <CardContent className="flex items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          <span className="mr-2 text-muted-foreground">جاري تحميل المواد...</span>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card className="border-2 border-black">
@@ -313,10 +372,11 @@ const SubjectsTab = () => {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddModal(false)}>
+            <Button variant="outline" onClick={() => setShowAddModal(false)} disabled={isSaving}>
               إلغاء
             </Button>
-            <Button onClick={handleAddSubject} className="bg-red-600 hover:bg-red-700">
+            <Button onClick={handleAddSubject} className="bg-red-600 hover:bg-red-700" disabled={isSaving}>
+              {isSaving && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}
               إضافة
             </Button>
           </DialogFooter>
@@ -339,10 +399,11 @@ const SubjectsTab = () => {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowEditModal(false)}>
+            <Button variant="outline" onClick={() => setShowEditModal(false)} disabled={isSaving}>
               إلغاء
             </Button>
-            <Button onClick={handleEditSubject} className="bg-red-600 hover:bg-red-700">
+            <Button onClick={handleEditSubject} className="bg-red-600 hover:bg-red-700" disabled={isSaving}>
+              {isSaving && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}
               حفظ التغييرات
             </Button>
           </DialogFooter>
