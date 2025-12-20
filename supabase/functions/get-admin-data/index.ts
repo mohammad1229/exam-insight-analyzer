@@ -123,6 +123,78 @@ serve(async (req) => {
       );
     }
 
+    if (action === "updateSchool") {
+      const { schoolId, updateData } = body;
+      
+      const { data, error } = await supabase
+        .from("schools")
+        .update(updateData)
+        .eq("id", schoolId)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      return new Response(
+        JSON.stringify({ success: true, data }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (action === "deleteSchool") {
+      const { schoolId } = body;
+      
+      // Delete related data first
+      await supabase.from("school_admins").delete().eq("school_id", schoolId);
+      await supabase.from("licenses").delete().eq("school_id", schoolId);
+      
+      const { error } = await supabase
+        .from("schools")
+        .delete()
+        .eq("id", schoolId);
+
+      if (error) throw error;
+
+      return new Response(
+        JSON.stringify({ success: true }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (action === "updateLicense") {
+      const { licenseId, updateData } = body;
+      
+      const { data, error } = await supabase
+        .from("licenses")
+        .update(updateData)
+        .eq("id", licenseId)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      return new Response(
+        JSON.stringify({ success: true, data }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (action === "deleteDevice") {
+      const { deviceId } = body;
+      
+      const { error } = await supabase
+        .from("device_activations")
+        .delete()
+        .eq("id", deviceId);
+
+      if (error) throw error;
+
+      return new Response(
+        JSON.stringify({ success: true }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     return new Response(
       JSON.stringify({ success: false, error: "Unknown action" }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
