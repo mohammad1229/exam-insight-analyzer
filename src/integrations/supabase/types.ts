@@ -382,6 +382,56 @@ export type Database = {
         }
         Relationships: []
       }
+      wisdoms: {
+        Row: {
+          author: string | null
+          category: string | null
+          content: string
+          created_at: string
+          created_by: string | null
+          display_order: number | null
+          id: string
+          is_active: boolean | null
+          is_global: boolean | null
+          school_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          author?: string | null
+          category?: string | null
+          content: string
+          created_at?: string
+          created_by?: string | null
+          display_order?: number | null
+          id?: string
+          is_active?: boolean | null
+          is_global?: boolean | null
+          school_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          author?: string | null
+          category?: string | null
+          content?: string
+          created_at?: string
+          created_by?: string | null
+          display_order?: number | null
+          id?: string
+          is_active?: boolean | null
+          is_global?: boolean | null
+          school_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wisdoms_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
