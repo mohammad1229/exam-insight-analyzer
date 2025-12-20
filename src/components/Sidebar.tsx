@@ -53,7 +53,7 @@ const Sidebar = () => {
           <SidebarLink to="/test-results" label={collapsed ? "ن" : "نتائج الاختبارات"} active={false} />
           <SidebarLink to="/reports" label={collapsed ? "ت" : "التقارير"} active={false} />
           <SidebarLink to="/statistics" label={collapsed ? "إح" : "الإحصائيات"} active={false} />
-          <SidebarLink to="/admin" label={collapsed ? "إ" : "إدارة النظام"} active={false} />
+          <SidebarLink to="/admin-dashboard" label={collapsed ? "إ" : "إدارة النظام"} active={false} />
         </div>
       </div>
       
