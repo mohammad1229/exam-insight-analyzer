@@ -3,9 +3,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Lock, Eye, EyeOff, ShieldCheck } from "lucide-react";
+import { Lock, Eye, EyeOff, ShieldCheck, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { getTeachers, saveTeachers } from "@/services/dataService";
+import { supabase } from "@/integrations/supabase/client";
 import { z } from "zod";
 
 interface TeacherChangePasswordDialogProps {
@@ -45,7 +45,19 @@ const TeacherChangePasswordDialog: React.FC<TeacherChangePasswordDialogProps> = 
 
   const validateForm = (): boolean => {
     try {
-      passwordSchema.parse({ currentPassword, newPassword, confirmPassword });
+      // For forced change, skip current password validation
+      if (isForced) {
+        const forcedSchema = z.object({
+          newPassword: z.string().min(6, "كلمة المرور يجب أن تكون 6 أحرف على الأقل"),
+          confirmPassword: z.string()
+        }).refine((data) => data.newPassword === data.confirmPassword, {
+          message: "كلمات المرور غير متطابقة",
+          path: ["confirmPassword"],
+        });
+        forcedSchema.parse({ newPassword, confirmPassword });
+      } else {
+        passwordSchema.parse({ currentPassword, newPassword, confirmPassword });
+      }
       setErrors({});
       return true;
     } catch (error) {
@@ -73,31 +85,32 @@ const TeacherChangePasswordDialog: React.FC<TeacherChangePasswordDialogProps> = 
 
     setIsLoading(true);
     try {
-      const teachers = getTeachers();
-      const teacherIndex = teachers.findIndex(t => t.id === teacherId);
+      const schoolId = localStorage.getItem("currentSchoolId");
       
-      if (teacherIndex === -1) {
-        toast.error("المعلم غير موجود");
-        return;
-      }
+      // Use database to change password
+      const { data, error } = await supabase.functions.invoke('school-data', {
+        body: { 
+          action: 'changeTeacherPassword',
+          schoolId: schoolId || 'none',
+          data: { 
+            teacherId,
+            currentPassword: isForced ? undefined : currentPassword,
+            newPassword,
+            isForced
+          }
+        }
+      });
 
-      const teacher = teachers[teacherIndex];
-
-      // Verify current password (skip for forced change)
-      if (!isForced && teacher.password !== currentPassword) {
-        setErrors({ currentPassword: "كلمة المرور الحالية غير صحيحة" });
+      if (error) throw error;
+      if (!data.success) {
+        if (data.error?.includes("الحالية")) {
+          setErrors({ currentPassword: data.error });
+        } else {
+          throw new Error(data.error);
+        }
         setIsLoading(false);
         return;
       }
-
-      // Update password
-      teachers[teacherIndex] = {
-        ...teacher,
-        password: newPassword,
-        must_change_password: false
-      };
-
-      saveTeachers(teachers);
 
       // Update logged in teacher data
       const loggedInTeacher = localStorage.getItem("loggedInTeacher");
@@ -116,7 +129,7 @@ const TeacherChangePasswordDialog: React.FC<TeacherChangePasswordDialogProps> = 
       onSuccess();
     } catch (error: any) {
       console.error("Error changing password:", error);
-      toast.error("حدث خطأ أثناء تغيير كلمة المرور");
+      toast.error(error.message || "حدث خطأ أثناء تغيير كلمة المرور");
     } finally {
       setIsLoading(false);
     }
@@ -247,7 +260,14 @@ const TeacherChangePasswordDialog: React.FC<TeacherChangePasswordDialogProps> = 
               </Button>
             )}
             <Button type="submit" disabled={isLoading}>
-              {isLoading ? "جاري التغيير..." : "تغيير كلمة المرور"}
+              {isLoading ? (
+                <>
+                  <Loader2 className="ml-2 h-4 w-4 animate-spin" />
+                  جاري التغيير...
+                </>
+              ) : (
+                "تغيير كلمة المرور"
+              )}
             </Button>
           </DialogFooter>
         </form>

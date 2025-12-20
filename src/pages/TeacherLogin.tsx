@@ -181,6 +181,19 @@ const TeacherLogin = () => {
       }
 
       if (teacher) {
+        // Store teacher info before checking password change
+        localStorage.setItem(
+          "loggedInTeacher",
+          JSON.stringify({
+            id: teacher.id,
+            name: teacher.name,
+            assignedClasses: teacher.classes || [],
+            assignedSubjects: teacher.subjects || [],
+            role: teacher.role || "teacher",
+          })
+        );
+        localStorage.setItem("currentTeacherId", teacher.id);
+
         // Check if must change password
         if (teacher.must_change_password) {
           setPendingTeacherId(teacher.id);
@@ -237,12 +250,18 @@ const TeacherLogin = () => {
 
   const handlePasswordChangeSuccess = async () => {
     setShowPasswordChange(false);
-    // Get updated teacher data and complete login
-    const { getTeachers } = await import("@/services/dataService");
-    const teachers = getTeachers();
-    const teacher = teachers.find((t: any) => t.id === pendingTeacherId);
-    if (teacher) {
-      completeTeacherLogin(teacher);
+    // Complete login with the pending teacher data stored earlier
+    if (pendingTeacherId) {
+      // Get teacher data from localStorage if available
+      const loggedInTeacher = localStorage.getItem("loggedInTeacher");
+      if (loggedInTeacher) {
+        const teacher = JSON.parse(loggedInTeacher);
+        toast({
+          title: "تم تسجيل الدخول بنجاح",
+          description: `مرحباً بك ${teacher.name}`,
+        });
+        navigate("/dashboard");
+      }
     }
     setPendingTeacherId(null);
     setPendingTeacherName("");

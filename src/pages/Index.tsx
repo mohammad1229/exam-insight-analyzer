@@ -160,33 +160,49 @@ const Index = () => {
           </div>
 
           {/* School and license info */}
-          <Card className="border-2 border-blue-500 bg-blue-50/90 dark:bg-blue-900/30 backdrop-blur max-w-md mx-auto shadow-lg">
+          <Card className="border-2 border-primary/50 bg-gradient-to-br from-primary/10 via-background to-accent/10 dark:from-primary/20 dark:via-gray-900 dark:to-accent/20 backdrop-blur max-w-lg mx-auto shadow-xl">
             <CardContent className="pt-6 pb-6">
               <div className="space-y-4 text-center">
-                {/* School Name - Always show */}
-                <div className="text-xl">
-                  <span className="text-blue-600 dark:text-blue-300 font-bold">
-                    {schoolName || "اسم المدرسة غير محدد"}
+                {/* School Logo */}
+                {localStorage.getItem("schoolLogo") && (
+                  <div className="mb-4">
+                    <img 
+                      src={localStorage.getItem("schoolLogo") || ""} 
+                      alt="شعار المدرسة" 
+                      className="h-20 w-20 object-contain mx-auto rounded-lg border-2 border-primary/30"
+                    />
+                  </div>
+                )}
+
+                {/* School Name */}
+                <div className="text-2xl font-bold">
+                  <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+                    {schoolName || "مرحباً بكم في النظام"}
                   </span>
                 </div>
 
-                {/* Director Name - Always show */}
-                <div className="text-base border-t border-blue-200 dark:border-blue-700 pt-3">
-                  <span className="text-muted-foreground">مدير المدرسة: </span>
-                  <span className="font-semibold text-foreground">
-                    {directorName || "غير محدد"}
-                  </span>
-                </div>
+                {/* Director Name */}
+                {directorName && (
+                  <div className="text-base border-t border-primary/20 pt-3">
+                    <span className="text-muted-foreground">مدير المدرسة: </span>
+                    <span className="font-semibold text-foreground">
+                      {directorName}
+                    </span>
+                  </div>
+                )}
 
                 {/* License Status */}
-                <div className="text-sm border-t border-blue-200 dark:border-blue-700 pt-3 flex items-center justify-center gap-3">
-                  <span className={`px-3 py-1 rounded-full ${
-                    isTrial ? 'bg-yellow-100 dark:bg-yellow-900/50 text-yellow-800 dark:text-yellow-200' : 'bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-200'
+                <div className="text-sm border-t border-primary/20 pt-3 flex flex-wrap items-center justify-center gap-3">
+                  <span className={`px-4 py-1.5 rounded-full font-medium ${
+                    isTrial 
+                      ? 'bg-yellow-100 dark:bg-yellow-900/50 text-yellow-800 dark:text-yellow-200 border border-yellow-300' 
+                      : 'bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-200 border border-green-300'
                   }`}>
-                    {isTrial ? `فترة تجريبية` : "ترخيص مفعل"}
+                    {isTrial ? "فترة تجريبية" : "ترخيص مفعل ✓"}
                   </span>
-                  <span className="text-muted-foreground">
-                    متبقي <span className="font-bold text-primary">{remainingDays}</span> يوم
+                  <span className="text-muted-foreground flex items-center gap-1">
+                    <span className="text-lg">📅</span>
+                    متبقي <span className="font-bold text-primary text-lg mx-1">{remainingDays}</span> يوم
                   </span>
                 </div>
               </div>
