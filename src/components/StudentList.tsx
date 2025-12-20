@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { Student } from "@/types";
-import { getStudentsByClassAndSection } from "@/services/dataService";
+import { getStudentsDB, DBStudent } from "@/services/databaseService";
 import { 
   Table,
   TableBody,
@@ -22,7 +22,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { ChevronRight, ChevronLeft } from "lucide-react";
+import { ChevronRight, ChevronLeft, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface StudentListProps {
@@ -47,25 +47,54 @@ const StudentList: React.FC<StudentListProps> = ({
   const [searchTerm, setSearchTerm] = useState("");
   const [currentStudentIndex, setCurrentStudentIndex] = useState(0);
   const [viewMode, setViewMode] = useState<"list" | "single">("list");
+  const [loading, setLoading] = useState(false);
   
   // Local scores for immediate UI updates
   const [localScores, setLocalScores] = useState<Record<string, Record<string, number>>>({});
   
   useEffect(() => {
-    if (classId && sectionId) {
-      const filteredStudents = getStudentsByClassAndSection(classId, sectionId);
-      setStudents(filteredStudents);
-      
-      // Initialize local scores for all students
-      const initialScores: Record<string, Record<string, number>> = {};
-      filteredStudents.forEach(student => {
-        initialScores[student.id] = selectedStudents[student.id]?.scores || {};
-      });
-      setLocalScores(initialScores);
-    } else {
-      setStudents([]);
-      setLocalScores({});
-    }
+    const fetchStudents = async () => {
+      if (classId && sectionId) {
+        setLoading(true);
+        try {
+          const allStudents = await getStudentsDB();
+          // Filter students by class_id and section_id, and map to Student type
+          const filteredStudents: Student[] = allStudents
+            .filter((s: DBStudent) => s.class_id === classId && s.section_id === sectionId)
+            .map((s: DBStudent) => ({
+              id: s.id,
+              name: s.name,
+              classId: s.class_id,
+              sectionId: s.section_id
+            }));
+          
+          setStudents(filteredStudents);
+          
+          // Initialize local scores for all students
+          const initialScores: Record<string, Record<string, number>> = {};
+          filteredStudents.forEach(student => {
+            initialScores[student.id] = selectedStudents[student.id]?.scores || {};
+          });
+          setLocalScores(initialScores);
+        } catch (error) {
+          console.error("Error fetching students:", error);
+          toast({
+            title: "خطأ",
+            description: "فشل في تحميل بيانات الطلاب",
+            variant: "destructive",
+          });
+          setStudents([]);
+          setLocalScores({});
+        } finally {
+          setLoading(false);
+        }
+      } else {
+        setStudents([]);
+        setLocalScores({});
+      }
+    };
+
+    fetchStudents();
   }, [classId, sectionId]);
 
   const filteredStudents = students.filter(student => 
@@ -159,6 +188,15 @@ const StudentList: React.FC<StudentListProps> = ({
 
   // Render the single student score entry form
   const renderSingleStudentForm = () => {
+    if (loading) {
+      return (
+        <div className="flex justify-center items-center py-8">
+          <Loader2 className="h-8 w-8 animate-spin text-green-600" />
+          <span className="mr-2">جاري تحميل الطلاب...</span>
+        </div>
+      );
+    }
+
     if (filteredStudents.length === 0) {
       return (
         <div className="text-center py-8">
@@ -279,6 +317,15 @@ const StudentList: React.FC<StudentListProps> = ({
 
   // Render the table view of all students
   const renderStudentsTable = () => {
+    if (loading) {
+      return (
+        <div className="flex justify-center items-center py-8">
+          <Loader2 className="h-8 w-8 animate-spin text-green-600" />
+          <span className="mr-2">جاري تحميل الطلاب...</span>
+        </div>
+      );
+    }
+
     return (
       <div className="border rounded-md overflow-hidden">
         <Table>
