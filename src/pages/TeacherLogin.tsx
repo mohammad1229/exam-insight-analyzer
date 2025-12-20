@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { isElectron } from "@/services/electronService";
 import electronService from "@/services/electronService";
 import { UserPlus, LogIn } from "lucide-react";
+import TeacherChangePasswordDialog from "@/components/TeacherChangePasswordDialog";
 
 const TeacherLogin = () => {
   const { toast } = useToast();
@@ -25,6 +26,11 @@ const TeacherLogin = () => {
   const [regPassword, setRegPassword] = useState("");
   const [regConfirmPassword, setRegConfirmPassword] = useState("");
   const [activeTab, setActiveTab] = useState("login");
+
+  // Password change states
+  const [showPasswordChange, setShowPasswordChange] = useState(false);
+  const [pendingTeacherId, setPendingTeacherId] = useState<string | null>(null);
+  const [pendingTeacherName, setPendingTeacherName] = useState("");
 
   useEffect(() => {
     // Check activation status
@@ -168,23 +174,15 @@ const TeacherLogin = () => {
       );
       
       if (teacher) {
-        // Store teacher info in localStorage for session management
-        localStorage.setItem("loggedInTeacher", JSON.stringify({
-          id: teacher.id,
-          name: teacher.name,
-          assignedClasses: teacher.assignedClasses,
-          assignedSubjects: teacher.assignedSubjects
-        }));
-        // Also set currentTeacherId for dataService compatibility
-        localStorage.setItem("currentTeacherId", teacher.id);
-        
-        toast({
-          title: "تم تسجيل الدخول بنجاح",
-          description: `مرحباً بك ${teacher.name}`,
-        });
-        
-        // Redirect to dashboard
-        navigate("/dashboard");
+        // Check if must change password
+        if (teacher.must_change_password) {
+          setPendingTeacherId(teacher.id);
+          setPendingTeacherName(teacher.name);
+          setShowPasswordChange(true);
+          return;
+        }
+
+        completeTeacherLogin(teacher);
       } else {
         toast({
           title: "فشل تسجيل الدخول",
@@ -200,6 +198,40 @@ const TeacherLogin = () => {
         variant: "destructive",
       });
     }
+  };
+
+  const completeTeacherLogin = (teacher: any) => {
+    // Store teacher info in localStorage for session management
+    localStorage.setItem("loggedInTeacher", JSON.stringify({
+      id: teacher.id,
+      name: teacher.name,
+      assignedClasses: teacher.assignedClasses,
+      assignedSubjects: teacher.assignedSubjects,
+      role: teacher.role || 'teacher'
+    }));
+    // Also set currentTeacherId for dataService compatibility
+    localStorage.setItem("currentTeacherId", teacher.id);
+    
+    toast({
+      title: "تم تسجيل الدخول بنجاح",
+      description: `مرحباً بك ${teacher.name}`,
+    });
+    
+    // Redirect to dashboard
+    navigate("/dashboard");
+  };
+
+  const handlePasswordChangeSuccess = async () => {
+    setShowPasswordChange(false);
+    // Get updated teacher data and complete login
+    const { getTeachers } = await import("@/services/dataService");
+    const teachers = getTeachers();
+    const teacher = teachers.find((t: any) => t.id === pendingTeacherId);
+    if (teacher) {
+      completeTeacherLogin(teacher);
+    }
+    setPendingTeacherId(null);
+    setPendingTeacherName("");
   };
 
   const handleRegister = async () => {
@@ -502,6 +534,16 @@ const TeacherLogin = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Forced Password Change Dialog */}
+      {pendingTeacherId && (
+        <TeacherChangePasswordDialog
+          open={showPasswordChange}
+          teacherId={pendingTeacherId}
+          isForced={true}
+          onSuccess={handlePasswordChangeSuccess}
+        />
+      )}
     </div>
   );
 };

@@ -550,14 +550,20 @@ export const verifySchoolAdminLogin = async (username: string, password: string)
 
     if (error) throw error;
     
-    const result = data as { success: boolean; error?: string; admin?: any };
+    const result = data as { 
+      success: boolean; 
+      error?: string; 
+      must_change_password?: boolean;
+      admin?: any 
+    };
     
     if (!result || !result.success) {
       return { success: false, error: result?.error || 'خطأ في تسجيل الدخول' };
     }
 
     return { 
-      success: true, 
+      success: true,
+      must_change_password: result.must_change_password || result.admin?.must_change_password,
       admin: {
         id: result.admin.id,
         full_name: result.admin.full_name,
@@ -566,6 +572,8 @@ export const verifySchoolAdminLogin = async (username: string, password: string)
         phone: result.admin.phone,
         school_id: result.admin.school_id,
         license_id: result.admin.license_id,
+        role: result.admin.role || 'school_admin',
+        must_change_password: result.admin.must_change_password,
         schools: {
           name: result.admin.school_name,
           director_name: result.admin.director_name,

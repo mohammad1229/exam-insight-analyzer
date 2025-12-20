@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Eye, FileText, TrendingUp, Users } from "lucide-react";
+import { Eye, FileText, TrendingUp, Users, Key, LogOut, Shield } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -14,6 +14,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 // Import custom components
 import AdminLoginForm from "@/components/admin/AdminLoginForm";
@@ -29,6 +36,7 @@ import HeaderSettingsTab from "@/components/admin/HeaderSettingsTab";
 import SummaryTab from "@/components/admin/SummaryTab";
 import ReportPreview from "@/components/ReportPreview";
 import FeatureToggle from "@/components/admin/FeatureToggle";
+import ChangePasswordDialog from "@/components/ChangePasswordDialog";
 
 // Import utility functions
 import { prepareMockReports, prepareChartData, Report } from "@/utils/reportUtils";
@@ -39,6 +47,9 @@ const AdminDashboard = () => {
   const navigate = useNavigate();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [adminName, setAdminName] = useState("");
+  const [adminId, setAdminId] = useState("");
+  const [adminRole, setAdminRole] = useState("school_admin");
+  const [showPasswordChange, setShowPasswordChange] = useState(false);
   
   // Filter states
   const [selectedClass, setSelectedClass] = useState("");
@@ -74,9 +85,12 @@ const AdminDashboard = () => {
   useEffect(() => {
     const schoolAdminId = localStorage.getItem("schoolAdminId");
     const schoolAdminName = localStorage.getItem("schoolAdminName");
+    const storedRole = localStorage.getItem("adminRole");
     if (schoolAdminId) {
       setIsLoggedIn(true);
       setAdminName(schoolAdminName || "");
+      setAdminId(schoolAdminId);
+      setAdminRole(storedRole || "school_admin");
     }
   }, []);
   
@@ -84,6 +98,7 @@ const AdminDashboard = () => {
     setIsLoggedIn(false);
     localStorage.removeItem("schoolAdminId");
     localStorage.removeItem("schoolAdminName");
+    localStorage.removeItem("adminRole");
     
     toast({
       title: "تم تسجيل الخروج",
@@ -102,9 +117,12 @@ const AdminDashboard = () => {
   const handleLoginSuccess = () => {
     const schoolAdminId = localStorage.getItem("schoolAdminId");
     const schoolAdminName = localStorage.getItem("schoolAdminName");
+    const storedRole = localStorage.getItem("adminRole");
     if (schoolAdminId) {
       setIsLoggedIn(true);
       setAdminName(schoolAdminName || "");
+      setAdminId(schoolAdminId);
+      setAdminRole(storedRole || "school_admin");
     }
   };
 
@@ -118,19 +136,41 @@ const AdminDashboard = () => {
       <Navbar />
       <main className="flex-1 container mx-auto p-6 dir-rtl">
         <div className="flex justify-between items-center mb-8 pb-4 border-b-2 border-red-500">
-          <div>
-            <h1 className="text-3xl font-bold text-black">لوحة تحكم مدير المدرسة</h1>
-            <p className="text-muted-foreground">
-              {adminName ? `مرحباً ${adminName}` : "إدارة كاملة للمعلمين والطلاب والصفوف والمواد"}
-            </p>
+          <div className="flex items-center gap-3">
+            <div>
+              <h1 className="text-3xl font-bold text-black">لوحة تحكم مدير المدرسة</h1>
+              <p className="text-muted-foreground flex items-center gap-2">
+                {adminName ? `مرحباً ${adminName}` : "إدارة كاملة للمعلمين والطلاب والصفوف والمواد"}
+                {adminRole && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-primary/10 text-primary">
+                    <Shield className="h-3 w-3" />
+                    {adminRole === 'super_admin' ? 'مدير النظام' : 'مدير المدرسة'}
+                  </span>
+                )}
+              </p>
+            </div>
           </div>
-          <Button 
-            onClick={handleLogout}
-            variant="outline"
-            className="border-red-500 text-red-500 hover:bg-red-50"
-          >
-            تسجيل الخروج
-          </Button>
+          <div className="flex gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline">
+                  <Key className="ml-2 h-4 w-4" />
+                  الإعدادات
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem onClick={() => setShowPasswordChange(true)}>
+                  <Key className="ml-2 h-4 w-4" />
+                  تغيير كلمة المرور
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleLogout} className="text-red-500">
+                  <LogOut className="ml-2 h-4 w-4" />
+                  تسجيل الخروج
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
 
         {/* Quick Stats and Recent Reports */}
@@ -319,6 +359,23 @@ const AdminDashboard = () => {
             setShowReportPreview(false);
             setSelectedTest(null);
           }}
+        />
+      )}
+
+      {/* Change Password Dialog */}
+      {adminId && (
+        <ChangePasswordDialog
+          open={showPasswordChange}
+          adminId={adminId}
+          isForced={false}
+          onSuccess={() => {
+            setShowPasswordChange(false);
+            toast({
+              title: "تم التحديث",
+              description: "تم تغيير كلمة المرور بنجاح",
+            });
+          }}
+          onClose={() => setShowPasswordChange(false)}
         />
       )}
     </div>

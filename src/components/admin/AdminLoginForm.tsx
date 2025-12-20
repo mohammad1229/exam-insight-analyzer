@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -7,7 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { verifySchoolAdminLogin } from "@/services/licenseService";
-import { Loader2, ArrowRight } from "lucide-react";
+import { Loader2, ArrowRight, Key } from "lucide-react";
+import ChangePasswordDialog from "@/components/ChangePasswordDialog";
 
 interface AdminLoginFormProps {
   onLoginSuccess?: () => void;
@@ -19,6 +19,11 @@ const AdminLoginForm = ({ onLoginSuccess }: AdminLoginFormProps) => {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Password change states
+  const [showPasswordChange, setShowPasswordChange] = useState(false);
+  const [pendingAdminId, setPendingAdminId] = useState<string | null>(null);
+  const [pendingAdminData, setPendingAdminData] = useState<any>(null);
 
   const handleLogin = async () => {
     if (!username.trim() || !password.trim()) {
@@ -35,26 +40,20 @@ const AdminLoginForm = ({ onLoginSuccess }: AdminLoginFormProps) => {
       const result = await verifySchoolAdminLogin(username.trim(), password);
       
       if (result.success && result.admin) {
-        // Store admin session securely
-        localStorage.setItem("schoolAdminId", result.admin.id);
-        localStorage.setItem("schoolAdminName", result.admin.full_name);
-        if (result.admin.school_id) {
-          localStorage.setItem("currentSchoolId", result.admin.school_id);
+        // Check if must change password
+        if (result.must_change_password || result.admin.must_change_password) {
+          setPendingAdminId(result.admin.id);
+          setPendingAdminData(result.admin);
+          setShowPasswordChange(true);
+          setIsLoading(false);
+          return;
         }
         
-        toast({
-          title: "تم تسجيل الدخول بنجاح",
-          description: `مرحباً بك ${result.admin.full_name}`,
-        });
-        
-        // Call the callback to update parent state
-        if (onLoginSuccess) {
-          onLoginSuccess();
-        }
+        completeLogin(result.admin);
       } else {
         toast({
           title: "فشل تسجيل الدخول",
-          description: "اسم المستخدم أو كلمة المرور غير صحيحة",
+          description: result.error || "اسم المستخدم أو كلمة المرور غير صحيحة",
           variant: "destructive",
         });
       }
@@ -70,72 +69,113 @@ const AdminLoginForm = ({ onLoginSuccess }: AdminLoginFormProps) => {
     }
   };
 
+  const completeLogin = (admin: any) => {
+    // Store admin session
+    localStorage.setItem("schoolAdminId", admin.id);
+    localStorage.setItem("schoolAdminName", admin.full_name);
+    localStorage.setItem("adminRole", admin.role || "school_admin");
+    if (admin.school_id) {
+      localStorage.setItem("currentSchoolId", admin.school_id);
+    }
+    
+    toast({
+      title: "تم تسجيل الدخول بنجاح",
+      description: `مرحباً بك ${admin.full_name}`,
+    });
+    
+    // Call the callback to update parent state
+    if (onLoginSuccess) {
+      onLoginSuccess();
+    }
+  };
+
+  const handlePasswordChangeSuccess = () => {
+    setShowPasswordChange(false);
+    if (pendingAdminData) {
+      completeLogin(pendingAdminData);
+    }
+    setPendingAdminId(null);
+    setPendingAdminData(null);
+  };
+
   const handleBackToMain = () => {
     navigate("/");
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-black via-white to-green-600 dir-rtl">
-      <Card className="w-[350px] border-2 border-[#ea384c]">
-        <CardHeader className="bg-black text-white">
-          <CardTitle className="text-center text-2xl">تسجيل دخول مدير المدرسة</CardTitle>
-        </CardHeader>
-        <CardContent className="pt-6 mt-2">
-          <form onSubmit={(e) => {
-            e.preventDefault();
-            handleLogin();
-          }}>
-            <div className="grid gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="username">اسم المستخدم</Label>
-                <Input
-                  id="username"
-                  type="text"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
+    <>
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-black via-white to-green-600 dir-rtl">
+        <Card className="w-[350px] border-2 border-[#ea384c]">
+          <CardHeader className="bg-black text-white">
+            <CardTitle className="text-center text-2xl">تسجيل دخول مدير المدرسة</CardTitle>
+          </CardHeader>
+          <CardContent className="pt-6 mt-2">
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              handleLogin();
+            }}>
+              <div className="grid gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="username">اسم المستخدم</Label>
+                  <Input
+                    id="username"
+                    type="text"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    disabled={isLoading}
+                    required
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="password">كلمة المرور</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    disabled={isLoading}
+                    required
+                  />
+                </div>
+                <Button 
+                  type="submit" 
+                  className="mt-2 bg-[#ea384c] hover:bg-red-700 text-white"
                   disabled={isLoading}
-                  required
-                />
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="ml-2 h-4 w-4 animate-spin" />
+                      جاري تسجيل الدخول...
+                    </>
+                  ) : (
+                    "تسجيل الدخول"
+                  )}
+                </Button>
+                <Button 
+                  type="button"
+                  variant="outline"
+                  onClick={handleBackToMain}
+                  className="border-gray-400 text-gray-700 hover:bg-gray-100"
+                >
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                  العودة للشاشة الرئيسية
+                </Button>
               </div>
-              <div className="grid gap-2">
-                <Label htmlFor="password">كلمة المرور</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  disabled={isLoading}
-                  required
-                />
-              </div>
-              <Button 
-                type="submit" 
-                className="mt-2 bg-[#ea384c] hover:bg-red-700 text-white"
-                disabled={isLoading}
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="ml-2 h-4 w-4 animate-spin" />
-                    جاري تسجيل الدخول...
-                  </>
-                ) : (
-                  "تسجيل الدخول"
-                )}
-              </Button>
-              <Button 
-                type="button"
-                variant="outline"
-                onClick={handleBackToMain}
-                className="border-gray-400 text-gray-700 hover:bg-gray-100"
-              >
-                <ArrowRight className="ml-2 h-4 w-4" />
-                العودة للشاشة الرئيسية
-              </Button>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
-    </div>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Forced Password Change Dialog */}
+      {pendingAdminId && (
+        <ChangePasswordDialog
+          open={showPasswordChange}
+          adminId={pendingAdminId}
+          isForced={true}
+          onSuccess={handlePasswordChangeSuccess}
+        />
+      )}
+    </>
   );
 };
 
