@@ -4,11 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { isElectron } from "@/services/electronService";
 import electronService from "@/services/electronService";
-import { UserPlus, LogIn } from "lucide-react";
+import { LogIn } from "lucide-react";
 import TeacherChangePasswordDialog from "@/components/TeacherChangePasswordDialog";
 
 const TeacherLogin = () => {
@@ -19,13 +18,6 @@ const TeacherLogin = () => {
   const [trialDaysLeft, setTrialDaysLeft] = useState(10);
   const [isActivated, setIsActivated] = useState(false);
   const [activationKey, setActivationKey] = useState("");
-  
-  // Registration form
-  const [regName, setRegName] = useState("");
-  const [regUsername, setRegUsername] = useState("");
-  const [regPassword, setRegPassword] = useState("");
-  const [regConfirmPassword, setRegConfirmPassword] = useState("");
-  const [activeTab, setActiveTab] = useState("login");
 
   // Password change states
   const [showPasswordChange, setShowPasswordChange] = useState(false);
@@ -267,95 +259,6 @@ const TeacherLogin = () => {
     setPendingTeacherName("");
   };
 
-  const handleRegister = async () => {
-    if (!regName.trim() || !regUsername.trim() || !regPassword.trim()) {
-      toast({
-        title: "خطأ",
-        description: "يرجى ملء جميع الحقول المطلوبة",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (regPassword !== regConfirmPassword) {
-      toast({
-        title: "خطأ",
-        description: "كلمة المرور غير متطابقة",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (regPassword.length < 4) {
-      toast({
-        title: "خطأ",
-        description: "كلمة المرور يجب أن تكون 4 أحرف على الأقل",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      let teachers = [];
-      
-      if (isElectron()) {
-        teachers = await electronService.db.getAll("teachers");
-      } else {
-        const { getTeachers, saveTeachers } = await import("@/services/dataService");
-        teachers = getTeachers();
-      }
-
-      // Check if username already exists
-      const existingTeacher = teachers.find((t: any) => t.username === regUsername);
-      if (existingTeacher) {
-        toast({
-          title: "خطأ",
-          description: "اسم المستخدم موجود بالفعل",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      const newTeacher = {
-        id: `t${Date.now()}`,
-        name: regName.trim(),
-        username: regUsername.trim(),
-        password: regPassword,
-        subjects: [],
-        assignedClasses: [],
-        assignedSubjects: [],
-      };
-
-      const updatedTeachers = [...teachers, newTeacher];
-      
-      if (isElectron()) {
-        await electronService.db.insert("teachers", newTeacher);
-      } else {
-        const { saveTeachers } = await import("@/services/dataService");
-        saveTeachers(updatedTeachers);
-      }
-
-      toast({
-        title: "تم التسجيل بنجاح",
-        description: "يمكنك الآن تسجيل الدخول بحسابك الجديد. ملاحظة: يجب أن يقوم المدير بتعيين الصفوف والمواد لك.",
-      });
-
-      // Clear form and switch to login
-      setRegName("");
-      setRegUsername("");
-      setRegPassword("");
-      setRegConfirmPassword("");
-      setActiveTab("login");
-      setUsername(regUsername);
-    } catch (error) {
-      console.error("Error during registration:", error);
-      toast({
-        title: "خطأ في التسجيل",
-        description: "حدث خطأ أثناء محاولة التسجيل",
-        variant: "destructive",
-      });
-    }
-  };
 
   // If trial expired and not activated
   if (!isActivated && trialDaysLeft <= 0) {
@@ -453,117 +356,50 @@ const TeacherLogin = () => {
               </div>
             )}
             
-            <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="grid w-full grid-cols-2 mb-4">
-                <TabsTrigger value="login" className="flex items-center gap-2">
-                  <LogIn className="h-4 w-4" />
+            {/* تسجيل الدخول فقط - التسجيل يتم من خلال المدير */}
+            <div className="mb-4 text-center">
+              <h3 className="text-lg font-semibold flex items-center justify-center gap-2">
+                <LogIn className="h-5 w-5" />
+                تسجيل الدخول
+              </h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                للحصول على حساب، تواصل مع مدير المدرسة
+              </p>
+            </div>
+
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              handleLogin();
+            }}>
+              <div className="grid gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="username">اسم المستخدم</Label>
+                  <Input
+                    id="username"
+                    type="text"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="password">كلمة المرور</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                  />
+                </div>
+                <Button 
+                  type="submit" 
+                  className="palestine-button-primary mt-2"
+                >
                   تسجيل الدخول
-                </TabsTrigger>
-                <TabsTrigger value="register" className="flex items-center gap-2">
-                  <UserPlus className="h-4 w-4" />
-                  تسجيل جديد
-                </TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="login">
-                <form onSubmit={(e) => {
-                  e.preventDefault();
-                  handleLogin();
-                }}>
-                  <div className="grid gap-4">
-                    <div className="grid gap-2">
-                      <Label htmlFor="username">اسم المستخدم</Label>
-                      <Input
-                        id="username"
-                        type="text"
-                        value={username}
-                        onChange={(e) => setUsername(e.target.value)}
-                        required
-                      />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="password">كلمة المرور</Label>
-                      <Input
-                        id="password"
-                        type="password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        required
-                      />
-                    </div>
-                    <Button 
-                      type="submit" 
-                      className="palestine-button-primary mt-2"
-                    >
-                      تسجيل الدخول
-                    </Button>
-                  </div>
-                </form>
-              </TabsContent>
-
-              <TabsContent value="register">
-                <form onSubmit={(e) => {
-                  e.preventDefault();
-                  handleRegister();
-                }}>
-                  <div className="grid gap-4">
-                    <div className="grid gap-2">
-                      <Label htmlFor="regName">الاسم الكامل</Label>
-                      <Input
-                        id="regName"
-                        type="text"
-                        value={regName}
-                        onChange={(e) => setRegName(e.target.value)}
-                        placeholder="أدخل اسمك الكامل"
-                        required
-                      />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="regUsername">اسم المستخدم</Label>
-                      <Input
-                        id="regUsername"
-                        type="text"
-                        value={regUsername}
-                        onChange={(e) => setRegUsername(e.target.value)}
-                        placeholder="اختر اسم مستخدم"
-                        required
-                      />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="regPassword">كلمة المرور</Label>
-                      <Input
-                        id="regPassword"
-                        type="password"
-                        value={regPassword}
-                        onChange={(e) => setRegPassword(e.target.value)}
-                        placeholder="أدخل كلمة المرور"
-                        required
-                      />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="regConfirmPassword">تأكيد كلمة المرور</Label>
-                      <Input
-                        id="regConfirmPassword"
-                        type="password"
-                        value={regConfirmPassword}
-                        onChange={(e) => setRegConfirmPassword(e.target.value)}
-                        placeholder="أعد إدخال كلمة المرور"
-                        required
-                      />
-                    </div>
-                    <Button 
-                      type="submit" 
-                      className="bg-green-600 hover:bg-green-700 mt-2"
-                    >
-                      تسجيل حساب جديد
-                    </Button>
-                    <p className="text-xs text-center text-muted-foreground">
-                      بعد التسجيل، سيقوم المدير بتعيين الصفوف والمواد لك
-                    </p>
-                  </div>
-                </form>
-              </TabsContent>
-            </Tabs>
+                </Button>
+              </div>
+            </form>
           </CardContent>
         </Card>
       </div>
