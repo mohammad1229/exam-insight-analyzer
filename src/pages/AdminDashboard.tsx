@@ -40,6 +40,7 @@ import ChangePasswordDialog from "@/components/ChangePasswordDialog";
 import BackupTab from "@/components/admin/BackupTab";
 import WisdomsTab from "@/components/admin/WisdomsTab";
 import TestsTab from "@/components/admin/TestsTab";
+import SchoolInfoTab from "@/components/admin/SchoolInfoTab";
 
 // Import utility functions
 import { prepareMockReports, prepareChartData, Report } from "@/utils/reportUtils";
@@ -277,7 +278,7 @@ const AdminDashboard = () => {
         </div>
 
         <Tabs defaultValue="teachers" className="space-y-6">
-          <TabsList className="grid grid-cols-7 lg:grid-cols-14 w-full mb-6">
+          <TabsList className="grid grid-cols-8 lg:grid-cols-15 w-full mb-6">
             <TabsTrigger value="teachers">المعلمين</TabsTrigger>
             <TabsTrigger value="students">الطلاب</TabsTrigger>
             <TabsTrigger value="classes">الصفوف</TabsTrigger>
@@ -291,6 +292,7 @@ const AdminDashboard = () => {
             <TabsTrigger value="wisdoms">الحكم</TabsTrigger>
             <TabsTrigger value="features">الميزات</TabsTrigger>
             <TabsTrigger value="backup">النسخ الاحتياطي</TabsTrigger>
+            <TabsTrigger value="school">بيانات المدرسة</TabsTrigger>
             <TabsTrigger value="settings">الإعدادات</TabsTrigger>
           </TabsList>
           
@@ -357,6 +359,10 @@ const AdminDashboard = () => {
 
           <TabsContent value="backup">
             <BackupTab />
+          </TabsContent>
+
+          <TabsContent value="school">
+            <SchoolInfoTab />
           </TabsContent>
           
           <TabsContent value="settings">
