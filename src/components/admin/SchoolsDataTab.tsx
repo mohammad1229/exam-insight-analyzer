@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Table,
   TableBody,
@@ -10,6 +12,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { 
   School, 
@@ -20,7 +24,10 @@ import {
   Download,
   BarChart3,
   CheckCircle,
-  XCircle
+  XCircle,
+  Edit,
+  Trash2,
+  Copy
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -45,6 +52,20 @@ const SchoolsDataTab = () => {
   const [data, setData] = useState<SchoolData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [activeSubTab, setActiveSubTab] = useState("schools");
+
+  // Edit modals
+  const [showEditSchoolModal, setShowEditSchoolModal] = useState(false);
+  const [editingSchool, setEditingSchool] = useState<any>(null);
+  const [showDeleteSchoolModal, setShowDeleteSchoolModal] = useState(false);
+  const [deletingSchool, setDeletingSchool] = useState<any>(null);
+
+  const [showEditLicenseModal, setShowEditLicenseModal] = useState(false);
+  const [editingLicense, setEditingLicense] = useState<any>(null);
+  const [showDeleteLicenseModal, setShowDeleteLicenseModal] = useState(false);
+  const [deletingLicense, setDeletingLicense] = useState<any>(null);
+
+  const [showDeleteDeviceModal, setShowDeleteDeviceModal] = useState(false);
+  const [deletingDevice, setDeletingDevice] = useState<any>(null);
 
   useEffect(() => {
     loadData();
@@ -71,6 +92,106 @@ const SchoolsDataTab = () => {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const copyToClipboard = (text: string, label: string = "النص") => {
+    navigator.clipboard.writeText(text);
+    toast({
+      title: "تم النسخ",
+      description: `تم نسخ ${label} إلى الحافظة`,
+    });
+  };
+
+  const handleEditSchool = async () => {
+    if (!editingSchool) return;
+    try {
+      const { error } = await supabase.functions.invoke('get-admin-data', {
+        body: { 
+          action: 'updateSchool',
+          schoolId: editingSchool.id,
+          updateData: {
+            name: editingSchool.name,
+            director_name: editingSchool.director_name,
+            email: editingSchool.email,
+            phone: editingSchool.phone,
+            address: editingSchool.address
+          }
+        }
+      });
+      if (error) throw error;
+      toast({ title: "تم التحديث", description: "تم تحديث بيانات المدرسة بنجاح" });
+      setShowEditSchoolModal(false);
+      loadData();
+    } catch (error: any) {
+      toast({ title: "خطأ", description: error.message, variant: "destructive" });
+    }
+  };
+
+  const handleDeleteSchool = async () => {
+    if (!deletingSchool) return;
+    try {
+      const { error } = await supabase.functions.invoke('get-admin-data', {
+        body: { action: 'deleteSchool', schoolId: deletingSchool.id }
+      });
+      if (error) throw error;
+      toast({ title: "تم الحذف", description: "تم حذف المدرسة بنجاح" });
+      setShowDeleteSchoolModal(false);
+      loadData();
+    } catch (error: any) {
+      toast({ title: "خطأ", description: error.message, variant: "destructive" });
+    }
+  };
+
+  const handleEditLicense = async () => {
+    if (!editingLicense) return;
+    try {
+      const { error } = await supabase.functions.invoke('get-admin-data', {
+        body: { 
+          action: 'updateLicense',
+          licenseId: editingLicense.id,
+          updateData: {
+            max_devices: parseInt(editingLicense.max_devices),
+            is_active: editingLicense.is_active
+          }
+        }
+      });
+      if (error) throw error;
+      toast({ title: "تم التحديث", description: "تم تحديث الترخيص بنجاح" });
+      setShowEditLicenseModal(false);
+      loadData();
+    } catch (error: any) {
+      toast({ title: "خطأ", description: error.message, variant: "destructive" });
+    }
+  };
+
+  const handleDeleteLicense = async () => {
+    if (!deletingLicense) return;
+    try {
+      const { error } = await supabase.functions.invoke('manage-license', {
+        body: { action: 'delete', licenseId: deletingLicense.id }
+      });
+      if (error) throw error;
+      toast({ title: "تم الحذف", description: "تم حذف الترخيص بنجاح" });
+      setShowDeleteLicenseModal(false);
+      loadData();
+    } catch (error: any) {
+      toast({ title: "خطأ", description: error.message, variant: "destructive" });
+    }
+  };
+
+  const handleDeleteDevice = async () => {
+    if (!deletingDevice) return;
+    try {
+      const { error } = await supabase.functions.invoke('get-admin-data', {
+        body: { action: 'deleteDevice', deviceId: deletingDevice.id }
+      });
+      if (error) throw error;
+      toast({ title: "تم الحذف", description: "تم حذف الجهاز بنجاح" });
+      setShowDeleteDeviceModal(false);
+      loadData();
+    } catch (error: any) {
+      toast({ title: "خطأ", description: error.message, variant: "destructive" });
     }
   };
 
@@ -194,6 +315,7 @@ const SchoolsDataTab = () => {
                       <TableHead className="text-right">البريد</TableHead>
                       <TableHead className="text-right">الهاتف</TableHead>
                       <TableHead className="text-right">تاريخ الإنشاء</TableHead>
+                      <TableHead className="text-right">الإجراءات</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -205,6 +327,40 @@ const SchoolsDataTab = () => {
                         <TableCell>{school.phone || '-'}</TableCell>
                         <TableCell>
                           {new Date(school.created_at).toLocaleDateString('ar-SA')}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => copyToClipboard(school.name, "اسم المدرسة")}
+                              className="h-7 w-7 p-0"
+                            >
+                              <Copy className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setEditingSchool({ ...school });
+                                setShowEditSchoolModal(true);
+                              }}
+                              className="h-7 w-7 p-0 text-blue-600"
+                            >
+                              <Edit className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setDeletingSchool(school);
+                                setShowDeleteSchoolModal(true);
+                              }}
+                              className="h-7 w-7 p-0 text-red-600"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -225,6 +381,7 @@ const SchoolsDataTab = () => {
                       <TableHead className="text-right">الأجهزة</TableHead>
                       <TableHead className="text-right">انتهاء الصلاحية</TableHead>
                       <TableHead className="text-right">الحالة</TableHead>
+                      <TableHead className="text-right">الإجراءات</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -263,6 +420,40 @@ const SchoolsDataTab = () => {
                               </span>
                             )}
                           </TableCell>
+                          <TableCell>
+                            <div className="flex gap-1">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => copyToClipboard(license.license_key, "مفتاح الترخيص")}
+                                className="h-7 w-7 p-0"
+                              >
+                                <Copy className="h-3 w-3" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  setEditingLicense({ ...license });
+                                  setShowEditLicenseModal(true);
+                                }}
+                                className="h-7 w-7 p-0 text-blue-600"
+                              >
+                                <Edit className="h-3 w-3" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  setDeletingLicense(license);
+                                  setShowDeleteLicenseModal(true);
+                                }}
+                                className="h-7 w-7 p-0 text-red-600"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          </TableCell>
                         </TableRow>
                       );
                     })}
@@ -283,6 +474,7 @@ const SchoolsDataTab = () => {
                       <TableHead className="text-right">البريد</TableHead>
                       <TableHead className="text-right">آخر دخول</TableHead>
                       <TableHead className="text-right">الحالة</TableHead>
+                      <TableHead className="text-right">الإجراءات</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -312,6 +504,18 @@ const SchoolsDataTab = () => {
                             {admin.is_active ? 'نشط' : 'غير نشط'}
                           </span>
                         </TableCell>
+                        <TableCell>
+                          <div className="flex gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => copyToClipboard(admin.username, "اسم المستخدم")}
+                              className="h-7 w-7 p-0"
+                            >
+                              <Copy className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -332,6 +536,7 @@ const SchoolsDataTab = () => {
                       <TableHead className="text-right">تاريخ التفعيل</TableHead>
                       <TableHead className="text-right">آخر نشاط</TableHead>
                       <TableHead className="text-right">الحالة</TableHead>
+                      <TableHead className="text-right">الإجراءات</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -361,11 +566,34 @@ const SchoolsDataTab = () => {
                             {device.is_active ? 'نشط' : 'غير نشط'}
                           </span>
                         </TableCell>
+                        <TableCell>
+                          <div className="flex gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => copyToClipboard(device.device_id, "معرف الجهاز")}
+                              className="h-7 w-7 p-0"
+                            >
+                              <Copy className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setDeletingDevice(device);
+                                setShowDeleteDeviceModal(true);
+                              }}
+                              className="h-7 w-7 p-0 text-red-600"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </TableCell>
                       </TableRow>
                     ))}
                     {(!data?.devices || data.devices.length === 0) && (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                           لا توجد أجهزة مسجلة
                         </TableCell>
                       </TableRow>
@@ -377,6 +605,132 @@ const SchoolsDataTab = () => {
           </Tabs>
         </CardContent>
       </Card>
+
+      {/* Edit School Modal */}
+      <Dialog open={showEditSchoolModal} onOpenChange={setShowEditSchoolModal}>
+        <DialogContent dir="rtl">
+          <DialogHeader>
+            <DialogTitle>تعديل بيانات المدرسة</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>اسم المدرسة</Label>
+              <Input
+                value={editingSchool?.name || ""}
+                onChange={(e) => setEditingSchool({ ...editingSchool, name: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>اسم المدير</Label>
+              <Input
+                value={editingSchool?.director_name || ""}
+                onChange={(e) => setEditingSchool({ ...editingSchool, director_name: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>البريد الإلكتروني</Label>
+              <Input
+                value={editingSchool?.email || ""}
+                onChange={(e) => setEditingSchool({ ...editingSchool, email: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>رقم الهاتف</Label>
+              <Input
+                value={editingSchool?.phone || ""}
+                onChange={(e) => setEditingSchool({ ...editingSchool, phone: e.target.value })}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEditSchoolModal(false)}>إلغاء</Button>
+            <Button onClick={handleEditSchool}>حفظ</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete School Confirmation */}
+      <AlertDialog open={showDeleteSchoolModal} onOpenChange={setShowDeleteSchoolModal}>
+        <AlertDialogContent dir="rtl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>حذف المدرسة</AlertDialogTitle>
+            <AlertDialogDescription>
+              هل أنت متأكد من حذف المدرسة "{deletingSchool?.name}"؟ سيتم حذف جميع البيانات المرتبطة بها.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>إلغاء</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteSchool} className="bg-red-600 hover:bg-red-700">حذف</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Edit License Modal */}
+      <Dialog open={showEditLicenseModal} onOpenChange={setShowEditLicenseModal}>
+        <DialogContent dir="rtl">
+          <DialogHeader>
+            <DialogTitle>تعديل الترخيص</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>مفتاح الترخيص</Label>
+              <Input value={editingLicense?.license_key || ""} disabled className="font-mono" />
+            </div>
+            <div className="space-y-2">
+              <Label>عدد الأجهزة</Label>
+              <Input
+                type="number"
+                value={editingLicense?.max_devices || 1}
+                onChange={(e) => setEditingLicense({ ...editingLicense, max_devices: e.target.value })}
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={editingLicense?.is_active || false}
+                onChange={(e) => setEditingLicense({ ...editingLicense, is_active: e.target.checked })}
+              />
+              <Label>نشط</Label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEditLicenseModal(false)}>إلغاء</Button>
+            <Button onClick={handleEditLicense}>حفظ</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete License Confirmation */}
+      <AlertDialog open={showDeleteLicenseModal} onOpenChange={setShowDeleteLicenseModal}>
+        <AlertDialogContent dir="rtl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>حذف الترخيص</AlertDialogTitle>
+            <AlertDialogDescription>
+              هل أنت متأكد من حذف الترخيص "{deletingLicense?.license_key}"؟
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>إلغاء</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteLicense} className="bg-red-600 hover:bg-red-700">حذف</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Device Confirmation */}
+      <AlertDialog open={showDeleteDeviceModal} onOpenChange={setShowDeleteDeviceModal}>
+        <AlertDialogContent dir="rtl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>حذف الجهاز</AlertDialogTitle>
+            <AlertDialogDescription>
+              هل أنت متأكد من حذف هذا الجهاز؟
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>إلغاء</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteDevice} className="bg-red-600 hover:bg-red-700">حذف</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
