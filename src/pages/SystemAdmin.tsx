@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useToast } from "@/hooks/use-toast";
 import { isElectron } from "@/services/electronService";
 import electronService from "@/services/electronService";
-import { Database, FileKey, Lock, Settings, User, Users, RefreshCw, BarChart3, Cloud, Download, Copy, Trash2 } from "lucide-react";
+import { Database, FileKey, Lock, Settings, User, Users, RefreshCw, BarChart3, Cloud, Download, Copy, Trash2, School } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { getLicenses, renewLicense, getSchools, generateLicense, deleteLicense, createSchool } from "@/services/licenseService";
@@ -21,6 +21,7 @@ import SchoolAdminsTab from "@/components/admin/SchoolAdminsTab";
 import DefaultDataSettings from "@/components/admin/DefaultDataSettings";
 import ImportSchoolData from "@/components/admin/ImportSchoolData";
 import SystemBackupTab from "@/components/admin/SystemBackupTab";
+import SchoolsDataTab from "@/components/admin/SchoolsDataTab";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 const SystemAdmin = () => {
@@ -691,7 +692,11 @@ const SystemAdmin = () => {
         </div>
         
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid grid-cols-7 w-full max-w-5xl mx-auto mb-6 bg-gray-100 dark:bg-gray-800 p-1">
+          <TabsList className="grid grid-cols-8 w-full max-w-6xl mx-auto mb-6 bg-gray-100 dark:bg-gray-800 p-1">
+            <TabsTrigger value="schools-data" className="flex items-center gap-2 data-[state=active]:bg-blue-600 data-[state=active]:text-white">
+              <School className="h-4 w-4" />
+              بيانات المدارس
+            </TabsTrigger>
             <TabsTrigger value="licenses" className="flex items-center gap-2 data-[state=active]:bg-green-600 data-[state=active]:text-white">
               <FileKey className="h-4 w-4" />
               التراخيص
@@ -700,7 +705,7 @@ const SystemAdmin = () => {
               <User className="h-4 w-4" />
               مدراء المدارس
             </TabsTrigger>
-            <TabsTrigger value="users" className="flex items-center gap-2 data-[state=active]:bg-blue-600 data-[state=active]:text-white">
+            <TabsTrigger value="users" className="flex items-center gap-2 data-[state=active]:bg-indigo-600 data-[state=active]:text-white">
               <Users className="h-4 w-4" />
               المستخدمون
             </TabsTrigger>
@@ -721,6 +726,11 @@ const SystemAdmin = () => {
               الإعدادات
             </TabsTrigger>
           </TabsList>
+          
+          {/* Schools Data Tab */}
+          <TabsContent value="schools-data">
+            <SchoolsDataTab />
+          </TabsContent>
           
           {/* School Admins Tab */}
           <TabsContent value="school-admins">
