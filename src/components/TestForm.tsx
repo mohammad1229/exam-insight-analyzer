@@ -22,14 +22,7 @@ import {
 import { Plus, Trash2 } from "lucide-react";
 import { Class, Question, Section } from "@/types";
 import { toast } from "@/hooks/use-toast";
-import { 
-  getClasses, 
-  getSubjects, 
-  getTeachers,
-  getCurrentTeacher,
-  getTeacherClasses,
-  getTeacherSubjects
-} from "@/services/dataService";
+import { supabase } from "@/integrations/supabase/client";
 
 interface TestFormProps {
   onFormDataChange: (data: {
@@ -92,22 +85,98 @@ const TestForm: React.FC<TestFormProps> = ({ onFormDataChange }) => {
   const [maxScore, setMaxScore] = useState<number>(5);
 
   useEffect(() => {
-    // Check if there's a logged in teacher
-    const currentTeacher = getCurrentTeacher();
+    const fetchData = async () => {
+      // Check if there's a logged in teacher
+      const loggedInTeacher = localStorage.getItem("loggedInTeacher");
+      const schoolId = localStorage.getItem("currentSchoolId");
+      
+      if (loggedInTeacher && schoolId) {
+        try {
+          const teacher = JSON.parse(loggedInTeacher);
+          setTeacherId(teacher.id);
+          setAvailableTeachers([{ id: teacher.id, name: teacher.name }]);
+          
+          // Fetch teacher's assigned classes from database
+          const teacherClasses = teacher.classes || [];
+          const teacherSubjects = teacher.subjects || [];
+          
+          // Fetch all classes and subjects then filter
+          const { data: classesResult } = await supabase.functions.invoke("school-data", {
+            body: { action: "getClasses", schoolId }
+          });
+          
+          const { data: subjectsResult } = await supabase.functions.invoke("school-data", {
+            body: { action: "getSubjects", schoolId }
+          });
+          
+          if (classesResult?.success && classesResult.data) {
+            // Filter to only teacher's assigned classes
+            const filteredClasses = classesResult.data.filter((c: any) => 
+              teacherClasses.includes(c.id)
+            );
+            setAvailableClasses(filteredClasses.map((c: any) => ({
+              id: c.id,
+              name: c.name,
+              sections: c.sections || []
+            })));
+          }
+          
+          if (subjectsResult?.success && subjectsResult.data) {
+            // Filter to only teacher's assigned subjects
+            const filteredSubjects = subjectsResult.data.filter((s: any) => 
+              teacherSubjects.includes(s.id)
+            );
+            setAvailableSubjects(filteredSubjects.map((s: any) => ({
+              id: s.id,
+              name: s.name
+            })));
+          }
+        } catch (e) {
+          console.error("Error fetching teacher data:", e);
+        }
+      } else if (schoolId) {
+        // Admin mode - show all classes and subjects
+        try {
+          const { data: classesResult } = await supabase.functions.invoke("school-data", {
+            body: { action: "getClasses", schoolId }
+          });
+          
+          const { data: subjectsResult } = await supabase.functions.invoke("school-data", {
+            body: { action: "getSubjects", schoolId }
+          });
+          
+          const { data: teachersResult } = await supabase.functions.invoke("school-data", {
+            body: { action: "getTeachers", schoolId }
+          });
+          
+          if (classesResult?.success) {
+            setAvailableClasses(classesResult.data.map((c: any) => ({
+              id: c.id,
+              name: c.name,
+              sections: c.sections || []
+            })));
+          }
+          
+          if (subjectsResult?.success) {
+            setAvailableSubjects(subjectsResult.data.map((s: any) => ({
+              id: s.id,
+              name: s.name
+            })));
+          }
+          
+          if (teachersResult?.success) {
+            setAvailableTeachers(teachersResult.data.map((t: any) => ({
+              id: t.id,
+              name: t.name
+            })));
+          }
+        } catch (e) {
+          console.error("Error fetching data:", e);
+        }
+      }
+    };
     
-    if (currentTeacher) {
-      // Teacher is logged in - show only their assigned classes and subjects
-      setTeacherId(currentTeacher.id);
-      setAvailableClasses(getTeacherClasses(currentTeacher.id));
-      setAvailableSubjects(getTeacherSubjects(currentTeacher.id));
-      setAvailableTeachers([{ id: currentTeacher.id, name: currentTeacher.name }]);
-    } else {
-      // Admin mode - show all
-      setAvailableClasses(getClasses());
-      setAvailableSubjects(getSubjects());
-      const teachers = getTeachers();
-      setAvailableTeachers(teachers.map(t => ({ id: t.id, name: t.name })));
-    }
+    fetchData();
   }, []);
 
   useEffect(() => {
