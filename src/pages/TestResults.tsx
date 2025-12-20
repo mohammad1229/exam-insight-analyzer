@@ -7,7 +7,7 @@ import PageTransition from "@/components/PageTransition";
 import TestForm from "@/components/TestForm";
 import StudentList from "@/components/StudentList";
 import QuestionAnalysis from "@/components/QuestionAnalysis";
-import ReportGenerator from "@/components/ReportGenerator"; 
+import ReportPreview from "@/components/ReportPreview";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -15,6 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import { Question, TestResult, Test } from "@/types";
 import { addTest, getTests, getCurrentTeacher, getStudentById } from "@/services/dataService";
+import { Save, Printer, Eye, FileDown } from "lucide-react";
 
 const TestResults = () => {
   const { toast } = useToast();
@@ -38,6 +39,9 @@ const TestResults = () => {
   
   // Current active tab
   const [activeTab, setActiveTab] = useState("test-info");
+  
+  // Report preview state
+  const [showReportPreview, setShowReportPreview] = useState(false);
   
   // Generate test ID
   const testId = "test_" + Date.now();
@@ -161,15 +165,31 @@ const TestResults = () => {
         : "تم حفظ نتائج الاختبار بنجاح",
     });
     
-    // Navigate to dashboard after saving
-    navigate("/dashboard")
+    return testData;
+  };
+
+  const handleSaveAndPrint = () => {
+    const savedTest = handleSaveTest(false);
+    if (savedTest) {
+      setShowReportPreview(true);
+    }
+  };
+
+  const handlePreviewAndSave = () => {
+    const savedTest = handleSaveTest(false);
+    if (savedTest) {
+      setShowReportPreview(true);
+    }
   };
 
   // Mock test object for report preview
   const mockTest = {
     id: testId,
     ...testFormData,
-    results: generateTestResults(),
+    results: generateTestResults().map(r => ({
+      ...r,
+      studentName: getStudentById(r.studentId)?.name || r.studentId
+    })),
     draft: false
   };
 
@@ -305,36 +325,68 @@ const TestResults = () => {
             <TabsContent value="report-preview">
               <Card className="p-6">
                 <h3 className="text-xl font-bold mb-4">معاينة التقرير</h3>
-                <p className="mb-4 text-muted-foreground">معاينة كيف سيظهر التقرير النهائي. يمكنك تنزيل التقرير أو العودة لتعديل البيانات.</p>
+                <p className="mb-6 text-muted-foreground">معاينة كيف سيظهر التقرير النهائي. يمكنك حفظ وطباعة التقرير أو العودة لتعديل البيانات.</p>
                 
-                <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-                  <div className="lg:col-span-1">
-                    <ReportGenerator test={mockTest} />
-                  </div>
-                  <div className="lg:col-span-3">
-                    <Card className="border-dashed border-2 p-6 h-full flex flex-col items-center justify-center">
-                      <p className="text-center text-muted-foreground">معاينة التقرير ستظهر هنا بعد التنزيل</p>
-                      <p className="mt-2 text-sm text-center">سيحتوي التقرير على كافة البيانات الأساسية للاختبار، درجات الطلاب، والرسوم البيانية للتحليل</p>
-                    </Card>
-                  </div>
+                {/* Action Buttons */}
+                <div className="flex flex-wrap gap-3 mb-6 justify-center">
+                  <Button 
+                    onClick={() => handleSaveTest(false)}
+                    className="gap-2"
+                  >
+                    <Save className="h-4 w-4" />
+                    حفظ
+                  </Button>
+                  <Button 
+                    onClick={handleSaveAndPrint}
+                    variant="outline"
+                    className="gap-2"
+                  >
+                    <Printer className="h-4 w-4" />
+                    طباعة
+                  </Button>
+                  <Button 
+                    onClick={handlePreviewAndSave}
+                    variant="secondary"
+                    className="gap-2"
+                  >
+                    <Eye className="h-4 w-4" />
+                    معاينة وحفظ
+                  </Button>
                 </div>
                 
-                <div className="flex justify-end mt-6">
+                {/* Preview iframe will be shown via ReportPreview */}
+                <Card className="border-2 p-6 min-h-[400px] flex flex-col items-center justify-center bg-muted/30">
+                  <FileDown className="h-16 w-16 text-muted-foreground/50 mb-4" />
+                  <p className="text-center text-muted-foreground text-lg font-medium">انقر على "معاينة وحفظ" لعرض التقرير</p>
+                  <p className="mt-2 text-sm text-center text-muted-foreground">سيحتوي التقرير على كافة البيانات الأساسية للاختبار، درجات الطلاب، والإحصائيات</p>
+                </Card>
+                
+                <div className="flex justify-between mt-6">
                   <Button 
-                    variant="secondary" 
-                    className="mr-2"
+                    variant="outline"
                     onClick={() => setActiveTab("analysis")}
                   >
                     رجوع
                   </Button>
                   <Button 
-                    onClick={() => handleSaveTest(false)}
+                    onClick={() => {
+                      handleSaveTest(false);
+                      navigate("/dashboard");
+                    }}
+                    className="bg-green-600 hover:bg-green-700"
                   >
-                    حفظ النتائج
+                    حفظ والانتقال للوحة التحكم
                   </Button>
                 </div>
               </Card>
             </TabsContent>
+            
+            {/* Report Preview Dialog */}
+            <ReportPreview
+              test={mockTest}
+              open={showReportPreview}
+              onClose={() => setShowReportPreview(false)}
+            />
           </Tabs>
         </main>
           </div>
