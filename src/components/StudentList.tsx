@@ -54,13 +54,24 @@ const StudentList: React.FC<StudentListProps> = ({
   
   useEffect(() => {
     const fetchStudents = async () => {
+      console.log("StudentList: Fetching students for classId:", classId, "sectionId:", sectionId);
+      
       if (classId && sectionId) {
         setLoading(true);
         try {
+          console.log("StudentList: Calling getStudentsDB...");
           const allStudents = await getStudentsDB();
+          console.log("StudentList: Got all students:", allStudents?.length, "students");
+          
           // Filter students by class_id and section_id, and map to Student type
           const filteredStudents: Student[] = allStudents
-            .filter((s: DBStudent) => s.class_id === classId && s.section_id === sectionId)
+            .filter((s: DBStudent) => {
+              const matches = s.class_id === classId && s.section_id === sectionId;
+              if (!matches) {
+                console.log("StudentList: Student doesn't match:", s.name, "class_id:", s.class_id, "vs", classId, "section_id:", s.section_id, "vs", sectionId);
+              }
+              return matches;
+            })
             .map((s: DBStudent) => ({
               id: s.id,
               name: s.name,
@@ -68,6 +79,7 @@ const StudentList: React.FC<StudentListProps> = ({
               sectionId: s.section_id
             }));
           
+          console.log("StudentList: Filtered students:", filteredStudents.length, "students");
           setStudents(filteredStudents);
           
           // Initialize local scores for all students
@@ -77,7 +89,7 @@ const StudentList: React.FC<StudentListProps> = ({
           });
           setLocalScores(initialScores);
         } catch (error) {
-          console.error("Error fetching students:", error);
+          console.error("StudentList: Error fetching students:", error);
           toast({
             title: "خطأ",
             description: "فشل في تحميل بيانات الطلاب",
@@ -89,6 +101,7 @@ const StudentList: React.FC<StudentListProps> = ({
           setLoading(false);
         }
       } else {
+        console.log("StudentList: No classId or sectionId, clearing students");
         setStudents([]);
         setLocalScores({});
       }
