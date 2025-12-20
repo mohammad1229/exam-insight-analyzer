@@ -55,7 +55,8 @@ import SchoolInfoTab from "@/components/admin/SchoolInfoTab";
 
 // Import utility functions
 import { prepareMockReports, prepareChartData, Report } from "@/utils/reportUtils";
-import { getTeachers, saveTeachers, TeacherWithCredentials, getTests } from "@/services/dataService";
+// Import from dataService
+import { getTeachers, saveTeachers, TeacherWithCredentials, getTests, isTeacherOnly } from "@/services/dataService";
 
 const AdminDashboard = () => {
   const { toast } = useToast();
@@ -65,6 +66,13 @@ const AdminDashboard = () => {
   const [adminId, setAdminId] = useState("");
   const [adminRole, setAdminRole] = useState("school_admin");
   const [showPasswordChange, setShowPasswordChange] = useState(false);
+  
+  // منع المعلمين من الوصول لهذه الصفحة
+  useEffect(() => {
+    if (isTeacherOnly()) {
+      navigate('/dashboard');
+    }
+  }, [navigate]);
   
   // Filter states
   const [selectedClass, setSelectedClass] = useState("");

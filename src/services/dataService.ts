@@ -316,3 +316,30 @@ export const getTeacherStudents = (teacherId: string): Student[] => {
   const allStudents = getStudents();
   return allStudents.filter(s => teacher.assignedClasses.includes(s.classId));
 };
+
+// Get current logged in admin
+export const getCurrentAdmin = (): any | null => {
+  const adminData = localStorage.getItem("adminData");
+  if (adminData) {
+    try {
+      return JSON.parse(adminData);
+    } catch (e) {
+      console.error("Error parsing adminData:", e);
+    }
+  }
+  return null;
+};
+
+// Check if user is admin only (not teacher)
+export const isAdminOnly = (): boolean => {
+  const admin = getCurrentAdmin();
+  const teacher = getCurrentTeacher();
+  return admin && !teacher;
+};
+
+// Check if user is teacher only (not admin)
+export const isTeacherOnly = (): boolean => {
+  const admin = getCurrentAdmin();
+  const teacher = getCurrentTeacher();
+  return teacher && !admin;
+};

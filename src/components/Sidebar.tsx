@@ -1,8 +1,8 @@
-
 import { useState } from "react";
 import { NavLink } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { getCurrentTeacher, getCurrentAdmin } from "@/services/dataService";
 
 interface SidebarLinkProps {
   to: string;
@@ -30,6 +30,11 @@ const SidebarLink: React.FC<SidebarLinkProps> = ({ to, label, active }) => {
 
 const Sidebar = () => {
   const [collapsed, setCollapsed] = useState(false);
+  const currentTeacher = getCurrentTeacher();
+  const currentAdmin = getCurrentAdmin();
+  
+  // تحديد ما إذا كان المستخدم معلم فقط (وليس مدير)
+  const isTeacherOnly = currentTeacher && !currentAdmin;
 
   return (
     <div
@@ -52,8 +57,14 @@ const Sidebar = () => {
           <SidebarLink to="/dashboard" label={collapsed ? "د" : "الرئيسية"} active={false} />
           <SidebarLink to="/test-results" label={collapsed ? "ن" : "نتائج الاختبارات"} active={false} />
           <SidebarLink to="/reports" label={collapsed ? "ت" : "التقارير"} active={false} />
-          <SidebarLink to="/statistics" label={collapsed ? "إح" : "الإحصائيات"} active={false} />
-          <SidebarLink to="/admin-dashboard" label={collapsed ? "إ" : "إدارة النظام"} active={false} />
+          
+          {/* إظهار الإحصائيات وإدارة النظام فقط للمدير */}
+          {!isTeacherOnly && (
+            <>
+              <SidebarLink to="/statistics" label={collapsed ? "إح" : "الإحصائيات"} active={false} />
+              <SidebarLink to="/admin-dashboard" label={collapsed ? "إ" : "إدارة النظام"} active={false} />
+            </>
+          )}
         </div>
       </div>
       

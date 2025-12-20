@@ -81,8 +81,12 @@ const Dashboard = () => {
             <main className="flex-1 container mx-auto p-6 dir-rtl">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
             <div>
-              <h1 className="text-3xl font-bold">لوحة المعلومات</h1>
-              <p className="text-muted-foreground">إدارة الاختبارات والنتائج</p>
+              <h1 className="text-3xl font-bold">
+                {currentTeacher ? `مرحباً ${currentTeacher.name}` : 'لوحة المعلومات'}
+              </h1>
+              <p className="text-muted-foreground">
+                {currentTeacher ? 'اختباراتي ونتائجي' : 'إدارة الاختبارات والنتائج'}
+              </p>
             </div>
             <Button 
               className="mt-4 md:mt-0" 
