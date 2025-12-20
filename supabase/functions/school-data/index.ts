@@ -773,6 +773,48 @@ serve(async (req) => {
         });
       }
 
+      // ========== CHANGE TEACHER PASSWORD ==========
+      case "changeTeacherPassword": {
+        const { data: teacher, error: fetchError } = await supabase
+          .from("teachers")
+          .select("id, password_hash")
+          .eq("id", data.teacherId)
+          .maybeSingle();
+        
+        if (fetchError) throw fetchError;
+        if (!teacher) {
+          return new Response(JSON.stringify({ success: false, error: "المعلم غير موجود" }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        // Verify current password if not forced
+        if (!data.isForced && data.currentPassword) {
+          const expectedBase64 = btoa(data.currentPassword);
+          if (teacher.password_hash !== expectedBase64) {
+            return new Response(JSON.stringify({ success: false, error: "كلمة المرور الحالية غير صحيحة" }), {
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
+        }
+
+        // Update password
+        const newPasswordHash = btoa(data.newPassword);
+        const { error: updateError } = await supabase
+          .from("teachers")
+          .update({ 
+            password_hash: newPasswordHash,
+            must_change_password: false
+          })
+          .eq("id", data.teacherId);
+        
+        if (updateError) throw updateError;
+        
+        return new Response(JSON.stringify({ success: true }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
       default:
         return new Response(JSON.stringify({ success: false, error: "Unknown action" }), {
           status: 400,

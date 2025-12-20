@@ -42,20 +42,20 @@ const SchoolInfoTab = () => {
       setSchoolId(currentSchoolId);
 
       // Fetch school data from backend
-      const { data, error } = await supabase.functions.invoke('get-license-details', {
-        body: { schoolId: currentSchoolId }
+      const { data, error } = await supabase.functions.invoke('school-data', {
+        body: { action: 'getSchool', schoolId: currentSchoolId }
       });
 
       if (error) throw error;
 
-      if (data) {
-        setSchoolName(data.school_name || "");
-        setDirectorName(data.director_name || "");
-        setLogoUrl(data.logo_url || "");
-        setLogoPreview(data.logo_url || "");
-        setPhone(data.phone || "");
-        setEmail(data.email || "");
-        setAddress(data.address || "");
+      if (data?.success && data?.data) {
+        setSchoolName(data.data.name || "");
+        setDirectorName(data.data.director_name || "");
+        setLogoUrl(data.data.logo_url || "");
+        setLogoPreview(data.data.logo_url || "");
+        setPhone(data.data.phone || "");
+        setEmail(data.data.email || "");
+        setAddress(data.data.address || "");
       }
     } catch (error) {
       console.error("Error loading school data:", error);
