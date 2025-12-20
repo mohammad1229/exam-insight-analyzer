@@ -325,11 +325,23 @@ const getDefaultSchoolData = () => ({
   ]
 });
 
-// Initialize empty database for a new school
-export const initializeSchoolDatabase = (schoolId: string, schoolName: string, directorName: string, withDefaults: boolean = true) => {
+// Initialize database for a new school - now uses Supabase
+export const initializeSchoolDatabase = async (schoolId: string, schoolName: string, directorName: string, withDefaults: boolean = true) => {
+  // Initialize in Supabase via edge function
+  if (withDefaults) {
+    try {
+      await supabase.functions.invoke('school-data', {
+        body: { action: 'initializeSchoolData', schoolId, data: {} }
+      });
+      console.log(`Initialized database in Supabase for school: ${schoolId}`);
+    } catch (error) {
+      console.error('Error initializing school data in Supabase:', error);
+    }
+  }
+
+  // Also keep localStorage for backward compatibility (will be migrated)
   const defaults = withDefaults ? getDefaultSchoolData() : { classes: [], subjects: [], performanceLevels: [] };
   
-  // Create data structures for the new school
   const schoolData = {
     students: [],
     classes: defaults.classes,
@@ -348,10 +360,8 @@ export const initializeSchoolDatabase = (schoolId: string, schoolName: string, d
     }
   };
 
-  // Save data with school ID prefix
   Object.entries(schoolData).forEach(([key, value]) => {
     const storageKey = `${schoolId}_${key}`;
-    // Only initialize if not already exists
     if (!localStorage.getItem(storageKey)) {
       localStorage.setItem(storageKey, JSON.stringify(value));
     }

@@ -1,1 +1,25 @@
 project_id = "uqssjjkrudpbibawoaua"
+
+[functions.create-backup]
+verify_jwt = false
+
+[functions.create-license]
+verify_jwt = false
+
+[functions.get-admin-data]
+verify_jwt = false
+
+[functions.get-all-schools-data]
+verify_jwt = false
+
+[functions.hash-password]
+verify_jwt = false
+
+[functions.manage-license]
+verify_jwt = false
+
+[functions.manage-wisdoms]
+verify_jwt = false
+
+[functions.school-data]
+verify_jwt = false
