@@ -335,6 +335,10 @@ export type Database = {
         Returns: Json
       }
       generate_license_key: { Args: never; Returns: string }
+      verify_admin_login: {
+        Args: { p_password: string; p_username: string }
+        Returns: Json
+      }
     }
     Enums: {
       [_ in never]: never
