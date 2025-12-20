@@ -520,31 +520,48 @@ export const deleteSchoolAdmin = async (adminId: string) => {
   return { success: true };
 };
 
-// Verify school admin login
+// Verify school admin login using secure database function
 export const verifySchoolAdminLogin = async (username: string, password: string) => {
-  const { data, error } = await supabase
-    .from("school_admins")
-    .select("*, schools(name, director_name), licenses(license_key, is_active, expiry_date)")
-    .eq("username", username)
-    .eq("is_active", true)
-    .maybeSingle();
+  try {
+    const { data, error } = await supabase.rpc('verify_admin_login', {
+      p_username: username,
+      p_password: password
+    });
 
-  if (error) throw error;
-  if (!data) return { success: false, error: "اسم المستخدم غير موجود" };
+    if (error) throw error;
+    
+    const result = data as { success: boolean; error?: string; admin?: any };
+    
+    if (!result || !result.success) {
+      return { success: false, error: result?.error || 'خطأ في تسجيل الدخول' };
+    }
 
-  // Verify password
-  const hashedPassword = btoa(password);
-  if (data.password_hash !== hashedPassword) {
-    return { success: false, error: "كلمة المرور غير صحيحة" };
+    return { 
+      success: true, 
+      admin: {
+        id: result.admin.id,
+        full_name: result.admin.full_name,
+        username: result.admin.username,
+        email: result.admin.email,
+        phone: result.admin.phone,
+        school_id: result.admin.school_id,
+        license_id: result.admin.license_id,
+        schools: {
+          name: result.admin.school_name,
+          director_name: result.admin.director_name,
+          logo_url: result.admin.logo_url
+        },
+        licenses: {
+          license_key: result.admin.license_key,
+          is_active: result.admin.license_active,
+          expiry_date: result.admin.expiry_date
+        }
+      }
+    };
+  } catch (error: any) {
+    console.error('Admin login error:', error);
+    return { success: false, error: 'حدث خطأ أثناء تسجيل الدخول' };
   }
-
-  // Update last login
-  await supabase
-    .from("school_admins")
-    .update({ last_login_at: new Date().toISOString() })
-    .eq("id", data.id);
-
-  return { success: true, admin: data };
 };
 
 // Delete license completely
