@@ -96,9 +96,13 @@ const TestForm: React.FC<TestFormProps> = ({ onFormDataChange }) => {
           setTeacherId(teacher.id);
           setAvailableTeachers([{ id: teacher.id, name: teacher.name }]);
           
-          // Fetch teacher's assigned classes from database
-          const teacherClasses = teacher.classes || [];
-          const teacherSubjects = teacher.subjects || [];
+          // Fetch teacher's assigned classes from localStorage (stored on login)
+          // Support both naming conventions: assignedClasses/assignedSubjects and classes/subjects
+          const teacherClasses = teacher.assignedClasses || teacher.classes || [];
+          const teacherSubjects = teacher.assignedSubjects || teacher.subjects || [];
+          
+          console.log("Teacher assigned classes:", teacherClasses);
+          console.log("Teacher assigned subjects:", teacherSubjects);
           
           // Fetch all classes and subjects then filter
           const { data: classesResult } = await supabase.functions.invoke("school-data", {
@@ -114,6 +118,7 @@ const TestForm: React.FC<TestFormProps> = ({ onFormDataChange }) => {
             const filteredClasses = classesResult.data.filter((c: any) => 
               teacherClasses.includes(c.id)
             );
+            console.log("Filtered classes for teacher:", filteredClasses);
             setAvailableClasses(filteredClasses.map((c: any) => ({
               id: c.id,
               name: c.name,
@@ -126,6 +131,7 @@ const TestForm: React.FC<TestFormProps> = ({ onFormDataChange }) => {
             const filteredSubjects = subjectsResult.data.filter((s: any) => 
               teacherSubjects.includes(s.id)
             );
+            console.log("Filtered subjects for teacher:", filteredSubjects);
             setAvailableSubjects(filteredSubjects.map((s: any) => ({
               id: s.id,
               name: s.name
