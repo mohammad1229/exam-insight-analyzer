@@ -5,7 +5,18 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Eye, FileText, TrendingUp, Users, Key, LogOut, Shield } from "lucide-react";
+import { Eye, FileText, TrendingUp, Users, Key, LogOut, Shield, Edit, Trash2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Table,
   TableBody,
@@ -67,6 +78,28 @@ const AdminDashboard = () => {
   const [tests, setTests] = useState<any[]>([]);
   const [selectedTest, setSelectedTest] = useState<any>(null);
   const [showReportPreview, setShowReportPreview] = useState(false);
+  const [testToDelete, setTestToDelete] = useState<any>(null);
+  const [testToEdit, setTestToEdit] = useState<any>(null);
+  
+  // Fetch tests from database
+  const fetchTests = async () => {
+    const schoolId = localStorage.getItem("currentSchoolId");
+    if (schoolId) {
+      try {
+        const { data: result } = await supabase.functions.invoke("school-data", {
+          body: { action: "getTests", schoolId }
+        });
+        if (result?.success && result.data) {
+          setTests(result.data);
+        }
+      } catch (e) {
+        console.error("Error fetching tests:", e);
+        setTests(getTests());
+      }
+    } else {
+      setTests(getTests());
+    }
+  };
   
   // Initialize teachers from dataService
   useEffect(() => {
@@ -77,7 +110,7 @@ const AdminDashboard = () => {
   useEffect(() => {
     const reports = prepareMockReports();
     setMockReports(reports);
-    setTests(getTests());
+    fetchTests();
   }, []);
   
   // Update chart data when filters change
@@ -115,7 +148,45 @@ const AdminDashboard = () => {
     setShowReportPreview(true);
   };
 
-  // Get recent tests (last 5)
+  const handleDeleteTest = async () => {
+    if (!testToDelete) return;
+    
+    const schoolId = localStorage.getItem("currentSchoolId");
+    if (schoolId) {
+      try {
+        const { data: result } = await supabase.functions.invoke("school-data", {
+          body: { action: "deleteTest", schoolId, data: { id: testToDelete.id } }
+        });
+        if (result?.success) {
+          toast({
+            title: "تم الحذف",
+            description: "تم حذف الاختبار بنجاح",
+          });
+          fetchTests();
+        }
+      } catch (e) {
+        console.error("Error deleting test:", e);
+        toast({
+          title: "خطأ",
+          description: "حدث خطأ أثناء حذف الاختبار",
+          variant: "destructive",
+        });
+      }
+    }
+    setTestToDelete(null);
+  };
+
+  const handleEditTest = (test: any) => {
+    // Navigate to tests tab and set the test for editing
+    setTestToEdit(test);
+    // Navigate to tests tab
+    const tabsTrigger = document.querySelector('[value="tests"]') as HTMLElement;
+    if (tabsTrigger) {
+      tabsTrigger.click();
+    }
+  };
+
+
   const recentTests = tests.slice(-5).reverse();
 
   const handleLoginSuccess = () => {
@@ -230,17 +301,19 @@ const AdminDashboard = () => {
                       <TableHead>المادة</TableHead>
                       <TableHead>التاريخ</TableHead>
                       <TableHead>نسبة النجاح</TableHead>
-                      <TableHead>عرض</TableHead>
+                      <TableHead>إجراءات</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {recentTests.map((test) => {
                       const report = mockReports.find(r => r.testId === test.id);
+                      const testDate = test.test_date || test.date;
+                      const subjectName = test.subjects?.name || report?.subjectName || "-";
                       return (
                         <TableRow key={test.id} className="hover:bg-blue-50">
                           <TableCell className="font-medium">{test.name}</TableCell>
-                          <TableCell>{report?.subjectName || "-"}</TableCell>
-                          <TableCell>{test.date}</TableCell>
+                          <TableCell>{subjectName}</TableCell>
+                          <TableCell>{testDate}</TableCell>
                           <TableCell>
                             <span className={`px-2 py-1 rounded text-sm ${
                               (report?.passRate || 0) >= 75 
@@ -253,14 +326,35 @@ const AdminDashboard = () => {
                             </span>
                           </TableCell>
                           <TableCell>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleViewReport(test)}
-                              className="text-blue-600 hover:bg-blue-50"
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Button>
+                            <div className="flex gap-1">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleViewReport(test)}
+                                className="text-blue-600 hover:bg-blue-50"
+                                title="عرض"
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleEditTest(test)}
+                                className="text-orange-600 hover:bg-orange-50"
+                                title="تعديل"
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setTestToDelete(test)}
+                                className="text-red-600 hover:bg-red-50"
+                                title="حذف"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       );
@@ -399,6 +493,24 @@ const AdminDashboard = () => {
           onClose={() => setShowPasswordChange(false)}
         />
       )}
+
+      {/* Delete Test Confirmation Dialog */}
+      <AlertDialog open={!!testToDelete} onOpenChange={(open) => !open && setTestToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>هل أنت متأكد من حذف هذا الاختبار؟</AlertDialogTitle>
+            <AlertDialogDescription>
+              سيتم حذف الاختبار "{testToDelete?.name}" وجميع نتائجه. هذا الإجراء لا يمكن التراجع عنه.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex gap-2">
+            <AlertDialogCancel>إلغاء</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteTest} className="bg-red-600 hover:bg-red-700">
+              حذف
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
