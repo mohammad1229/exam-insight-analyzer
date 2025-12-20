@@ -19,26 +19,44 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Plus, Trash2, Edit, Upload, Download, FileSpreadsheet } from "lucide-react";
-import { Class, Section } from "@/types";
-import { getClasses, saveClasses } from "@/services/dataService";
+import { Plus, Trash2, Edit, Upload, Download, FileSpreadsheet, Loader2 } from "lucide-react";
+import { getClassesDB, addClassDB, updateClassDB, deleteClassDB, addSectionDB, deleteSectionDB, DBClass, DBSection } from "@/services/databaseService";
 import * as XLSX from "xlsx";
 
 const ClassesTab = () => {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [classes, setClasses] = useState<Class[]>([]);
+  const [classes, setClasses] = useState<DBClass[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [editingClass, setEditingClass] = useState<Class | null>(null);
+  const [editingClass, setEditingClass] = useState<DBClass | null>(null);
   const [newClassName, setNewClassName] = useState("");
   const [newSections, setNewSections] = useState<string[]>([""]);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const loadClasses = async () => {
+    setIsLoading(true);
+    try {
+      const data = await getClassesDB();
+      setClasses(data || []);
+    } catch (error) {
+      console.error("Error loading classes:", error);
+      toast({
+        title: "خطأ",
+        description: "فشل في تحميل الصفوف",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    setClasses(getClasses());
+    loadClasses();
   }, []);
 
-  const handleAddClass = () => {
+  const handleAddClass = async () => {
     if (!newClassName.trim()) {
       toast({
         title: "خطأ",
@@ -48,79 +66,105 @@ const ClassesTab = () => {
       return;
     }
 
-    const sections: Section[] = newSections
-      .filter(s => s.trim())
-      .map((name, index) => ({
-        id: `s${index + 1}c${Date.now()}`,
-        name: name.trim(),
-      }));
+    setIsSaving(true);
+    try {
+      const sections = newSections
+        .filter(s => s.trim())
+        .map((name) => ({ name: name.trim() }));
 
-    const newClass: Class = {
-      id: `c${Date.now()}`,
-      name: newClassName.trim(),
-      sections,
-    };
+      await addClassDB({ name: newClassName.trim(), sections });
+      await loadClasses();
 
-    const updatedClasses = [...classes, newClass];
-    setClasses(updatedClasses);
-    saveClasses(updatedClasses);
+      toast({
+        title: "تمت الإضافة",
+        description: `تم إضافة ${newClassName} بنجاح`,
+      });
 
-    toast({
-      title: "تمت الإضافة",
-      description: `تم إضافة ${newClassName} بنجاح`,
-    });
-
-    setNewClassName("");
-    setNewSections([""]);
-    setShowAddModal(false);
+      setNewClassName("");
+      setNewSections([""]);
+      setShowAddModal(false);
+    } catch (error: any) {
+      toast({
+        title: "خطأ",
+        description: error.message || "فشل في إضافة الصف",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const handleEditClass = () => {
+  const handleEditClass = async () => {
     if (!editingClass || !newClassName.trim()) return;
 
-    const sections: Section[] = newSections
-      .filter(s => s.trim())
-      .map((name, index) => ({
-        id: editingClass.sections[index]?.id || `s${index + 1}c${Date.now()}`,
-        name: name.trim(),
-      }));
+    setIsSaving(true);
+    try {
+      await updateClassDB(editingClass.id, newClassName.trim());
+      
+      // Handle sections - delete removed ones and add new ones
+      const existingSections = editingClass.sections || [];
+      const existingSectionNames = existingSections.map(s => s.name);
+      const newSectionNames = newSections.filter(s => s.trim());
 
-    const updatedClasses = classes.map(c =>
-      c.id === editingClass.id
-        ? { ...c, name: newClassName.trim(), sections }
-        : c
-    );
+      // Delete sections that are no longer in the list
+      for (const section of existingSections) {
+        if (!newSectionNames.includes(section.name)) {
+          await deleteSectionDB(section.id);
+        }
+      }
 
-    setClasses(updatedClasses);
-    saveClasses(updatedClasses);
+      // Add new sections
+      for (const sectionName of newSectionNames) {
+        if (!existingSectionNames.includes(sectionName)) {
+          await addSectionDB(editingClass.id, sectionName);
+        }
+      }
 
-    toast({
-      title: "تم التحديث",
-      description: `تم تحديث ${newClassName} بنجاح`,
-    });
+      await loadClasses();
 
-    setEditingClass(null);
-    setNewClassName("");
-    setNewSections([""]);
-    setShowEditModal(false);
+      toast({
+        title: "تم التحديث",
+        description: `تم تحديث ${newClassName} بنجاح`,
+      });
+
+      setEditingClass(null);
+      setNewClassName("");
+      setNewSections([""]);
+      setShowEditModal(false);
+    } catch (error: any) {
+      toast({
+        title: "خطأ",
+        description: error.message || "فشل في تحديث الصف",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const handleDeleteClass = (classId: string) => {
+  const handleDeleteClass = async (classId: string) => {
     const classToDelete = classes.find(c => c.id === classId);
-    const updatedClasses = classes.filter(c => c.id !== classId);
-    setClasses(updatedClasses);
-    saveClasses(updatedClasses);
+    try {
+      await deleteClassDB(classId);
+      await loadClasses();
 
-    toast({
-      title: "تم الحذف",
-      description: `تم حذف ${classToDelete?.name || "الصف"} بنجاح`,
-    });
+      toast({
+        title: "تم الحذف",
+        description: `تم حذف ${classToDelete?.name || "الصف"} بنجاح`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "خطأ",
+        description: error.message || "فشل في حذف الصف",
+        variant: "destructive",
+      });
+    }
   };
 
-  const openEditModal = (cls: Class) => {
+  const openEditModal = (cls: DBClass) => {
     setEditingClass(cls);
     setNewClassName(cls.name);
-    setNewSections(cls.sections.map(s => s.name));
+    setNewSections(cls.sections?.map(s => s.name) || [""]);
     setShowEditModal(true);
   };
 
@@ -161,35 +205,34 @@ const ClassesTab = () => {
       }
 
       let addedCount = 0;
-      const newClasses = [...classes];
 
-      jsonData.forEach((row) => {
+      for (const row of jsonData) {
         const className = row["اسم الصف"] || row["الصف"] || row["name"];
         const sectionsStr = row["الشعب"] || row["sections"] || "";
 
-        if (!className) return;
+        if (!className) continue;
 
         // Check if class already exists
-        const existingClass = newClasses.find(c => c.name === className);
-        if (existingClass) return;
+        const existingClass = classes.find(c => c.name === className);
+        if (existingClass) continue;
 
         const sectionNames = sectionsStr.split(/[,،]/).map((s: string) => s.trim()).filter(Boolean);
-        const sections: Section[] = sectionNames.map((name: string, index: number) => ({
-          id: `s${index + 1}c${Date.now()}_${addedCount}`,
-          name,
-        }));
+        const sections = sectionNames.map((name: string) => ({ name }));
 
-        newClasses.push({
-          id: `c${Date.now()}_${addedCount}`,
-          name: className,
-          sections: sections.length > 0 ? sections : [{ id: `s1c${Date.now()}`, name: "أ" }],
-        });
-        addedCount++;
-      });
+        try {
+          await addClassDB({ 
+            name: className, 
+            sections: sections.length > 0 ? sections : [{ name: "أ" }] 
+          });
+          addedCount++;
+        } catch (error) {
+          console.error("Error adding class:", error);
+        }
+      }
+
+      await loadClasses();
 
       if (addedCount > 0) {
-        setClasses(newClasses);
-        saveClasses(newClasses);
         toast({
           title: "تم الاستيراد",
           description: `تم إضافة ${addedCount} صف بنجاح`,
@@ -234,7 +277,7 @@ const ClassesTab = () => {
   const exportClasses = () => {
     const exportData = classes.map(cls => ({
       "اسم الصف": cls.name,
-      "الشعب": cls.sections.map(s => s.name).join("، "),
+      "الشعب": cls.sections?.map(s => s.name).join("، ") || "",
     }));
 
     const ws = XLSX.utils.json_to_sheet(exportData);
@@ -247,6 +290,17 @@ const ClassesTab = () => {
       description: `تم تصدير ${classes.length} صف`,
     });
   };
+
+  if (isLoading) {
+    return (
+      <Card className="border-2 border-black">
+        <CardContent className="flex items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <span className="mr-2">جاري تحميل الصفوف...</span>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card className="border-2 border-black">
@@ -310,7 +364,7 @@ const ClassesTab = () => {
                 <TableRow key={cls.id} className="hover:bg-green-50">
                   <TableCell className="font-medium">{cls.name}</TableCell>
                   <TableCell>
-                    {cls.sections.map(s => s.name).join("، ")}
+                    {cls.sections?.map(s => s.name).join("، ") || "-"}
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-2">
@@ -393,7 +447,8 @@ const ClassesTab = () => {
             <Button variant="outline" onClick={() => setShowAddModal(false)}>
               إلغاء
             </Button>
-            <Button onClick={handleAddClass} className="bg-green-600 hover:bg-green-700">
+            <Button onClick={handleAddClass} className="bg-green-600 hover:bg-green-700" disabled={isSaving}>
+              {isSaving ? <Loader2 className="h-4 w-4 animate-spin ml-2" /> : null}
               إضافة
             </Button>
           </DialogFooter>
@@ -447,7 +502,8 @@ const ClassesTab = () => {
             <Button variant="outline" onClick={() => setShowEditModal(false)}>
               إلغاء
             </Button>
-            <Button onClick={handleEditClass} className="bg-green-600 hover:bg-green-700">
+            <Button onClick={handleEditClass} className="bg-green-600 hover:bg-green-700" disabled={isSaving}>
+              {isSaving ? <Loader2 className="h-4 w-4 animate-spin ml-2" /> : null}
               حفظ التغييرات
             </Button>
           </DialogFooter>
