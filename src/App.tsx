@@ -4,7 +4,9 @@ import { useEffect } from "react";
 import { LicenseProvider } from "@/contexts/LicenseContext";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { initializeBackupScheduler } from "@/services/backupService";
+import { setupAutoSync, syncPendingOperations, isOnline } from "@/services/offlineSyncService";
 import WisdomBanner from "@/components/WisdomBanner";
+import OfflineIndicator from "@/components/OfflineIndicator";
 import Welcome from "./pages/Welcome";
 import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
@@ -15,11 +17,26 @@ import TeacherLogin from "./pages/TeacherLogin";
 import SystemAdmin from "./pages/SystemAdmin";
 import SchoolStatistics from "./pages/SchoolStatistics";
 import NotFound from "./pages/NotFound";
+import { toast } from "sonner";
 
 function App() {
   useEffect(() => {
     // Initialize automatic backup scheduler
     initializeBackupScheduler();
+    
+    // Setup offline sync
+    const cleanupSync = setupAutoSync((result) => {
+      if (result.synced > 0) {
+        toast.success(`تم مزامنة ${result.synced} عملية محفوظة`);
+      }
+    });
+    
+    // Try to sync pending operations on app start if online
+    if (isOnline()) {
+      syncPendingOperations();
+    }
+    
+    return cleanupSync;
   }, []);
 
   // Check if we should show wisdom banner (not on index/welcome pages)
@@ -45,6 +62,7 @@ function App() {
           <Route path="/statistics" element={<SchoolStatistics />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
+        <OfflineIndicator />
         <Toaster />
       </LicenseProvider>
     </ThemeProvider>
