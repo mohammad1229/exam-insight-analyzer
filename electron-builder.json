@@ -1,4 +1,3 @@
-
 {
   "appId": "com.schoolexams.app",
   "productName": "نظام تحليل نتائج الاختبارات المدرسية",
@@ -9,8 +8,9 @@
   },
   "asar": true,
   "win": {
-    "target": ["nsis"],
-    "icon": "resources/icon.ico"
+    "target": ["nsis", "portable"],
+    "icon": "resources/icon.ico",
+    "requestedExecutionLevel": "asInvoker"
   },
   "nsis": {
     "oneClick": false,
@@ -18,16 +18,22 @@
     "createDesktopShortcut": true,
     "createStartMenuShortcut": true,
     "shortcutName": "نظام تحليل نتائج الاختبارات المدرسية",
-    "artifactName": "${productName}-Setup-${version}.${ext}"
+    "artifactName": "${productName}-Setup-${version}.${ext}",
+    "runAfterFinish": true
+  },
+  "portable": {
+    "artifactName": "${productName}-Portable-${version}.${ext}"
   },
   "mac": {
-    "target": ["dmg"],
-    "icon": "resources/icon.icns"
+    "target": ["dmg", "zip"],
+    "icon": "resources/icon.icns",
+    "category": "public.app-category.education"
   },
   "linux": {
-    "target": ["AppImage", "deb"],
+    "target": ["AppImage", "deb", "rpm"],
     "icon": "resources/icons",
-    "category": "Education"
+    "category": "Education",
+    "maintainer": "School Exams System"
   },
   "publish": null,
   "extraResources": [
@@ -35,5 +41,6 @@
       "from": "resources",
       "to": "resources"
     }
-  ]
+  ],
+  "electronVersion": "36.2.0"
 }
