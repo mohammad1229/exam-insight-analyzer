@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,13 +18,13 @@ import {
   TableRow 
 } from "@/components/ui/table";
 import { Label } from "@/components/ui/label";
-import { FileText, Download, Users, Filter } from "lucide-react";
+import { FileText, Download, Users, Filter, Eye, Edit2, Trash2 } from "lucide-react";
 import { 
   classesData, 
   subjectsData,
   teachersData,
 } from "@/data/mockData";
-import { getTests, getStudents, getClasses, getTeachers, getSubjects, getClassById, getSectionById, getSubjectById, getTeacherById } from "@/services/dataService";
+import { getTests, getStudents, getClasses, getTeachers, getSubjects, getClassById, getSectionById, getSubjectById, getTeacherById, deleteTest, updateTest } from "@/services/dataService";
 import { jsPDF } from "jspdf";
 import "jspdf-autotable";
 import { loadAmiriFont, ARABIC_FONT_NAME } from "@/utils/fontLoader";
@@ -32,6 +32,19 @@ import { toast } from "sonner";
 import { getPerformanceLevels } from "./PerformanceLevelsTab";
 import { getFooterSettings } from "./SettingsTab";
 import { getHeaderSettings } from "./HeaderSettingsTab";
+import ReportPreview from "@/components/ReportPreview";
+import TestResultsEditor from "@/components/TestResultsEditor";
+import { Test } from "@/types";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 // Mock reports type
 interface Report {
@@ -65,6 +78,19 @@ const ReportsTab = ({ mockReports }: ReportsTabProps) => {
   const [reportTeacherFilter, setReportTeacherFilter] = useState("all");
   const [reportSubjectFilter, setReportSubjectFilter] = useState("all");
 
+  // Report preview and edit states
+  const [allTests, setAllTests] = useState<Test[]>([]);
+  const [selectedTest, setSelectedTest] = useState<Test | null>(null);
+  const [showReportPreview, setShowReportPreview] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [testToDelete, setTestToDelete] = useState<string | null>(null);
+
+  // Load tests from localStorage
+  useEffect(() => {
+    setAllTests(getTests());
+  }, []);
+
   // Get data for filters
   const allClasses = getClasses();
   const allTeachers = getTeachers();
@@ -91,7 +117,43 @@ const ReportsTab = ({ mockReports }: ReportsTabProps) => {
 
   // Handle report view
   const handleViewReport = (testId: string) => {
-    navigate(`/reports/${testId}`);
+    const test = allTests.find(t => t.id === testId);
+    if (test) {
+      setSelectedTest(test);
+      setShowReportPreview(true);
+    }
+  };
+
+  // Handle edit report
+  const handleEditReport = (testId: string) => {
+    const test = allTests.find(t => t.id === testId);
+    if (test) {
+      setSelectedTest(test);
+      setShowEditDialog(true);
+    }
+  };
+
+  // Handle delete report
+  const handleDeleteReport = (testId: string) => {
+    setTestToDelete(testId);
+    setShowDeleteDialog(true);
+  };
+
+  // Confirm delete
+  const confirmDelete = () => {
+    if (testToDelete) {
+      deleteTest(testToDelete);
+      setAllTests(getTests());
+      toast.success("تم حذف التقرير بنجاح");
+      setShowDeleteDialog(false);
+      setTestToDelete(null);
+    }
+  };
+
+  // Handle save edited test
+  const handleSaveEditedTest = (updatedTest: Test) => {
+    setAllTests(getTests());
+    setSelectedTest(updatedTest);
   };
 
   // Generate comprehensive school report
@@ -848,13 +910,33 @@ const ReportsTab = ({ mockReports }: ReportsTabProps) => {
                       </span>
                     </TableCell>
                     <TableCell>
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => handleViewReport(report.testId)}
-                      >
-                        عرض التقرير
-                      </Button>
+                      <div className="flex gap-1">
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => handleViewReport(report.testId)}
+                          title="عرض التقرير"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => handleEditReport(report.testId)}
+                          title="تعديل النتائج"
+                        >
+                          <Edit2 className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => handleDeleteReport(report.testId)}
+                          className="text-red-500 hover:bg-red-50"
+                          title="حذف"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))
@@ -869,6 +951,49 @@ const ReportsTab = ({ mockReports }: ReportsTabProps) => {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Report Preview Dialog */}
+      {selectedTest && (
+        <ReportPreview
+          test={selectedTest}
+          open={showReportPreview}
+          onClose={() => {
+            setShowReportPreview(false);
+            setSelectedTest(null);
+          }}
+        />
+      )}
+
+      {/* Edit Results Dialog */}
+      {selectedTest && (
+        <TestResultsEditor
+          test={selectedTest}
+          open={showEditDialog}
+          onClose={() => {
+            setShowEditDialog(false);
+            setSelectedTest(null);
+          }}
+          onSave={handleSaveEditedTest}
+        />
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>هل أنت متأكد من الحذف؟</AlertDialogTitle>
+            <AlertDialogDescription>
+              سيتم حذف هذا التقرير نهائياً ولا يمكن استرجاعه.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>إلغاء</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-red-500 hover:bg-red-600">
+              حذف
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
