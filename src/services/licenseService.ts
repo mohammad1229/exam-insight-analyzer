@@ -100,19 +100,24 @@ export const activateLicense = async (licenseKey: string) => {
       return { success: false, error: result.error };
     }
 
-    // Get license details from database
-    const { data: license } = await supabase
-      .from("licenses")
-      .select("*, schools(*)")
-      .eq("license_key", licenseKey)
-      .maybeSingle();
+    // Get license + school details via backend function (licenses/schools are service-role protected)
+    const detailsResp = await supabase.functions.invoke("get-license-details", {
+      body: { licenseKey },
+    });
+
+    if (detailsResp.error) throw detailsResp.error;
+    if (!detailsResp.data?.success) {
+      return { success: false, error: detailsResp.data?.error || "تعذر جلب بيانات الترخيص" };
+    }
+
+    const license = detailsResp.data.data as any;
 
     const licenseInfo = {
       licenseKey,
       schoolId: license?.school_id,
-      schoolName: (license?.schools as any)?.name || "",
-      directorName: (license?.schools as any)?.director_name || "",
-      schoolLogo: (license?.schools as any)?.logo_url || "",
+      schoolName: license?.schools?.name || "",
+      directorName: license?.schools?.director_name || "",
+      schoolLogo: license?.schools?.logo_url || "",
       isTrial: result.is_trial,
       remainingDays: result.remaining_days,
       devicesUsed: result.devices_used,
@@ -121,11 +126,14 @@ export const activateLicense = async (licenseKey: string) => {
     };
 
     storeLicense(licenseInfo);
-    
+
     // Store school data in localStorage for UI components
     localStorage.setItem("schoolName", licenseInfo.schoolName);
     localStorage.setItem("directorName", licenseInfo.directorName);
+    localStorage.setItem("schoolLogo", licenseInfo.schoolLogo);
     localStorage.setItem("currentSchoolId", licenseInfo.schoolId || "");
+    localStorage.setItem("licenseSchoolName", licenseInfo.schoolName);
+    localStorage.setItem("licenseDirectorName", licenseInfo.directorName);
     
     // Initialize school data in database if this is first activation
     if (licenseInfo.schoolId) {
@@ -165,31 +173,33 @@ export const checkLicenseValidity = async () => {
 
     const result = data as unknown as LicenseValidityResult;
 
-    if (result.valid) {
-      // Fetch latest school info from database
-      const { data: license } = await supabase
-        .from("licenses")
-        .select("*, schools(*)")
-        .eq("license_key", stored.licenseKey)
-        .maybeSingle();
+      if (result.valid) {
+        // Fetch latest school info via backend function (service-role protected tables)
+        const detailsResp = await supabase.functions.invoke("get-license-details", {
+          body: { licenseKey: stored.licenseKey },
+        });
 
-      if (license) {
-        // Update stored info with latest data from database
-        stored.remainingDays = result.remaining_days;
-        stored.isTrial = result.is_trial;
-        stored.schoolName = (license.schools as any)?.name || stored.schoolName;
-        stored.directorName = (license.schools as any)?.director_name || stored.directorName;
-        stored.schoolLogo = (license.schools as any)?.logo_url || stored.schoolLogo || "";
-        stored.schoolId = license.school_id || stored.schoolId;
-        storeLicense(stored);
+        if (!detailsResp.error && detailsResp.data?.success && detailsResp.data.data) {
+          const license = detailsResp.data.data as any;
 
-        // Update localStorage for UI components
-        localStorage.setItem("schoolName", stored.schoolName || "");
-        localStorage.setItem("directorName", stored.directorName || "");
-        localStorage.setItem("schoolLogo", stored.schoolLogo || "");
-        localStorage.setItem("currentSchoolId", stored.schoolId || "");
+          // Update stored info with latest data
+          stored.remainingDays = result.remaining_days;
+          stored.isTrial = result.is_trial;
+          stored.schoolName = license?.schools?.name || stored.schoolName;
+          stored.directorName = license?.schools?.director_name || stored.directorName;
+          stored.schoolLogo = license?.schools?.logo_url || stored.schoolLogo || "";
+          stored.schoolId = license?.school_id || stored.schoolId;
+          storeLicense(stored);
+
+          // Update localStorage for UI components
+          localStorage.setItem("schoolName", stored.schoolName || "");
+          localStorage.setItem("directorName", stored.directorName || "");
+          localStorage.setItem("schoolLogo", stored.schoolLogo || "");
+          localStorage.setItem("currentSchoolId", stored.schoolId || "");
+          localStorage.setItem("licenseSchoolName", stored.schoolName || "");
+          localStorage.setItem("licenseDirectorName", stored.directorName || "");
+        }
       }
-    }
 
     return result;
   } catch (error: any) {
