@@ -126,24 +126,39 @@ export const useLicense = () => {
       const result = await activateLicenseService(licenseKey);
       
       if (result.success && result.licenseInfo) {
-        setState(prev => ({
-          ...prev,
+        const newState = {
+          isLoading: false,
           isActivated: true,
-          isTrial: result.licenseInfo.isTrial,
+          isTrial: result.licenseInfo.isTrial || false,
           remainingDays: result.licenseInfo.remainingDays || 0,
-          schoolId: result.licenseInfo.schoolId,
-          schoolName: result.licenseInfo.schoolName,
+          schoolId: result.licenseInfo.schoolId || null,
+          schoolName: result.licenseInfo.schoolName || null,
           directorName: result.licenseInfo.directorName || null,
+          schoolLogo: result.licenseInfo.schoolLogo || null,
           licenseKey: result.licenseInfo.licenseKey,
           devicesUsed: result.licenseInfo.devicesUsed || 0,
           maxDevices: result.licenseInfo.maxDevices || 1,
           expiryDate: result.licenseInfo.expiryDate || null,
-        }));
+          showExpiryWarning: false,
+        };
+        
+        setState(newState);
+
+        // Store in localStorage for Welcome page
+        if (result.licenseInfo.schoolName) {
+          localStorage.setItem("schoolName", result.licenseInfo.schoolName);
+        }
+        if (result.licenseInfo.directorName) {
+          localStorage.setItem("directorName", result.licenseInfo.directorName);
+        }
 
         toast({
           title: "تم التنشيط بنجاح",
           description: `تم تنشيط النظام لـ ${result.licenseInfo.schoolName}`,
         });
+
+        // Navigate to welcome page after activation
+        window.location.href = "/welcome";
 
         return { success: true };
       } else {
