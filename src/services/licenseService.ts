@@ -100,12 +100,12 @@ export const activateLicense = async (licenseKey: string) => {
       return { success: false, error: result.error };
     }
 
-    // Get license details
+    // Get license details from database
     const { data: license } = await supabase
       .from("licenses")
       .select("*, schools(*)")
       .eq("license_key", licenseKey)
-      .single();
+      .maybeSingle();
 
     const licenseInfo = {
       licenseKey,
@@ -122,10 +122,22 @@ export const activateLicense = async (licenseKey: string) => {
 
     storeLicense(licenseInfo);
     
-    // Store school name and director in localStorage for Welcome page
+    // Store school data in localStorage for UI components
     localStorage.setItem("schoolName", licenseInfo.schoolName);
     localStorage.setItem("directorName", licenseInfo.directorName);
     localStorage.setItem("currentSchoolId", licenseInfo.schoolId || "");
+    
+    // Initialize school data in database if this is first activation
+    if (licenseInfo.schoolId) {
+      try {
+        await supabase.functions.invoke('school-data', {
+          body: { action: 'initializeSchoolData', schoolId: licenseInfo.schoolId, data: {} }
+        });
+        console.log(`Initialized school data for: ${licenseInfo.schoolId}`);
+      } catch (initError) {
+        console.log('School data already initialized or init skipped:', initError);
+      }
+    }
     
     return { success: true, licenseInfo, data: result };
   } catch (error: any) {
