@@ -159,20 +159,27 @@ const TeacherLogin = () => {
     }
 
     try {
-      let teachers = [];
-      
+      let teacher: any = null;
+
       if (isElectron()) {
-        teachers = await electronService.db.getAll("teachers");
+        const teachers = await electronService.db.getAll("teachers");
+        teacher = teachers.find((t: any) => t.username === username && t.password === password);
       } else {
-        // Get teachers from dataService (which uses localStorage)
-        const { getTeachers } = await import("@/services/dataService");
-        teachers = getTeachers();
+        // Use database (Lovable Cloud) verification
+        const { verifyTeacherLoginDB } = await import("@/services/databaseService");
+        const result = await verifyTeacherLoginDB(username, password);
+        teacher = result.success ? result.teacher : null;
+
+        if (!result.success) {
+          toast({
+            title: "فشل تسجيل الدخول",
+            description: result.error || "اسم المستخدم أو كلمة المرور غير صحيحة",
+            variant: "destructive",
+          });
+          return;
+        }
       }
-      
-      const teacher = teachers.find(
-        (t: any) => t.username === username && t.password === password
-      );
-      
+
       if (teacher) {
         // Check if must change password
         if (teacher.must_change_password) {
@@ -201,22 +208,29 @@ const TeacherLogin = () => {
   };
 
   const completeTeacherLogin = (teacher: any) => {
+    const assignedClasses = teacher.assignedClasses || teacher.classes || [];
+    const assignedSubjects = teacher.assignedSubjects || teacher.subjects || [];
+
     // Store teacher info in localStorage for session management
-    localStorage.setItem("loggedInTeacher", JSON.stringify({
-      id: teacher.id,
-      name: teacher.name,
-      assignedClasses: teacher.assignedClasses,
-      assignedSubjects: teacher.assignedSubjects,
-      role: teacher.role || 'teacher'
-    }));
-    // Also set currentTeacherId for dataService compatibility
+    localStorage.setItem(
+      "loggedInTeacher",
+      JSON.stringify({
+        id: teacher.id,
+        name: teacher.name,
+        assignedClasses,
+        assignedSubjects,
+        role: teacher.role || "teacher",
+      })
+    );
+
+    // Also set currentTeacherId for compatibility
     localStorage.setItem("currentTeacherId", teacher.id);
-    
+
     toast({
       title: "تم تسجيل الدخول بنجاح",
       description: `مرحباً بك ${teacher.name}`,
     });
-    
+
     // Redirect to dashboard
     navigate("/dashboard");
   };

@@ -207,14 +207,6 @@ const Index = () => {
               لوحة تحكم المدير
             </Button>
             
-            <Button 
-              variant="outline" 
-              size="lg"
-              className="border-accent text-accent-foreground bg-accent/20 hover:bg-accent hover:text-accent-foreground dark:border-green-400 dark:text-green-400"
-              onClick={() => navigate("/statistics")}
-            >
-              الإحصائيات
-            </Button>
             
             <Button 
               variant="outline" 
