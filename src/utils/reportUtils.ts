@@ -1,13 +1,13 @@
 
 import { 
-  testsData, 
-  classesData, 
-  subjectsData,
+  getTests, 
+  getClasses, 
+  getSubjects,
   getClassById,
   getSectionById,
   getSubjectById,
   getTeacherById
-} from "@/data/mockData";
+} from "@/services/dataService";
 
 export interface Report {
   id: string;
@@ -23,13 +23,18 @@ export interface Report {
   passRate: number;
 }
 
-// Prepare mock reports data
+// Prepare reports from actual test data
 export const prepareMockReports = (): Report[] => {
+  const testsData = getTests();
+  
   return testsData.map(test => {
     const classObj = getClassById(test.classId);
     const section = getSectionById(test.classId, test.sectionId);
     const subject = getSubjectById(test.subjectId);
     const teacher = getTeacherById(test.teacherId);
+    
+    const presentResults = test.results?.filter(r => !r.isAbsent) || [];
+    const passedResults = presentResults.filter(r => r.percentage >= 50);
     
     return {
       id: `report_${test.id}`,
@@ -40,19 +45,19 @@ export const prepareMockReports = (): Report[] => {
       subjectName: subject?.name || '',
       teacherName: teacher?.name || '',
       date: test.date,
-      totalStudents: test.results.filter(r => !r.isAbsent).length,
-      passedStudents: test.results.filter(r => !r.isAbsent && r.percentage >= 50).length,
-      passRate: (() => {
-        const present = test.results.filter(r => !r.isAbsent).length;
-        const passed = test.results.filter(r => !r.isAbsent && r.percentage >= 50).length;
-        return present > 0 ? Math.round((passed / present) * 100) : 0;
-      })()
+      totalStudents: presentResults.length,
+      passedStudents: passedResults.length,
+      passRate: presentResults.length > 0 
+        ? Math.round((passedResults.length / presentResults.length) * 100) 
+        : 0
     };
   });
 };
 
 // Prepare chart data
 export const prepareChartData = (reports: Report[], filteredClass = "") => {
+  const subjectsData = getSubjects();
+  
   const subjectStats = subjectsData.map(subject => {
     const subjectTests = filteredClass ? 
       reports.filter(report => report.subjectName === subject.name && report.className === filteredClass) :
