@@ -6,22 +6,6 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Hash password using SHA-256
-async function hashPassword(password: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(password);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-  return hashHex;
-}
-
-// Verify password
-async function verifyPassword(password: string, storedHash: string): Promise<boolean> {
-  const inputHash = await hashPassword(password);
-  return inputHash === storedHash;
-}
-
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -64,8 +48,8 @@ serve(async (req) => {
           );
         }
 
-        // Verify password using SHA-256
-        const isValid = await verifyPassword(password, admin.password_hash);
+        // Verify password - plain text comparison
+        const isValid = password === admin.password_hash;
         
         if (!isValid) {
           return new Response(
@@ -122,22 +106,18 @@ serve(async (req) => {
           );
         }
 
-        // Verify current password
-        const isCurrentValid = await verifyPassword(password, admin.password_hash);
-        if (!isCurrentValid) {
+        // Verify current password - plain text
+        if (password !== admin.password_hash) {
           return new Response(
             JSON.stringify({ success: false, error: "كلمة المرور الحالية غير صحيحة" }),
             { headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
 
-        // Hash new password
-        const newHash = await hashPassword(newPassword);
-
-        // Update password
+        // Update password - plain text
         const { error: updateError } = await supabase
           .from("system_admins")
-          .update({ password_hash: newHash })
+          .update({ password_hash: newPassword })
           .eq("id", adminId);
 
         if (updateError) {
