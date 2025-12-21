@@ -673,9 +673,14 @@ const SystemAdmin = () => {
                 >
                   تسجيل الدخول
                 </Button>
-                <div className="text-sm text-center text-muted-foreground mt-4">
-                  اسم المستخدم: mohammad | كلمة المرور: 12345
-                </div>
+                <Button 
+                  type="button"
+                  variant="outline"
+                  onClick={() => navigate("/")}
+                  className="mt-2 border-gray-400 text-gray-700 hover:bg-gray-100"
+                >
+                  العودة للرئيسية
+                </Button>
               </div>
             </form>
           </CardContent>
