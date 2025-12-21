@@ -1189,9 +1189,6 @@ const SystemAdmin = () => {
                       <p className="text-sm text-green-800">
                         ✓ يتم تأمين بيانات مسؤول النظام في قاعدة البيانات
                       </p>
-                      <p className="text-xs text-green-600 mt-1">
-                        اسم المستخدم الافتراضي: sysadmin
-                      </p>
                     </div>
                     <p className="text-sm text-muted-foreground">
                       لتغيير كلمة المرور، يرجى التواصل مع الدعم الفني
