@@ -1,11 +1,26 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import * as bcrypt from "https://deno.land/x/bcrypt@v0.4.1/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+// Hash password using SHA-256
+async function hashPassword(password: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(password);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  return hashHex;
+}
+
+// Verify password
+async function verifyPassword(password: string, storedHash: string): Promise<boolean> {
+  const inputHash = await hashPassword(password);
+  return inputHash === storedHash;
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -49,8 +64,8 @@ serve(async (req) => {
           );
         }
 
-        // Verify password using bcrypt
-        const isValid = await bcrypt.compare(password, admin.password_hash);
+        // Verify password using SHA-256
+        const isValid = await verifyPassword(password, admin.password_hash);
         
         if (!isValid) {
           return new Response(
@@ -65,7 +80,7 @@ serve(async (req) => {
           .update({ last_login_at: new Date().toISOString() })
           .eq("id", admin.id);
 
-        // Generate a session token (simple approach - in production use JWT)
+        // Generate a session token
         const sessionToken = crypto.randomUUID();
         const sessionExpiry = new Date(Date.now() + 30 * 60 * 1000).toISOString(); // 30 minutes
 
@@ -108,7 +123,7 @@ serve(async (req) => {
         }
 
         // Verify current password
-        const isCurrentValid = await bcrypt.compare(password, admin.password_hash);
+        const isCurrentValid = await verifyPassword(password, admin.password_hash);
         if (!isCurrentValid) {
           return new Response(
             JSON.stringify({ success: false, error: "كلمة المرور الحالية غير صحيحة" }),
@@ -117,7 +132,7 @@ serve(async (req) => {
         }
 
         // Hash new password
-        const newHash = await bcrypt.hash(newPassword, 10);
+        const newHash = await hashPassword(newPassword);
 
         // Update password
         const { error: updateError } = await supabase
@@ -136,7 +151,6 @@ serve(async (req) => {
       }
 
       case "verifySession": {
-        // This is a placeholder - in production, implement proper JWT verification
         return new Response(
           JSON.stringify({ success: true }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
