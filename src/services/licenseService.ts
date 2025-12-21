@@ -496,20 +496,8 @@ export const createSchoolAdmin = async (adminData: {
   email?: string;
   phone?: string;
 }) => {
-  // Hash password using edge function for bcrypt
-  const hashResponse = await supabase.functions.invoke('hash-password', {
-    body: { password: adminData.password }
-  });
-
-  if (hashResponse.error) {
-    throw new Error('فشل في تشفير كلمة المرور');
-  }
-
-  const passwordHash = hashResponse.data?.hash;
-  
-  if (!passwordHash) {
-    throw new Error('فشل في تشفير كلمة المرور');
-  }
+  // Use plain text password (no encryption)
+  const passwordHash = adminData.password;
 
   // Use edge function to create admin
   const { data, error } = await supabase.functions.invoke('get-admin-data', {
@@ -541,17 +529,9 @@ export const updateSchoolAdmin = async (
 ) => {
   const updateData: any = { ...updates };
   
-  // If password is being updated, hash it securely using edge function
+  // If password is being updated, use plain text (no encryption)
   if (updates.password) {
-    const hashResponse = await supabase.functions.invoke('hash-password', {
-      body: { password: updates.password }
-    });
-
-    if (hashResponse.error) {
-      throw new Error('فشل في تشفير كلمة المرور');
-    }
-
-    updateData.password_hash = hashResponse.data?.hash;
+    updateData.password_hash = updates.password;
     delete updateData.password;
   }
 
