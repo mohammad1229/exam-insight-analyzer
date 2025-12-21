@@ -11,7 +11,7 @@ import {
   downloadCloudData,
   initHybridStorage 
 } from "@/services/hybridStorageService";
-import { getStorageSettings, saveStorageSettings, StorageSettings } from "@/services/indexedDBService";
+import { getStorageSettings, saveStorageSettings, StorageSettings, exportAllData } from "@/services/indexedDBService";
 import { 
   Cloud, 
   HardDrive, 
@@ -22,7 +22,9 @@ import {
   WifiOff,
   CheckCircle,
   AlertCircle,
-  Loader2
+  Loader2,
+  FileJson,
+  FileSpreadsheet
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
@@ -40,6 +42,7 @@ const StorageSettingsTab = () => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isExporting, setIsExporting] = useState(false);
 
   useEffect(() => {
     loadSettings();
@@ -176,6 +179,41 @@ const StorageSettingsTab = () => {
       });
     } finally {
       setIsDownloading(false);
+    }
+  };
+
+  const handleExportLocalData = async () => {
+    setIsExporting(true);
+    try {
+      const schoolId = localStorage.getItem("currentSchoolId") || "";
+      const data = await exportAllData(schoolId);
+      
+      // Create JSON blob
+      const jsonString = JSON.stringify(data, null, 2);
+      const blob = new Blob([jsonString], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      
+      // Create download link
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `school_data_backup_${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      toast({
+        title: "تم التصدير",
+        description: "تم تصدير البيانات المحلية بنجاح",
+      });
+    } catch (error) {
+      toast({
+        title: "خطأ",
+        description: "فشل في تصدير البيانات",
+        variant: "destructive",
+      });
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -351,7 +389,7 @@ const StorageSettingsTab = () => {
           <CardTitle>إدارة البيانات</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Button 
               variant="outline" 
               className="h-auto py-4"
@@ -386,6 +424,25 @@ const StorageSettingsTab = () => {
                 <span>رفع للسحابة</span>
                 <span className="text-xs text-muted-foreground">
                   رفع التغييرات المحلية للسحابة
+                </span>
+              </div>
+            </Button>
+
+            <Button 
+              variant="outline" 
+              className="h-auto py-4"
+              onClick={handleExportLocalData}
+              disabled={isExporting}
+            >
+              <div className="flex flex-col items-center gap-2">
+                {isExporting ? (
+                  <Loader2 className="h-6 w-6 animate-spin" />
+                ) : (
+                  <FileJson className="h-6 w-6" />
+                )}
+                <span>تصدير البيانات</span>
+                <span className="text-xs text-muted-foreground">
+                  تصدير البيانات المحلية كملف JSON
                 </span>
               </div>
             </Button>
