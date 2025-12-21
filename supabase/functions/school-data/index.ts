@@ -6,34 +6,9 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Helper function to hash passwords using SHA-256 (compatible with edge runtime)
-async function hashPassword(password: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(password + "lovable_salt_2024");
-  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-  return `sha256:${hashHex}`;
-}
-
-// Helper function to verify passwords (supports SHA-256, bcrypt, and legacy base64)
-async function verifyPassword(password: string, hash: string): Promise<boolean> {
-  // Check if it's a SHA-256 hash (new format)
-  if (hash.startsWith('sha256:')) {
-    const newHash = await hashPassword(password);
-    return newHash === hash;
-  }
-  
-  // Check if it's a bcrypt hash (old format - just compare with base64 fallback)
-  if (hash.startsWith('$2a$') || hash.startsWith('$2b$')) {
-    // For bcrypt hashes, we can't verify in edge runtime
-    // Try base64 comparison as fallback
-    console.warn("bcrypt hash detected but not supported in edge runtime");
-    return false;
-  }
-  
-  // Legacy base64 comparison
-  return btoa(password) === hash;
+// Plain text password comparison (no encryption)
+function verifyPassword(password: string, storedPassword: string): boolean {
+  return password === storedPassword;
 }
 
 serve(async (req) => {
