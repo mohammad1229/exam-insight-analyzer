@@ -116,11 +116,36 @@ const AdminDashboard = () => {
     setTeachers(getTeachers());
   }, []);
   
-  // Initialize reports data
-  useEffect(() => {
+  // Function to refresh reports data
+  const refreshReports = () => {
     const reports = prepareMockReports();
     setMockReports(reports);
+  };
+  
+  // Initialize reports data
+  useEffect(() => {
+    refreshReports();
     fetchTests();
+    
+    // Listen for storage changes to refresh reports when teachers save
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key?.includes('tests')) {
+        refreshReports();
+        fetchTests();
+      }
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    
+    // Also refresh every 10 seconds to catch local changes
+    const interval = setInterval(() => {
+      refreshReports();
+    }, 10000);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      clearInterval(interval);
+    };
   }, []);
   
   // Update chart data when filters change
