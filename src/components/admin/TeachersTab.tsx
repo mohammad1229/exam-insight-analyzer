@@ -28,7 +28,18 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Trash2, Edit, Plus, Upload, Download, FileSpreadsheet, Loader2 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Trash2, Edit, Plus, Upload, Download, FileSpreadsheet, Loader2, KeyRound } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 import { 
   getClassesDB, 
   getSubjectsDB, 
@@ -53,6 +64,8 @@ const TeachersTab = () => {
   const [editingTeacher, setEditingTeacher] = useState<DBTeacher | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [teacherToResetPassword, setTeacherToResetPassword] = useState<DBTeacher | null>(null);
+  const [isResettingPassword, setIsResettingPassword] = useState(false);
   
   const teacherFormSchema = z.object({
     name: z.string().min(3, { message: "يجب أن يحتوي الاسم على 3 أحرف على الأقل" }),
@@ -193,6 +206,48 @@ const TeachersTab = () => {
         description: error.message || "فشل في حذف المعلم",
         variant: "destructive",
       });
+    }
+  };
+
+  // Reset teacher password
+  const handleResetPassword = async () => {
+    if (!teacherToResetPassword) return;
+    
+    setIsResettingPassword(true);
+    try {
+      const schoolId = localStorage.getItem("currentSchoolId");
+      const defaultPassword = "123456";
+      
+      const { data: result, error } = await supabase.functions.invoke("school-data", {
+        body: { 
+          action: "changeTeacherPassword", 
+          schoolId,
+          data: {
+            teacherId: teacherToResetPassword.id,
+            newPassword: defaultPassword,
+            forceChange: true
+          }
+        }
+      });
+
+      if (error || !result?.success) {
+        throw new Error(result?.error || "فشل في إعادة تعيين كلمة المرور");
+      }
+
+      toast({
+        title: "تم إعادة تعيين كلمة المرور",
+        description: `تم إعادة تعيين كلمة مرور ${teacherToResetPassword.name} إلى: ${defaultPassword}`,
+      });
+      
+    } catch (error: any) {
+      toast({
+        title: "خطأ",
+        description: error.message || "فشل في إعادة تعيين كلمة المرور",
+        variant: "destructive",
+      });
+    } finally {
+      setIsResettingPassword(false);
+      setTeacherToResetPassword(null);
     }
   };
 
@@ -580,14 +635,25 @@ const TeachersTab = () => {
                           variant="outline"
                           size="sm"
                           onClick={() => openEditModal(teacher)}
+                          title="تعديل"
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
                         <Button
                           variant="outline"
                           size="sm"
+                          className="text-orange-500 hover:bg-orange-50"
+                          onClick={() => setTeacherToResetPassword(teacher)}
+                          title="إعادة تعيين كلمة المرور"
+                        >
+                          <KeyRound className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
                           className="text-red-500 hover:bg-red-50"
                           onClick={() => handleDeleteTeacher(teacher.id)}
+                          title="حذف"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -626,6 +692,35 @@ const TeachersTab = () => {
           {renderTeacherForm(handleEditTeacher, true)}
         </DialogContent>
       </Dialog>
+
+      {/* Reset Password Confirmation Dialog */}
+      <AlertDialog open={!!teacherToResetPassword} onOpenChange={(open) => !open && setTeacherToResetPassword(null)}>
+        <AlertDialogContent className="dir-rtl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>إعادة تعيين كلمة المرور</AlertDialogTitle>
+            <AlertDialogDescription>
+              هل أنت متأكد من إعادة تعيين كلمة مرور المعلم "{teacherToResetPassword?.name}"؟
+              <br />
+              <span className="text-orange-600 font-medium">
+                سيتم تعيين كلمة المرور إلى: 123456
+              </span>
+              <br />
+              سيُطلب من المعلم تغيير كلمة المرور عند تسجيل الدخول التالي.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex gap-2">
+            <AlertDialogCancel disabled={isResettingPassword}>إلغاء</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleResetPassword}
+              disabled={isResettingPassword}
+              className="bg-orange-600 hover:bg-orange-700"
+            >
+              {isResettingPassword && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}
+              إعادة تعيين
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 };
