@@ -563,49 +563,41 @@ export const deleteSchoolAdmin = async (adminId: string) => {
   return { success: true };
 };
 
-// Verify school admin login using secure database function
+// Verify school admin login using edge function (service role)
 export const verifySchoolAdminLogin = async (username: string, password: string) => {
   try {
-    const { data, error } = await supabase.rpc('verify_admin_login', {
-      p_username: username,
-      p_password: password
+    const { data, error } = await supabase.functions.invoke('get-admin-data', {
+      body: { action: 'verifySchoolAdminLogin', username, password }
     });
 
     if (error) throw error;
     
-    const result = data as { 
-      success: boolean; 
-      error?: string; 
-      must_change_password?: boolean;
-      admin?: any 
-    };
-    
-    if (!result || !result.success) {
-      return { success: false, error: result?.error || 'خطأ في تسجيل الدخول' };
+    if (!data || !data.success) {
+      return { success: false, error: data?.error || 'خطأ في تسجيل الدخول' };
     }
 
     return { 
       success: true,
-      must_change_password: result.must_change_password || result.admin?.must_change_password,
+      must_change_password: data.must_change_password || data.admin?.must_change_password,
       admin: {
-        id: result.admin.id,
-        full_name: result.admin.full_name,
-        username: result.admin.username,
-        email: result.admin.email,
-        phone: result.admin.phone,
-        school_id: result.admin.school_id,
-        license_id: result.admin.license_id,
-        role: result.admin.role || 'school_admin',
-        must_change_password: result.admin.must_change_password,
+        id: data.admin.id,
+        full_name: data.admin.full_name,
+        username: data.admin.username,
+        email: data.admin.email,
+        phone: data.admin.phone,
+        school_id: data.admin.school_id,
+        license_id: data.admin.license_id,
+        role: data.admin.role || 'school_admin',
+        must_change_password: data.admin.must_change_password,
         schools: {
-          name: result.admin.school_name,
-          director_name: result.admin.director_name,
-          logo_url: result.admin.logo_url
+          name: data.admin.school_name,
+          director_name: data.admin.director_name,
+          logo_url: data.admin.logo_url
         },
         licenses: {
-          license_key: result.admin.license_key,
-          is_active: result.admin.license_active,
-          expiry_date: result.admin.expiry_date
+          license_key: data.admin.license_key,
+          is_active: data.admin.license_active,
+          expiry_date: data.admin.expiry_date
         }
       }
     };

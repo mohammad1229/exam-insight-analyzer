@@ -195,6 +195,79 @@ serve(async (req) => {
       );
     }
 
+    // ========== VERIFY SCHOOL ADMIN LOGIN ==========
+    if (action === "verifySchoolAdminLogin") {
+      const { username, password } = body;
+      
+      // Find admin with matching username
+      const { data: admin, error } = await supabase
+        .from("school_admins")
+        .select(`
+          *,
+          schools(name, director_name, logo_url),
+          licenses(license_key, is_active, expiry_date)
+        `)
+        .eq("username", username)
+        .eq("is_active", true)
+        .maybeSingle();
+
+      if (error) throw error;
+      
+      if (!admin) {
+        return new Response(
+          JSON.stringify({ success: false, error: "اسم المستخدم أو كلمة المرور غير صحيحة" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Verify password - plain text comparison
+      if (admin.password_hash !== password) {
+        return new Response(
+          JSON.stringify({ success: false, error: "اسم المستخدم أو كلمة المرور غير صحيحة" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Get user role
+      const { data: roleData } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", admin.id)
+        .eq("user_type", "school_admin")
+        .maybeSingle();
+
+      // Update last login timestamp
+      await supabase
+        .from("school_admins")
+        .update({ last_login_at: new Date().toISOString() })
+        .eq("id", admin.id);
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          must_change_password: admin.must_change_password,
+          admin: {
+            id: admin.id,
+            full_name: admin.full_name,
+            username: admin.username,
+            email: admin.email,
+            phone: admin.phone,
+            school_id: admin.school_id,
+            license_id: admin.license_id,
+            school_name: admin.schools?.name,
+            director_name: admin.schools?.director_name,
+            logo_url: admin.schools?.logo_url,
+            license_key: admin.licenses?.license_key,
+            license_active: admin.licenses?.is_active,
+            expiry_date: admin.licenses?.expiry_date,
+            role: roleData?.role || "school_admin",
+            must_change_password: admin.must_change_password
+          }
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     return new Response(
       JSON.stringify({ success: false, error: "Unknown action" }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
