@@ -5,6 +5,7 @@ import { LicenseProvider } from "@/contexts/LicenseContext";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { initializeBackupScheduler } from "@/services/backupService";
 import { setupAutoSync, syncPendingOperations, isOnline } from "@/services/offlineSyncService";
+import { initHybridStorage, syncPendingChanges } from "@/services/hybridStorageService";
 import WisdomBanner from "@/components/WisdomBanner";
 import OfflineIndicator from "@/components/OfflineIndicator";
 import Welcome from "./pages/Welcome";
@@ -24,6 +25,19 @@ function App() {
     // Initialize automatic backup scheduler
     initializeBackupScheduler();
     
+    // Initialize hybrid storage (local + cloud) automatically
+    initHybridStorage().then(() => {
+      console.log('Hybrid storage initialized');
+      // Sync pending changes on app start
+      if (navigator.onLine) {
+        syncPendingChanges().then(result => {
+          if (result.success > 0) {
+            console.log(`Synced ${result.success} pending changes`);
+          }
+        });
+      }
+    });
+    
     // Setup offline sync
     const cleanupSync = setupAutoSync((result) => {
       if (result.synced > 0) {
@@ -36,7 +50,17 @@ function App() {
       syncPendingOperations();
     }
     
-    return cleanupSync;
+    // Auto-sync hybrid storage every 5 minutes
+    const hybridSyncInterval = setInterval(() => {
+      if (navigator.onLine) {
+        syncPendingChanges();
+      }
+    }, 5 * 60 * 1000);
+    
+    return () => {
+      cleanupSync();
+      clearInterval(hybridSyncInterval);
+    };
   }, []);
 
   // Check if we should show wisdom banner (not on index/welcome pages)
