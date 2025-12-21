@@ -53,7 +53,7 @@ import WisdomsTab from "@/components/admin/WisdomsTab";
 import TestsTab from "@/components/admin/TestsTab";
 import SchoolInfoTab from "@/components/admin/SchoolInfoTab";
 import LoginCredentialsTab from "@/components/admin/LoginCredentialsTab";
-import StorageSettingsTab from "@/components/admin/StorageSettingsTab";
+
 
 // Import utility functions
 import { prepareMockReports, prepareChartData, Report } from "@/utils/reportUtils";
@@ -422,7 +422,7 @@ const AdminDashboard = () => {
             <TabsTrigger value="credentials">بيانات الدخول</TabsTrigger>
             <TabsTrigger value="features">الميزات</TabsTrigger>
             <TabsTrigger value="backup">النسخ الاحتياطي</TabsTrigger>
-            <TabsTrigger value="storage">التخزين</TabsTrigger>
+            
             <TabsTrigger value="school">بيانات المدرسة</TabsTrigger>
             <TabsTrigger value="settings">الإعدادات</TabsTrigger>
           </TabsList>
@@ -496,9 +496,6 @@ const AdminDashboard = () => {
             <BackupTab />
           </TabsContent>
 
-          <TabsContent value="storage">
-            <StorageSettingsTab />
-          </TabsContent>
 
           <TabsContent value="school">
             <SchoolInfoTab />
