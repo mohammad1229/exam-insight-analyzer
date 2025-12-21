@@ -34,6 +34,7 @@ import {
   getCurrentTeacher,
   getTeacherClasses
 } from "@/services/dataService";
+import TeacherReportsList from "@/components/TeacherReportsList";
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -249,6 +250,13 @@ const Dashboard = () => {
               </Table>
             </div>
           </div>
+
+          {/* Teacher Reports Section */}
+          {currentTeacher && (
+            <div className="mt-8">
+              <TeacherReportsList />
+            </div>
+          )}
         </main>
           </div>
         </div>

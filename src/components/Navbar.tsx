@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useLicenseContext } from "@/contexts/LicenseContext";
 import ThemeToggle from "@/components/ThemeToggle";
 import ColorCustomizer from "@/components/ColorCustomizer";
+import SyncStatusIndicator from "@/components/SyncStatusIndicator";
 import { useState, useEffect } from "react";
 import { Clock } from "lucide-react";
 
@@ -71,6 +72,7 @@ const Navbar = () => {
         </div>
         
         <div className="flex items-center gap-3">
+          <SyncStatusIndicator />
           <ThemeToggle />
           <ColorCustomizer />
           <Button 
