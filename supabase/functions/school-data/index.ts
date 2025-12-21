@@ -287,8 +287,8 @@ serve(async (req) => {
       }
 
       case "addTeacher": {
-        // Use bcrypt for password hashing
-        const passwordHash = await hashPassword(data.password);
+        // Use plain text password (no encryption)
+        const passwordHash = data.password;
         
         const { data: newTeacher, error } = await supabase
           .from("teachers")
@@ -343,8 +343,8 @@ serve(async (req) => {
         };
         
         if (data.password) {
-          // Use bcrypt for password hashing
-          updates.password_hash = await hashPassword(data.password);
+          // Use plain text password (no encryption)
+          updates.password_hash = data.password;
         }
         
         if (data.must_change_password !== undefined) {
