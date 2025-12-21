@@ -415,19 +415,13 @@ serve(async (req) => {
           });
         }
 
-        // Verify password using bcrypt (supports legacy base64)
-        const isValid = await verifyPassword(data.password, teacher.password_hash);
+        // Verify password - plain text comparison
+        const isValid = verifyPassword(data.password, teacher.password_hash);
 
         if (!isValid) {
           return new Response(JSON.stringify({ success: false, error: "اسم المستخدم أو كلمة المرور غير صحيحة" }), {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
-        }
-
-        // If using legacy base64, migrate to bcrypt
-        if (!teacher.password_hash.startsWith('$2a$') && !teacher.password_hash.startsWith('$2b$')) {
-          const newHash = await hashPassword(data.password);
-          await supabase.from("teachers").update({ password_hash: newHash }).eq("id", teacher.id);
         }
 
         // Update last login
@@ -678,19 +672,13 @@ serve(async (req) => {
           });
         }
 
-        // Verify password using bcrypt (supports legacy base64)
-        const isValid = await verifyPassword(data.password, teacher.password_hash);
+        // Verify password - plain text comparison
+        const isValid = verifyPassword(data.password, teacher.password_hash);
 
         if (!isValid) {
           return new Response(JSON.stringify({ success: false, error: "اسم المستخدم أو كلمة المرور غير صحيحة" }), {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
-        }
-
-        // If using legacy base64, migrate to bcrypt
-        if (!teacher.password_hash.startsWith('$2a$') && !teacher.password_hash.startsWith('$2b$')) {
-          const newHash = await hashPassword(data.password);
-          await supabase.from("teachers").update({ password_hash: newHash }).eq("id", teacher.id);
         }
 
         // Update last login
@@ -801,7 +789,7 @@ serve(async (req) => {
 
         // Verify current password if not forced
         if (!data.isForced && data.currentPassword) {
-          const isValid = await verifyPassword(data.currentPassword, teacher.password_hash);
+          const isValid = verifyPassword(data.currentPassword, teacher.password_hash);
           if (!isValid) {
             return new Response(JSON.stringify({ success: false, error: "كلمة المرور الحالية غير صحيحة" }), {
               headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -809,12 +797,11 @@ serve(async (req) => {
           }
         }
 
-        // Update password with bcrypt
-        const newPasswordHash = await hashPassword(data.newPassword);
+        // Update password - plain text
         const { error: updateError } = await supabase
           .from("teachers")
           .update({ 
-            password_hash: newPasswordHash,
+            password_hash: data.newPassword,
             must_change_password: false
           })
           .eq("id", data.teacherId);
