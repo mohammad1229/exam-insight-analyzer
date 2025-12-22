@@ -56,6 +56,10 @@ const StatisticsTab = () => {
   const loadStatisticsData = async () => {
     setLoading(true);
     try {
+      // التحقق من وجود school ID
+      const schoolId = localStorage.getItem("currentSchoolId");
+      console.log("Statistics - Current school ID:", schoolId);
+
       const [tests, teachers, subjects, classes, performanceLevels] = await Promise.all([
         getTestsDB(),
         getTeachersDB(),
@@ -64,15 +68,27 @@ const StatisticsTab = () => {
         getPerformanceLevelsDB()
       ]);
 
+      console.log("Statistics data loaded:", {
+        testsCount: tests?.length || 0,
+        teachersCount: teachers?.length || 0,
+        subjectsCount: subjects?.length || 0,
+        classesCount: classes?.length || 0
+      });
+
       // Configure performance levels from database
-      const levelsConfig = configurePerformanceLevels(performanceLevels);
+      const levelsConfig = configurePerformanceLevels(performanceLevels || []);
       setLevels(levelsConfig);
 
-      setTestsCount(tests.length);
-      setTeachersCount(teachers.length);
+      setTestsCount(tests?.length || 0);
+      setTeachersCount(teachers?.length || 0);
+
+      // Use safe arrays
+      const safeTests = tests || [];
+      const safeSubjects = subjects || [];
+      const safeClasses = classes || [];
 
       // Prepare reports from tests with results
-      const reportsData: ReportData[] = tests
+      const reportsData: ReportData[] = safeTests
         .filter((test: DBTest) => test.test_results && test.test_results.length > 0)
         .map((test: DBTest) => {
           const presentStudents = test.test_results?.filter(r => !r.is_absent) || [];
