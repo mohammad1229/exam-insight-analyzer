@@ -82,6 +82,10 @@ const SummaryTab = () => {
   const loadSummaryData = async () => {
     setLoading(true);
     try {
+      // التحقق من وجود school ID
+      const schoolId = localStorage.getItem("currentSchoolId");
+      console.log("Summary - Current school ID:", schoolId);
+
       // Fetch all data from database
       const [tests, classes, subjects, teachers, students, performanceLevels] = await Promise.all([
         getTestsDB(),
@@ -92,8 +96,16 @@ const SummaryTab = () => {
         getPerformanceLevelsDB()
       ]);
 
+      console.log("Summary data loaded:", {
+        testsCount: tests?.length || 0,
+        classesCount: classes?.length || 0,
+        subjectsCount: subjects?.length || 0,
+        teachersCount: teachers?.length || 0,
+        studentsCount: students?.length || 0
+      });
+
       // Configure performance levels from database
-      const levelsConfig = configurePerformanceLevels(performanceLevels);
+      const levelsConfig = configurePerformanceLevels(performanceLevels || []);
       setLevels(levelsConfig);
 
       // Calculate overall stats from test results
@@ -106,7 +118,14 @@ const SummaryTab = () => {
       const teacherStats: Record<string, { total: number; passed: number; count: number; name: string }> = {};
       const monthlyStats: Record<string, { total: number; passed: number; count: number }> = {};
 
-      tests.forEach((test: DBTest) => {
+      // Use safe arrays in case data is empty
+      const safeTests = tests || [];
+      const safeClasses = classes || [];
+      const safeSubjects = subjects || [];
+      const safeTeachers = teachers || [];
+      const safeStudents = students || [];
+
+      safeTests.forEach((test: DBTest) => {
         if (!test.test_results || test.test_results.length === 0) return;
 
         const presentStudents = test.test_results.filter(r => !r.is_absent);
@@ -169,7 +188,7 @@ const SummaryTab = () => {
 
       // Prepare chart data
       const subjectChartData = Object.entries(subjectStats).map(([id, stats]) => {
-        const subject = subjects.find(s => s.id === id);
+        const subject = safeSubjects.find(s => s.id === id);
         return {
           name: subject?.name || id,
           passRate: stats.total > 0 ? Math.round((stats.passed / stats.total) * 100) : 0,
@@ -178,7 +197,7 @@ const SummaryTab = () => {
       });
 
       const classChartData = Object.entries(classStats).map(([id, stats]) => {
-        const cls = classes.find(c => c.id === id);
+        const cls = safeClasses.find(c => c.id === id);
         return {
           name: cls?.name || id,
           passRate: stats.total > 0 ? Math.round((stats.passed / stats.total) * 100) : 0,
@@ -199,11 +218,11 @@ const SummaryTab = () => {
       }));
 
       setSummaryData({
-        totalStudents: students.length,
-        totalTeachers: teachers.length,
-        totalClasses: classes.length,
-        totalSubjects: subjects.length,
-        totalTests: tests.length,
+        totalStudents: safeStudents.length,
+        totalTeachers: safeTeachers.length,
+        totalClasses: safeClasses.length,
+        totalSubjects: safeSubjects.length,
+        totalTests: safeTests.length,
         avgPassRate: testsWithResults > 0 ? Math.round(totalPassRate / testsWithResults) : 0,
         excellentCount: totalExcellent,
         goodCount: totalGood,
