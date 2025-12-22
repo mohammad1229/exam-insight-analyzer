@@ -14,7 +14,8 @@ import {
   DBTest,
   DBPerformanceLevel
 } from "@/services/databaseService";
-import { TrendingUp, Users, BookOpen, GraduationCap, Award, AlertTriangle, Loader2 } from "lucide-react";
+import { TrendingUp, Users, BookOpen, GraduationCap, Award, AlertTriangle, Loader2, RefreshCw } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface SummaryData {
   totalStudents: number;
@@ -268,6 +269,20 @@ const SummaryTab = () => {
 
   return (
     <div className="space-y-6">
+      {/* Header with Refresh Button */}
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-bold">ملخص بيانات المدرسة</h2>
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={loadSummaryData}
+          disabled={loading}
+        >
+          <RefreshCw className={`h-4 w-4 ml-2 ${loading ? 'animate-spin' : ''}`} />
+          تحديث البيانات
+        </Button>
+      </div>
+
       {/* Overview Stats */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <Card className="border-2 border-blue-500">

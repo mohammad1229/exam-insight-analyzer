@@ -10,7 +10,8 @@ import {
   DBTest,
   DBPerformanceLevel
 } from "@/services/databaseService";
-import { Loader2 } from "lucide-react";
+import { Loader2, RefreshCw } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface PerformanceLevelsConfig {
   excellent: { min: number; color: string };
@@ -186,8 +187,17 @@ const StatisticsTab = () => {
 
   return (
     <Card className="border-2 border-black">
-      <CardHeader className="bg-gradient-to-r from-gray-100 to-white border-b border-black">
+      <CardHeader className="bg-gradient-to-r from-gray-100 to-white border-b border-black flex flex-row items-center justify-between">
         <CardTitle>إحصائيات المدرسة</CardTitle>
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={loadStatisticsData}
+          disabled={loading}
+        >
+          <RefreshCw className={`h-4 w-4 ml-2 ${loading ? 'animate-spin' : ''}`} />
+          تحديث البيانات
+        </Button>
       </CardHeader>
       <CardContent className="pt-6">
         {/* Summary Cards */}
