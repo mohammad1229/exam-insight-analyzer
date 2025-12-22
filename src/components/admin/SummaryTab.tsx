@@ -2,11 +2,19 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-  PieChart, Pie, Cell, LineChart, Line, AreaChart, Area
+  PieChart, Pie, Cell, AreaChart, Area
 } from "recharts";
-import { getTests, getClasses, getSubjects, getTeachers, getStudents } from "@/services/dataService";
-import { TrendingUp, Users, BookOpen, GraduationCap, Award, AlertTriangle } from "lucide-react";
-import { getPerformanceLevels } from "./PerformanceLevelsTab";
+import { 
+  getClassesDB, 
+  getSubjectsDB, 
+  getTeachersDB, 
+  getStudentsDB, 
+  getTestsDB,
+  getPerformanceLevelsDB,
+  DBTest,
+  DBPerformanceLevel
+} from "@/services/databaseService";
+import { TrendingUp, Users, BookOpen, GraduationCap, Award, AlertTriangle, Loader2 } from "lucide-react";
 
 interface SummaryData {
   totalStudents: number;
@@ -22,7 +30,16 @@ interface SummaryData {
   failedCount: number;
 }
 
+interface PerformanceLevelsConfig {
+  excellent: { min: number; color: string };
+  good: { min: number; color: string };
+  average: { min: number; color: string };
+  low: { min: number; color: string };
+  failed: { min: number; color: string };
+}
+
 const SummaryTab = () => {
+  const [loading, setLoading] = useState(true);
   const [summaryData, setSummaryData] = useState<SummaryData>({
     totalStudents: 0,
     totalTeachers: 0,
@@ -41,8 +58,13 @@ const SummaryTab = () => {
   const [classPerformance, setClassPerformance] = useState<any[]>([]);
   const [teacherPerformance, setTeacherPerformance] = useState<any[]>([]);
   const [monthlyTrend, setMonthlyTrend] = useState<any[]>([]);
-
-  const levels = getPerformanceLevels();
+  const [levels, setLevels] = useState<PerformanceLevelsConfig>({
+    excellent: { min: 90, color: "#22c55e" },
+    good: { min: 75, color: "#3b82f6" },
+    average: { min: 60, color: "#f59e0b" },
+    low: { min: 50, color: "#ef4444" },
+    failed: { min: 0, color: "#dc2626" }
+  });
 
   const COLORS = {
     excellent: "#22c55e",
@@ -56,135 +78,193 @@ const SummaryTab = () => {
     loadSummaryData();
   }, []);
 
-  const loadSummaryData = () => {
-    const tests = getTests();
-    const classes = getClasses();
-    const subjects = getSubjects();
-    const teachers = getTeachers();
-    const students = getStudents();
+  const loadSummaryData = async () => {
+    setLoading(true);
+    try {
+      // Fetch all data from database
+      const [tests, classes, subjects, teachers, students, performanceLevels] = await Promise.all([
+        getTestsDB(),
+        getClassesDB(),
+        getSubjectsDB(),
+        getTeachersDB(),
+        getStudentsDB(),
+        getPerformanceLevelsDB()
+      ]);
 
-    // Calculate overall stats
-    let totalExcellent = 0, totalGood = 0, totalAverage = 0, totalLow = 0, totalFailed = 0;
-    let totalPassRate = 0;
+      // Configure performance levels from database
+      const levelsConfig = configurePerformanceLevels(performanceLevels);
+      setLevels(levelsConfig);
 
-    const subjectStats: Record<string, { total: number; passed: number; count: number }> = {};
-    const classStats: Record<string, { total: number; passed: number; count: number }> = {};
-    const teacherStats: Record<string, { total: number; passed: number; count: number; name: string }> = {};
+      // Calculate overall stats from test results
+      let totalExcellent = 0, totalGood = 0, totalAverage = 0, totalLow = 0, totalFailed = 0;
+      let totalPassRate = 0;
+      let testsWithResults = 0;
 
-    tests.forEach((test: any) => {
-      if (!test.results) return;
+      const subjectStats: Record<string, { total: number; passed: number; count: number }> = {};
+      const classStats: Record<string, { total: number; passed: number; count: number }> = {};
+      const teacherStats: Record<string, { total: number; passed: number; count: number; name: string }> = {};
+      const monthlyStats: Record<string, { total: number; passed: number; count: number }> = {};
 
-      const presentStudents = test.results.filter((r: any) => !r.isAbsent);
-      
-      presentStudents.forEach((result: any) => {
-        const pct = result.percentage || 0;
-        if (pct >= levels.excellent.min) totalExcellent++;
-        else if (pct >= levels.good.min) totalGood++;
-        else if (pct >= levels.average.min) totalAverage++;
-        else if (pct >= levels.low.min) totalLow++;
-        else totalFailed++;
+      tests.forEach((test: DBTest) => {
+        if (!test.test_results || test.test_results.length === 0) return;
+
+        const presentStudents = test.test_results.filter(r => !r.is_absent);
+        if (presentStudents.length === 0) return;
+
+        testsWithResults++;
+
+        presentStudents.forEach(result => {
+          const pct = result.percentage || 0;
+          if (pct >= levelsConfig.excellent.min) totalExcellent++;
+          else if (pct >= levelsConfig.good.min) totalGood++;
+          else if (pct >= levelsConfig.average.min) totalAverage++;
+          else if (pct >= levelsConfig.low.min) totalLow++;
+          else totalFailed++;
+        });
+
+        const passedCount = presentStudents.filter(r => r.percentage >= levelsConfig.low.min).length;
+        const passRate = presentStudents.length > 0 ? (passedCount / presentStudents.length) * 100 : 0;
+        totalPassRate += passRate;
+
+        // Subject stats
+        const subjectId = test.subject_id;
+        if (!subjectStats[subjectId]) {
+          subjectStats[subjectId] = { total: 0, passed: 0, count: 0 };
+        }
+        subjectStats[subjectId].total += presentStudents.length;
+        subjectStats[subjectId].passed += passedCount;
+        subjectStats[subjectId].count++;
+
+        // Class stats
+        const classId = test.class_id;
+        if (!classStats[classId]) {
+          classStats[classId] = { total: 0, passed: 0, count: 0 };
+        }
+        classStats[classId].total += presentStudents.length;
+        classStats[classId].passed += passedCount;
+        classStats[classId].count++;
+
+        // Teacher stats
+        const teacherId = test.teacher_id;
+        if (teacherId) {
+          if (!teacherStats[teacherId]) {
+            const teacherName = test.teachers?.name || "غير معروف";
+            teacherStats[teacherId] = { total: 0, passed: 0, count: 0, name: teacherName };
+          }
+          teacherStats[teacherId].total += presentStudents.length;
+          teacherStats[teacherId].passed += passedCount;
+          teacherStats[teacherId].count++;
+        }
+
+        // Monthly stats
+        const testMonth = new Date(test.test_date).toLocaleString('ar-EG', { month: 'long' });
+        if (!monthlyStats[testMonth]) {
+          monthlyStats[testMonth] = { total: 0, passed: 0, count: 0 };
+        }
+        monthlyStats[testMonth].total += presentStudents.length;
+        monthlyStats[testMonth].passed += passedCount;
+        monthlyStats[testMonth].count++;
       });
 
-      const passedCount = presentStudents.filter((r: any) => r.percentage >= levels.low.min).length;
-      const passRate = presentStudents.length > 0 ? (passedCount / presentStudents.length) * 100 : 0;
-      totalPassRate += passRate;
+      // Prepare chart data
+      const subjectChartData = Object.entries(subjectStats).map(([id, stats]) => {
+        const subject = subjects.find(s => s.id === id);
+        return {
+          name: subject?.name || id,
+          passRate: stats.total > 0 ? Math.round((stats.passed / stats.total) * 100) : 0,
+          tests: stats.count
+        };
+      });
 
-      // Subject stats
-      const subjectId = test.subjectId;
-      if (!subjectStats[subjectId]) {
-        subjectStats[subjectId] = { total: 0, passed: 0, count: 0 };
-      }
-      subjectStats[subjectId].total += presentStudents.length;
-      subjectStats[subjectId].passed += passedCount;
-      subjectStats[subjectId].count++;
+      const classChartData = Object.entries(classStats).map(([id, stats]) => {
+        const cls = classes.find(c => c.id === id);
+        return {
+          name: cls?.name || id,
+          passRate: stats.total > 0 ? Math.round((stats.passed / stats.total) * 100) : 0,
+          students: stats.total
+        };
+      });
 
-      // Class stats
-      const classId = test.classId;
-      if (!classStats[classId]) {
-        classStats[classId] = { total: 0, passed: 0, count: 0 };
-      }
-      classStats[classId].total += presentStudents.length;
-      classStats[classId].passed += passedCount;
-      classStats[classId].count++;
-
-      // Teacher stats
-      const teacherId = test.teacherId;
-      if (teacherId) {
-        if (!teacherStats[teacherId]) {
-          const teacher = teachers.find((t: any) => t.id === teacherId);
-          teacherStats[teacherId] = { total: 0, passed: 0, count: 0, name: teacher?.name || "غير معروف" };
-        }
-        teacherStats[teacherId].total += presentStudents.length;
-        teacherStats[teacherId].passed += passedCount;
-        teacherStats[teacherId].count++;
-      }
-    });
-
-    // Prepare chart data
-    const subjectChartData = Object.entries(subjectStats).map(([id, stats]) => {
-      const subject = subjects.find((s: any) => s.id === id);
-      return {
-        name: subject?.name || id,
+      const teacherChartData = Object.entries(teacherStats).map(([id, stats]) => ({
+        name: stats.name,
         passRate: stats.total > 0 ? Math.round((stats.passed / stats.total) * 100) : 0,
         tests: stats.count
-      };
+      }));
+
+      // Monthly trend data
+      const monthlyData = Object.entries(monthlyStats).map(([month, stats]) => ({
+        month,
+        passRate: stats.total > 0 ? Math.round((stats.passed / stats.total) * 100) : 0
+      }));
+
+      setSummaryData({
+        totalStudents: students.length,
+        totalTeachers: teachers.length,
+        totalClasses: classes.length,
+        totalSubjects: subjects.length,
+        totalTests: tests.length,
+        avgPassRate: testsWithResults > 0 ? Math.round(totalPassRate / testsWithResults) : 0,
+        excellentCount: totalExcellent,
+        goodCount: totalGood,
+        averageCount: totalAverage,
+        lowCount: totalLow,
+        failedCount: totalFailed,
+      });
+
+      setSubjectPerformance(subjectChartData);
+      setClassPerformance(classChartData);
+      setTeacherPerformance(teacherChartData);
+      setMonthlyTrend(monthlyData.length > 0 ? monthlyData : [{ month: "لا توجد بيانات", passRate: 0 }]);
+    } catch (error) {
+      console.error("Error loading summary data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const configurePerformanceLevels = (dbLevels: DBPerformanceLevel[]): PerformanceLevelsConfig => {
+    const defaults: PerformanceLevelsConfig = {
+      excellent: { min: 90, color: "#22c55e" },
+      good: { min: 75, color: "#3b82f6" },
+      average: { min: 60, color: "#f59e0b" },
+      low: { min: 50, color: "#ef4444" },
+      failed: { min: 0, color: "#dc2626" }
+    };
+
+    if (dbLevels.length === 0) return defaults;
+
+    // Sort by min_score descending to map levels correctly
+    const sorted = [...dbLevels].sort((a, b) => b.min_score - a.min_score);
+    
+    const levelNames = ['excellent', 'good', 'average', 'low', 'failed'] as const;
+    sorted.forEach((level, index) => {
+      if (index < levelNames.length) {
+        defaults[levelNames[index]] = { min: level.min_score, color: level.color };
+      }
     });
 
-    const classChartData = Object.entries(classStats).map(([id, stats]) => {
-      const cls = classes.find((c: any) => c.id === id);
-      return {
-        name: cls?.name || id,
-        passRate: stats.total > 0 ? Math.round((stats.passed / stats.total) * 100) : 0,
-        students: stats.total
-      };
-    });
-
-    const teacherChartData = Object.entries(teacherStats).map(([id, stats]) => ({
-      name: stats.name,
-      passRate: stats.total > 0 ? Math.round((stats.passed / stats.total) * 100) : 0,
-      tests: stats.count
-    }));
-
-    // Monthly trend (mock data based on tests)
-    const monthlyData = [
-      { month: "يناير", passRate: 72 },
-      { month: "فبراير", passRate: 75 },
-      { month: "مارس", passRate: 68 },
-      { month: "أبريل", passRate: 80 },
-      { month: "مايو", passRate: 78 },
-      { month: "يونيو", passRate: 82 },
-    ];
-
-    setSummaryData({
-      totalStudents: students.length,
-      totalTeachers: teachers.length,
-      totalClasses: classes.length,
-      totalSubjects: subjects.length,
-      totalTests: tests.length,
-      avgPassRate: tests.length > 0 ? Math.round(totalPassRate / tests.length) : 0,
-      excellentCount: totalExcellent,
-      goodCount: totalGood,
-      averageCount: totalAverage,
-      lowCount: totalLow,
-      failedCount: totalFailed,
-    });
-
-    setSubjectPerformance(subjectChartData);
-    setClassPerformance(classChartData);
-    setTeacherPerformance(teacherChartData);
-    setMonthlyTrend(monthlyData);
+    return defaults;
   };
 
   const performanceDistribution = [
-    { name: `ممتاز (${levels.excellent.min}%+)`, value: summaryData.excellentCount, color: COLORS.excellent },
-    { name: `جيد (${levels.good.min}-${levels.excellent.min - 1}%)`, value: summaryData.goodCount, color: COLORS.good },
-    { name: `متوسط (${levels.average.min}-${levels.good.min - 1}%)`, value: summaryData.averageCount, color: COLORS.average },
-    { name: `متدني (${levels.low.min}-${levels.average.min - 1}%)`, value: summaryData.lowCount, color: COLORS.low },
-    { name: `راسب (<${levels.low.min}%)`, value: summaryData.failedCount, color: COLORS.failed },
+    { name: `ممتاز (${levels.excellent.min}%+)`, value: summaryData.excellentCount, color: levels.excellent.color || COLORS.excellent },
+    { name: `جيد (${levels.good.min}-${levels.excellent.min - 1}%)`, value: summaryData.goodCount, color: levels.good.color || COLORS.good },
+    { name: `متوسط (${levels.average.min}-${levels.good.min - 1}%)`, value: summaryData.averageCount, color: levels.average.color || COLORS.average },
+    { name: `متدني (${levels.low.min}-${levels.average.min - 1}%)`, value: summaryData.lowCount, color: levels.low.color || COLORS.low },
+    { name: `راسب (<${levels.low.min}%)`, value: summaryData.failedCount, color: levels.failed.color || COLORS.failed },
   ];
 
   const totalStudentResults = summaryData.excellentCount + summaryData.goodCount + 
     summaryData.averageCount + summaryData.lowCount + summaryData.failedCount;
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <span className="mr-2">جاري تحميل البيانات...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -303,16 +383,22 @@ const SummaryTab = () => {
         </CardHeader>
         <CardContent className="pt-4">
           <div className="h-[350px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={subjectPerformance} margin={{ bottom: 60 }}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" angle={-45} textAnchor="end" height={80} />
-                <YAxis domain={[0, 100]} />
-                <Tooltip formatter={(value) => [`${value}%`, 'نسبة النجاح']} />
-                <Legend />
-                <Bar dataKey="passRate" name="نسبة النجاح" fill="#3b82f6" />
-              </BarChart>
-            </ResponsiveContainer>
+            {subjectPerformance.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={subjectPerformance} margin={{ bottom: 60 }}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" angle={-45} textAnchor="end" height={80} />
+                  <YAxis domain={[0, 100]} />
+                  <Tooltip formatter={(value) => [`${value}%`, 'نسبة النجاح']} />
+                  <Legend />
+                  <Bar dataKey="passRate" name="نسبة النجاح" fill="#3b82f6" />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex items-center justify-center h-full text-muted-foreground">
+                لا توجد بيانات كافية لعرض الإحصائيات
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -325,15 +411,21 @@ const SummaryTab = () => {
           </CardHeader>
           <CardContent className="pt-4">
             <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={classPerformance} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis type="number" domain={[0, 100]} />
-                  <YAxis dataKey="name" type="category" width={100} />
-                  <Tooltip formatter={(value) => [`${value}%`, 'نسبة النجاح']} />
-                  <Bar dataKey="passRate" name="نسبة النجاح" fill="#22c55e" />
-                </BarChart>
-              </ResponsiveContainer>
+              {classPerformance.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={classPerformance} layout="vertical">
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis type="number" domain={[0, 100]} />
+                    <YAxis dataKey="name" type="category" width={100} />
+                    <Tooltip formatter={(value) => [`${value}%`, 'نسبة النجاح']} />
+                    <Bar dataKey="passRate" name="نسبة النجاح" fill="#22c55e" />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex items-center justify-center h-full text-muted-foreground">
+                  لا توجد بيانات
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -344,15 +436,21 @@ const SummaryTab = () => {
           </CardHeader>
           <CardContent className="pt-4">
             <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={teacherPerformance} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis type="number" domain={[0, 100]} />
-                  <YAxis dataKey="name" type="category" width={100} />
-                  <Tooltip formatter={(value) => [`${value}%`, 'نسبة النجاح']} />
-                  <Bar dataKey="passRate" name="نسبة النجاح" fill="#a855f7" />
-                </BarChart>
-              </ResponsiveContainer>
+              {teacherPerformance.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={teacherPerformance} layout="vertical">
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis type="number" domain={[0, 100]} />
+                    <YAxis dataKey="name" type="category" width={100} />
+                    <Tooltip formatter={(value) => [`${value}%`, 'نسبة النجاح']} />
+                    <Bar dataKey="passRate" name="نسبة النجاح" fill="#a855f7" />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex items-center justify-center h-full text-muted-foreground">
+                  لا توجد بيانات
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>

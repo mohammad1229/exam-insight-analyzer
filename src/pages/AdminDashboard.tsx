@@ -456,13 +456,7 @@ const AdminDashboard = () => {
           </TabsContent>
           
           <TabsContent value="statistics">
-            <StatisticsTab 
-              mockReports={mockReports}
-              testsCount={tests.length}
-              teachersCount={teachers.length}
-              selectedClass={selectedClass}
-              chartData={chartData}
-            />
+            <StatisticsTab />
           </TabsContent>
 
           <TabsContent value="levels">
