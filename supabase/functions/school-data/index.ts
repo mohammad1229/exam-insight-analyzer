@@ -601,21 +601,38 @@ serve(async (req) => {
       }
 
       case "bulkSavePerformanceLevels": {
-        // Delete existing and insert new
-        await supabase.from("performance_levels").delete().eq("school_id", schoolId);
+        console.log("Saving performance levels for school:", schoolId);
+        console.log("Levels data:", data.levels);
         
+        // First, try to delete existing levels (ignore error if none exist)
+        const { error: deleteError } = await supabase
+          .from("performance_levels")
+          .delete()
+          .eq("school_id", schoolId);
+        
+        if (deleteError) {
+          console.log("Delete error (may be ignored if no rows):", deleteError.message);
+        }
+        
+        // Insert new levels
         const levelsToInsert = data.levels.map((l: any, idx: number) => ({
           school_id: schoolId,
           name: l.name,
-          min_score: l.min_score || l.minScore,
-          max_score: l.max_score || l.maxScore,
-          color: l.color,
+          min_score: l.min_score ?? l.minScore ?? 0,
+          max_score: l.max_score ?? l.maxScore ?? 100,
+          color: l.color || "#3b82f6",
           display_order: idx
         }));
         
-        const { error } = await supabase.from("performance_levels").insert(levelsToInsert);
-        if (error) throw error;
+        console.log("Inserting levels:", levelsToInsert);
         
+        const { error: insertError } = await supabase.from("performance_levels").insert(levelsToInsert);
+        if (insertError) {
+          console.error("Insert error:", insertError);
+          throw insertError;
+        }
+        
+        console.log("Performance levels saved successfully");
         return new Response(JSON.stringify({ success: true }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
