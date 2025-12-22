@@ -132,6 +132,14 @@ const AdminDashboard = () => {
     refreshReports();
     fetchTests();
     fetchTeachersCount();
+
+    // تحديث العدد مباشرة من تبويب المعلمين عند أي تغيير
+    const handleTeachersCount = (e: Event) => {
+      const ev = e as CustomEvent<{ count: number } | { count: number }>;
+      const count = (ev as any).detail?.count;
+      if (typeof count === "number") setTeachersCount(count);
+    };
+    window.addEventListener("teachers:count", handleTeachersCount as EventListener);
     
     // Listen for storage changes to refresh reports when tests save
     const handleStorageChange = (e: StorageEvent) => {
@@ -150,6 +158,7 @@ const AdminDashboard = () => {
     }, 10000);
     
     return () => {
+      window.removeEventListener("teachers:count", handleTeachersCount as EventListener);
       window.removeEventListener('storage', handleStorageChange);
       clearInterval(interval);
     };
