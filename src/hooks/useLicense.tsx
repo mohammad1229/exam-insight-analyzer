@@ -58,6 +58,34 @@ export const useLicense = () => {
         return;
       }
 
+      // Check if device is already activated (skip online check if recently validated)
+      const lastValidation = localStorage.getItem("lastLicenseValidation");
+      const validationInterval = 24 * 60 * 60 * 1000; // 24 hours
+      const now = Date.now();
+      
+      if (lastValidation && (now - parseInt(lastValidation)) < validationInterval) {
+        // Use cached validation - device already activated
+        const remainingDays = stored.remainingDays || 0;
+        const showWarning = remainingDays <= 7 && remainingDays > 0;
+        
+        setState({
+          isLoading: false,
+          isActivated: true,
+          isTrial: stored.isTrial || false,
+          remainingDays: remainingDays,
+          schoolId: stored.schoolId,
+          schoolName: stored.schoolName,
+          directorName: stored.directorName || null,
+          schoolLogo: stored.schoolLogo || null,
+          licenseKey: stored.licenseKey,
+          devicesUsed: stored.devicesUsed || 0,
+          maxDevices: stored.maxDevices || 1,
+          expiryDate: stored.expiryDate || null,
+          showExpiryWarning: showWarning,
+        });
+        return;
+      }
+
       const result = await checkLicenseValidity();
       
       if (result.valid) {
@@ -86,6 +114,9 @@ export const useLicense = () => {
           showExpiryWarning: showWarning,
         });
 
+        // Save validation timestamp to avoid repeated checks
+        localStorage.setItem("lastLicenseValidation", Date.now().toString());
+
         // Store school info in localStorage for other components
         if (stored.schoolName) {
           localStorage.setItem("licenseSchoolName", stored.schoolName);
@@ -94,8 +125,10 @@ export const useLicense = () => {
           localStorage.setItem("licenseDirectorName", stored.directorName);
         }
 
-        // Show warning notification if expiring soon
-        if (showWarning) {
+        // Show warning notification if expiring soon (only once per session)
+        const warningShown = sessionStorage.getItem("licenseWarningShown");
+        if (showWarning && !warningShown) {
+          sessionStorage.setItem("licenseWarningShown", "true");
           toast({
             title: "تنبيه: اقتراب انتهاء الترخيص",
             description: `متبقي ${remainingDays} أيام على انتهاء الترخيص. يرجى التجديد قبل انتهاء الصلاحية.`,
@@ -232,6 +265,10 @@ export const useLicense = () => {
 
   const logout = useCallback(() => {
     clearLicense();
+    // Clear validation cache
+    localStorage.removeItem("lastLicenseValidation");
+    sessionStorage.removeItem("licenseWarningShown");
+    
     setState({
       isLoading: false,
       isActivated: false,

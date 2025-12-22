@@ -102,7 +102,12 @@ export interface DBPerformanceLevel {
 const callSchoolDataAPI = async (action: string, data?: any) => {
   const schoolId = getCurrentSchoolId();
   if (!schoolId) {
-    throw new Error("لم يتم تحديد المدرسة");
+    console.warn(`لم يتم تحديد المدرسة للعملية: ${action}`);
+    // For read operations, return empty array; for write operations, throw error
+    if (action.startsWith('get') || action.startsWith('Get')) {
+      return [];
+    }
+    throw new Error("لم يتم تحديد المدرسة - يرجى تسجيل الدخول مرة أخرى");
   }
 
   const { data: result, error } = await supabase.functions.invoke('school-data', {
