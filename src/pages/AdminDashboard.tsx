@@ -57,8 +57,9 @@ import LoginCredentialsTab from "@/components/admin/LoginCredentialsTab";
 
 // Import utility functions
 import { prepareMockReports, prepareChartData, Report } from "@/utils/reportUtils";
-// Import from dataService
-import { getTeachers, saveTeachers, TeacherWithCredentials, getTests, isTeacherOnly } from "@/services/dataService";
+// Import from dataService (بعض أجزاء الصفحة ما زالت تستخدم بيانات محلية)
+import { getTests, isTeacherOnly } from "@/services/dataService";
+import { getTeachersDB } from "@/services/databaseService";
 
 const AdminDashboard = () => {
   const { toast } = useToast();
@@ -80,9 +81,8 @@ const AdminDashboard = () => {
   const [selectedClass, setSelectedClass] = useState("");
   const [mockReports, setMockReports] = useState<Report[]>([]);
   const [chartData, setChartData] = useState<any[]>([]);
-  
-  // Teachers management
-  const [teachers, setTeachers] = useState<TeacherWithCredentials[]>([]);
+  // Teachers count (من قاعدة البيانات)
+  const [teachersCount, setTeachersCount] = useState(0);
   
   // Tests and report preview
   const [tests, setTests] = useState<any[]>([]);
@@ -111,11 +111,16 @@ const AdminDashboard = () => {
     }
   };
   
-  // Initialize teachers from dataService
-  useEffect(() => {
-    setTeachers(getTeachers());
-  }, []);
-  
+  const fetchTeachersCount = async () => {
+    try {
+      const teachers = await getTeachersDB();
+      setTeachersCount(teachers?.length || 0);
+    } catch (e) {
+      console.error("Error fetching teachers count:", e);
+      setTeachersCount(0);
+    }
+  };
+
   // Function to refresh reports data
   const refreshReports = () => {
     const reports = prepareMockReports();
@@ -126,8 +131,9 @@ const AdminDashboard = () => {
   useEffect(() => {
     refreshReports();
     fetchTests();
+    fetchTeachersCount();
     
-    // Listen for storage changes to refresh reports when teachers save
+    // Listen for storage changes to refresh reports when tests save
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key?.includes('tests')) {
         refreshReports();
@@ -140,6 +146,7 @@ const AdminDashboard = () => {
     // Also refresh every 10 seconds to catch local changes
     const interval = setInterval(() => {
       refreshReports();
+      fetchTeachersCount();
     }, 10000);
     
     return () => {
@@ -147,7 +154,7 @@ const AdminDashboard = () => {
       clearInterval(interval);
     };
   }, []);
-  
+
   // Update chart data when filters change
   useEffect(() => {
     setChartData(prepareChartData(mockReports, selectedClass));
@@ -300,7 +307,7 @@ const AdminDashboard = () => {
                   <p className="text-sm text-muted-foreground">اختبارات</p>
                 </div>
                 <div className="text-center p-3 bg-purple-50 rounded-lg">
-                  <p className="text-2xl font-bold text-purple-600">{teachers.length}</p>
+                  <p className="text-2xl font-bold text-purple-600">{teachersCount}</p>
                   <p className="text-sm text-muted-foreground">معلمين</p>
                 </div>
                 <div className="text-center p-3 bg-green-50 rounded-lg">
