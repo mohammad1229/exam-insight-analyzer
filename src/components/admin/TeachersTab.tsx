@@ -90,6 +90,10 @@ const TeachersTab = () => {
     loadData();
   }, []);
 
+  const emitTeachersCount = (count: number) => {
+    window.dispatchEvent(new CustomEvent("teachers:count", { detail: { count } }));
+  };
+
   const loadData = async () => {
     setIsLoading(true);
     try {
@@ -101,6 +105,7 @@ const TeachersTab = () => {
       setClasses(classesData);
       setSubjects(subjectsData);
       setTeachers(teachersData);
+      emitTeachersCount(teachersData?.length || 0);
     } catch (error: any) {
       console.error("Error loading data:", error);
       toast({
@@ -134,7 +139,9 @@ const TeachersTab = () => {
         must_change_password: true,
       });
       
-      setTeachers([...teachers, newTeacher]);
+      const next = [...teachers, newTeacher];
+      setTeachers(next);
+      emitTeachersCount(next.length);
       
       toast({
         title: "تمت إضافة المعلم بنجاح",
@@ -194,7 +201,9 @@ const TeachersTab = () => {
     
     try {
       await deleteTeacherDB(teacherId);
-      setTeachers(teachers.filter(t => t.id !== teacherId));
+      const next = teachers.filter(t => t.id !== teacherId);
+      setTeachers(next);
+      emitTeachersCount(next.length);
       
       toast({
         title: "تم حذف المعلم",
