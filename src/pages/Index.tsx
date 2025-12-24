@@ -12,8 +12,32 @@ import ColorCustomizer from "@/components/ColorCustomizer";
 import PageTransition from "@/components/PageTransition";
 import { useColorStore } from "@/stores/colorStore";
 import CopyrightFooter from "@/components/CopyrightFooter";
-import { motion } from "framer-motion";
-import { CheckCircle, Users, UserCog, Settings, LogIn } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { CheckCircle, Users, UserCog, Settings, LogIn, User, ArrowRight, Clock } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+
+// Helper to get last logged in user
+const getLastUser = () => {
+  const saved = localStorage.getItem("lastLoggedInUser");
+  if (saved) {
+    try {
+      return JSON.parse(saved);
+    } catch {
+      return null;
+    }
+  }
+  return null;
+};
+
+// Helper to save last logged in user
+export const saveLastUser = (user: { name: string; type: 'teacher' | 'admin'; timestamp: string }) => {
+  localStorage.setItem("lastLoggedInUser", JSON.stringify(user));
+};
 
 const Index = () => {
   const navigate = useNavigate();
@@ -31,12 +55,17 @@ const Index = () => {
 
   const [progress, setProgress] = useState(0);
   const [showWelcome, setShowWelcome] = useState(true);
+  const [showUserTypeDialog, setShowUserTypeDialog] = useState(false);
+  const [lastUser, setLastUser] = useState<{ name: string; type: 'teacher' | 'admin'; timestamp: string } | null>(null);
   
   // Apply saved color theme - MUST be called before any conditional returns
   const { applyTheme } = useColorStore();
   
   useEffect(() => {
     applyTheme();
+    // Load last user
+    const user = getLastUser();
+    setLastUser(user);
   }, [applyTheme]);
 
   useEffect(() => {
@@ -55,6 +84,44 @@ const Index = () => {
 
     return () => clearInterval(interval);
   }, []);
+
+  const handleLoginClick = () => {
+    setShowUserTypeDialog(true);
+  };
+
+  const handleUserTypeSelect = (type: 'teacher' | 'admin') => {
+    setShowUserTypeDialog(false);
+    if (type === 'teacher') {
+      navigate("/teacher-login");
+    } else {
+      navigate("/admin-dashboard");
+    }
+  };
+
+  const handleQuickLogin = () => {
+    if (lastUser) {
+      if (lastUser.type === 'teacher') {
+        navigate("/teacher-login");
+      } else {
+        navigate("/admin-dashboard");
+      }
+    }
+  };
+
+  const formatLastLoginTime = (timestamp: string) => {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return "الآن";
+    if (diffMins < 60) return `منذ ${diffMins} دقيقة`;
+    if (diffHours < 24) return `منذ ${diffHours} ساعة`;
+    if (diffDays < 7) return `منذ ${diffDays} يوم`;
+    return date.toLocaleDateString('ar-SA');
+  };
 
   // Show welcome screen with loading bar
   if (showWelcome) {
@@ -268,39 +335,67 @@ const Index = () => {
               </Card>
             </motion.div>
 
-            {/* أزرار تسجيل الدخول */}
+            {/* آخر مستخدم قام بتسجيل الدخول */}
+            <AnimatePresence>
+              {lastUser && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.9 }}
+                  transition={{ delay: 0.6 }}
+                >
+                  <Card className="border border-blue-400/30 bg-blue-500/10 backdrop-blur-xl max-w-md mx-auto cursor-pointer hover:bg-blue-500/20 transition-all duration-200"
+                    onClick={handleQuickLogin}
+                  >
+                    <CardContent className="py-4">
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 rounded-full bg-blue-500/30 flex items-center justify-center">
+                            <User className="h-6 w-6 text-blue-300" />
+                          </div>
+                          <div className="text-right">
+                            <p className="text-white font-bold">{lastUser.name}</p>
+                            <div className="flex items-center gap-2 text-sm text-gray-400">
+                              <span>{lastUser.type === 'teacher' ? 'معلم' : 'مدير'}</span>
+                              <span>•</span>
+                              <span className="flex items-center gap-1">
+                                <Clock className="h-3 w-3" />
+                                {formatLastLoginTime(lastUser.timestamp)}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                        <Button 
+                          size="sm" 
+                          className="bg-blue-600 hover:bg-blue-700 text-white"
+                        >
+                          متابعة
+                          <ArrowRight className="h-4 w-4 mr-2" />
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* زر تسجيل الدخول */}
             <motion.div 
               className="space-y-4"
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.7 }}
             >
-              <p className="text-gray-300 text-lg font-medium flex items-center justify-center gap-2">
-                <LogIn className="h-5 w-5" />
-                تسجيل الدخول إلى النظام
-              </p>
+              <Button 
+                size="lg" 
+                className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-white font-bold shadow-xl transition-all duration-200 hover:scale-105 flex items-center gap-2 px-12 py-6 text-lg"
+                onClick={handleLoginClick}
+              >
+                <LogIn className="h-6 w-6" />
+                تسجيل الدخول
+              </Button>
               
-              <div className="flex flex-wrap justify-center gap-4">
-                <Button 
-                  size="lg" 
-                  className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold shadow-lg transition-all duration-200 hover:scale-105 flex items-center gap-2 px-8"
-                  onClick={() => navigate("/teacher-login")}
-                >
-                  <Users className="h-5 w-5" />
-                  دخول المعلمين
-                </Button>
-                
-                <Button 
-                  size="lg"
-                  className="bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white font-semibold shadow-lg transition-all duration-200 hover:scale-105 flex items-center gap-2 px-8"
-                  onClick={() => navigate("/admin-dashboard")}
-                >
-                  <UserCog className="h-5 w-5" />
-                  لوحة تحكم المدير
-                </Button>
-              </div>
-              
-              <div className="pt-4">
+              <div className="pt-2">
                 <Button 
                   variant="ghost"
                   size="sm"
@@ -324,6 +419,58 @@ const Index = () => {
         >
           <CopyrightFooter className="text-white/70" />
         </motion.div>
+
+        {/* حوار اختيار نوع المستخدم */}
+        <Dialog open={showUserTypeDialog} onOpenChange={setShowUserTypeDialog}>
+          <DialogContent className="sm:max-w-md bg-gradient-to-br from-slate-900 via-purple-900/90 to-slate-900 border border-white/20 text-white">
+            <DialogHeader>
+              <DialogTitle className="text-center text-xl text-white flex items-center justify-center gap-2">
+                <LogIn className="h-5 w-5" />
+                اختر نوع الحساب
+              </DialogTitle>
+            </DialogHeader>
+            
+            <div className="grid grid-cols-2 gap-4 py-6">
+              {/* خيار المعلم */}
+              <motion.div
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <Card 
+                  className="border border-blue-400/30 bg-blue-500/20 hover:bg-blue-500/30 cursor-pointer transition-all duration-200 h-full"
+                  onClick={() => handleUserTypeSelect('teacher')}
+                >
+                  <CardContent className="pt-6 pb-6 text-center">
+                    <div className="w-16 h-16 rounded-full bg-blue-500/30 flex items-center justify-center mx-auto mb-4">
+                      <Users className="h-8 w-8 text-blue-300" />
+                    </div>
+                    <h3 className="text-lg font-bold text-white mb-1">معلم</h3>
+                    <p className="text-sm text-gray-400">الدخول كمعلم لإدخال وتحليل النتائج</p>
+                  </CardContent>
+                </Card>
+              </motion.div>
+
+              {/* خيار المدير */}
+              <motion.div
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <Card 
+                  className="border border-purple-400/30 bg-purple-500/20 hover:bg-purple-500/30 cursor-pointer transition-all duration-200 h-full"
+                  onClick={() => handleUserTypeSelect('admin')}
+                >
+                  <CardContent className="pt-6 pb-6 text-center">
+                    <div className="w-16 h-16 rounded-full bg-purple-500/30 flex items-center justify-center mx-auto mb-4">
+                      <UserCog className="h-8 w-8 text-purple-300" />
+                    </div>
+                    <h3 className="text-lg font-bold text-white mb-1">مدير المدرسة</h3>
+                    <p className="text-sm text-gray-400">الدخول للوحة التحكم والإدارة</p>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </PageTransition>
   );
