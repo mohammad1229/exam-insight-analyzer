@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { verifySchoolAdminLogin } from "@/services/licenseService";
 import { Loader2, ArrowRight, Key } from "lucide-react";
 import ChangePasswordDialog from "@/components/ChangePasswordDialog";
+import { saveLastUser } from "@/pages/Index";
 
 interface AdminLoginFormProps {
   onLoginSuccess?: () => void;
@@ -77,6 +78,13 @@ const AdminLoginForm = ({ onLoginSuccess }: AdminLoginFormProps) => {
     if (admin.school_id) {
       localStorage.setItem("currentSchoolId", admin.school_id);
     }
+
+    // Save last logged in user
+    saveLastUser({
+      name: admin.full_name,
+      type: 'admin',
+      timestamp: new Date().toISOString()
+    });
     
     toast({
       title: "تم تسجيل الدخول بنجاح",

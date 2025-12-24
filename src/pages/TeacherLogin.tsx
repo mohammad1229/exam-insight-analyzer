@@ -9,6 +9,7 @@ import { isElectron } from "@/services/electronService";
 import electronService from "@/services/electronService";
 import { LogIn } from "lucide-react";
 import TeacherChangePasswordDialog from "@/components/TeacherChangePasswordDialog";
+import { saveLastUser } from "@/pages/Index";
 
 const TeacherLogin = () => {
   const { toast } = useToast();
@@ -243,6 +244,13 @@ const TeacherLogin = () => {
 
     // Also set currentTeacherId for compatibility
     localStorage.setItem("currentTeacherId", teacher.id);
+
+    // Save last logged in user
+    saveLastUser({
+      name: teacher.name,
+      type: 'teacher',
+      timestamp: new Date().toISOString()
+    });
 
     toast({
       title: "تم تسجيل الدخول بنجاح",
