@@ -20,6 +20,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { toast } from "sonner";
 
 // Helper to get last logged in user
 const getLastUser = () => {
@@ -66,7 +67,41 @@ const Index = () => {
     // Load last user
     const user = getLastUser();
     setLastUser(user);
+    
+    // Show personalized welcome notification
+    if (user) {
+      const timeSinceLogin = getWelcomeMessage(user.timestamp);
+      setTimeout(() => {
+        toast.success(
+          `مرحباً بعودتك ${user.name}! 👋`,
+          {
+            description: timeSinceLogin,
+            duration: 5000,
+            position: "top-center",
+          }
+        );
+      }, 2500); // Show after loading animation
+    }
   }, [applyTheme]);
+
+  // Generate personalized welcome message based on last login time
+  const getWelcomeMessage = (timestamp: string) => {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 5) return "عدت بسرعة! سعيدون برؤيتك 🚀";
+    if (diffMins < 30) return `آخر زيارة لك كانت منذ ${diffMins} دقيقة`;
+    if (diffHours < 1) return "عدت خلال أقل من ساعة، رائع! ⭐";
+    if (diffHours < 24) return `لم نرك منذ ${diffHours} ساعة، أهلاً بعودتك! 🌟`;
+    if (diffDays === 1) return "عدت بعد يوم واحد، استمر في العمل الرائع! 💪";
+    if (diffDays < 7) return `افتقدناك! آخر زيارة كانت منذ ${diffDays} أيام 🌈`;
+    if (diffDays < 30) return `مرحباً! لم نرك منذ ${diffDays} يوماً، سعيدون بعودتك! 🎉`;
+    return `أهلاً بعودتك بعد غياب طويل! نتمنى لك يوماً سعيداً ☀️`;
+  };
 
   useEffect(() => {
     const interval = setInterval(() => {
