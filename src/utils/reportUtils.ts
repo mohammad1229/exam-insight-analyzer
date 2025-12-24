@@ -21,6 +21,7 @@ export interface Report {
   totalStudents: number;
   passedStudents: number;
   passRate: number;
+  totalMaxScore: number;
 }
 
 // Prepare reports from actual test data
@@ -36,6 +37,9 @@ export const prepareMockReports = (): Report[] => {
     const presentResults = test.results?.filter(r => !r.isAbsent) || [];
     const passedResults = presentResults.filter(r => r.percentage >= 50);
     
+    // Calculate total max score from questions
+    const totalMaxScore = test.questions?.reduce((sum: number, q: any) => sum + (q.maxScore || 0), 0) || 0;
+    
     return {
       id: `report_${test.id}`,
       testId: test.id,
@@ -49,7 +53,8 @@ export const prepareMockReports = (): Report[] => {
       passedStudents: passedResults.length,
       passRate: presentResults.length > 0 
         ? Math.round((passedResults.length / presentResults.length) * 100) 
-        : 0
+        : 0,
+      totalMaxScore
     };
   });
 };

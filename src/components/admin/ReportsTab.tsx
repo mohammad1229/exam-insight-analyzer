@@ -54,6 +54,7 @@ interface Report {
   totalStudents: number;
   passedStudents: number;
   passRate: number;
+  totalMaxScore?: number;
 }
 
 interface ReportsTabProps {
@@ -871,56 +872,77 @@ const ReportsTab = ({ mockReports }: ReportsTabProps) => {
       
       <Card className="border-2 border-red-500">
         <CardHeader className="bg-gradient-to-r from-red-100 to-white border-b border-red-500">
-          <CardTitle>قائمة التقارير</CardTitle>
+          <CardTitle>قائمة التقارير ({filteredReports.length})</CardTitle>
         </CardHeader>
         <CardContent className="pt-6">
-          <Table>
-            <TableHeader className="bg-black">
-              <TableRow>
-                <TableHead className="text-white">اسم الاختبار</TableHead>
-                <TableHead className="text-white">الصف</TableHead>
-                <TableHead className="text-white">المادة</TableHead>
-                <TableHead className="text-white">المعلم</TableHead>
-                <TableHead className="text-white">التاريخ</TableHead>
-                <TableHead className="text-center text-white">نسبة النجاح</TableHead>
-                <TableHead className="text-white"></TableHead>
-              </TableRow>
-            </TableHeader>
-            
-            <TableBody>
-              {filteredReports.length > 0 ? (
-                filteredReports.map(report => (
-                  <TableRow key={report.id} className="hover:bg-green-50">
-                    <TableCell className="font-medium">{report.testName}</TableCell>
-                    <TableCell>{report.className} {report.sectionName}</TableCell>
-                    <TableCell>{report.subjectName}</TableCell>
-                    <TableCell>{report.teacherName}</TableCell>
-                    <TableCell>{report.date}</TableCell>
-                    <TableCell className="text-center">
-                      <span className={`px-2 py-1 rounded-full text-white ${
-                        report.passRate >= 70 ? 'bg-green-500' : 
-                        report.passRate >= 50 ? 'bg-yellow-500' : 'bg-red-500'
-                      }`}>
-                        {report.passRate}%
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-1">
+          {filteredReports.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredReports.map(report => {
+                // Get total max score from the test
+                const test = allTests.find(t => t.id === report.testId);
+                const totalMaxScore = test?.questions?.reduce((sum: number, q: any) => sum + (q.maxScore || 0), 0) || 0;
+                
+                return (
+                  <Card key={report.id} className="border hover:shadow-lg transition-shadow hover:border-green-300">
+                    <CardHeader className="pb-2 bg-gradient-to-r from-green-50 to-transparent">
+                      <CardTitle className="text-base flex items-center justify-between">
+                        <span className="truncate">{report.testName}</span>
+                        <span className={`px-2 py-1 rounded-full text-white text-sm ${
+                          report.passRate >= 70 ? 'bg-green-500' : 
+                          report.passRate >= 50 ? 'bg-yellow-500' : 'bg-red-500'
+                        }`}>
+                          {report.passRate}%
+                        </span>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <div className="flex flex-col">
+                          <span className="text-muted-foreground text-xs">الصف / الشعبة</span>
+                          <span className="font-medium">{report.className} {report.sectionName}</span>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-muted-foreground text-xs">المادة</span>
+                          <span className="font-medium">{report.subjectName}</span>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-muted-foreground text-xs">المعلم</span>
+                          <span className="font-medium">{report.teacherName}</span>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-muted-foreground text-xs">التاريخ</span>
+                          <span className="font-medium">{report.date}</span>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-muted-foreground text-xs">علامة الاختبار</span>
+                          <span className="font-medium text-primary">{totalMaxScore} درجة</span>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-muted-foreground text-xs">عدد الطلاب</span>
+                          <span className="font-medium">{report.totalStudents}</span>
+                        </div>
+                      </div>
+                      
+                      <div className="flex justify-between gap-2 pt-2 border-t">
                         <Button 
                           variant="outline" 
                           size="sm"
                           onClick={() => handleViewReport(report.testId)}
                           title="عرض التقرير"
+                          className="flex-1"
                         >
-                          <Eye className="h-4 w-4" />
+                          <Eye className="h-4 w-4 ml-1" />
+                          عرض
                         </Button>
                         <Button 
                           variant="outline" 
                           size="sm"
                           onClick={() => handleEditReport(report.testId)}
                           title="تعديل النتائج"
+                          className="flex-1"
                         >
-                          <Edit2 className="h-4 w-4" />
+                          <Edit2 className="h-4 w-4 ml-1" />
+                          تعديل
                         </Button>
                         <Button 
                           variant="outline" 
@@ -932,18 +954,17 @@ const ReportsTab = ({ mockReports }: ReportsTabProps) => {
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center py-6">
-                    لا توجد تقارير تطابق معايير التصفية المحددة
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-muted-foreground">
+              <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p>لا توجد تقارير تطابق معايير التصفية المحددة</p>
+            </div>
+          )}
         </CardContent>
       </Card>
 
