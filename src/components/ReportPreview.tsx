@@ -278,8 +278,8 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({ test, open, onClose }) =>
     // === TEST INFO ROW ===
     doc.autoTable({
       startY: currentY,
-      head: [["معلم المادة", "التاريخ", "الصف / الشعبة", "المبحث"]],
-      body: [[teacherName, test.date, `${className} / ${sectionName}`, subjectName]],
+      head: [["علامة الاختبار", "معلم المادة", "التاريخ", "الصف / الشعبة", "المبحث"]],
+      body: [[`${stats.totalMaxScore} درجة`, teacherName, test.date, `${className} / ${sectionName}`, subjectName]],
       theme: "grid",
       styles: { 
         halign: "center", 

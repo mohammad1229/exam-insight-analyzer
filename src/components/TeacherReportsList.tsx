@@ -45,6 +45,7 @@ interface Report {
   totalStudents: number;
   passedStudents: number;
   passRate: number;
+  totalMaxScore: number;
   test: Test;
 }
 
@@ -82,6 +83,9 @@ const TeacherReportsList = () => {
           ? Math.round((passedCount / presentResults.length) * 100)
           : 0;
 
+      // Calculate total max score from questions
+      const totalMaxScore = test.questions?.reduce((sum: number, q: any) => sum + (q.maxScore || 0), 0) || 0;
+
       return {
         id: `report_${test.id}`,
         testId: test.id,
@@ -93,6 +97,7 @@ const TeacherReportsList = () => {
         totalStudents: presentResults.length,
         passedStudents: passedCount,
         passRate,
+        totalMaxScore,
         test,
       };
     });
@@ -162,33 +167,12 @@ const TeacherReportsList = () => {
           </CardTitle>
         </CardHeader>
         <CardContent className="pt-4">
-          <Table>
-            <TableHeader className="bg-muted">
-              <TableRow>
-                <TableHead className="text-right">اسم الاختبار</TableHead>
-                <TableHead className="text-right">الصف</TableHead>
-                <TableHead className="text-right">المادة</TableHead>
-                <TableHead className="text-right">التاريخ</TableHead>
-                <TableHead className="text-center">عدد الطلاب</TableHead>
-                <TableHead className="text-center">نسبة النجاح</TableHead>
-                <TableHead className="text-center">الإجراءات</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {reports.map((report) => (
-                <TableRow key={report.id} className="hover:bg-muted/50">
-                  <TableCell className="font-medium">
-                    {report.testName}
-                  </TableCell>
-                  <TableCell>
-                    {report.className} {report.sectionName}
-                  </TableCell>
-                  <TableCell>{report.subjectName}</TableCell>
-                  <TableCell>{report.date}</TableCell>
-                  <TableCell className="text-center">
-                    <Badge variant="outline">{report.totalStudents}</Badge>
-                  </TableCell>
-                  <TableCell className="text-center">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {reports.map((report) => (
+              <Card key={report.id} className="border hover:shadow-lg transition-shadow">
+                <CardHeader className="pb-2 bg-gradient-to-r from-primary/5 to-transparent">
+                  <CardTitle className="text-base flex items-center justify-between">
+                    <span className="truncate">{report.testName}</span>
                     <Badge
                       className={
                         report.passRate >= 70
@@ -200,40 +184,71 @@ const TeacherReportsList = () => {
                     >
                       {report.passRate}%
                     </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex justify-center gap-1">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleViewReport(report.test)}
-                        title="عرض التقرير"
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleEditReport(report.test)}
-                        title="تعديل النتائج"
-                      >
-                        <Edit2 className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleDeleteReport(report.testId)}
-                        className="text-destructive hover:bg-destructive/10"
-                        title="حذف"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div className="flex flex-col">
+                      <span className="text-muted-foreground text-xs">الصف</span>
+                      <span className="font-medium">{report.className} {report.sectionName}</span>
                     </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+                    <div className="flex flex-col">
+                      <span className="text-muted-foreground text-xs">المادة</span>
+                      <span className="font-medium">{report.subjectName}</span>
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-muted-foreground text-xs">التاريخ</span>
+                      <span className="font-medium">{report.date}</span>
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-muted-foreground text-xs">علامة الاختبار</span>
+                      <span className="font-medium text-primary">{report.totalMaxScore} درجة</span>
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-muted-foreground text-xs">عدد الطلاب</span>
+                      <Badge variant="outline" className="w-fit">{report.totalStudents}</Badge>
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-muted-foreground text-xs">الناجحون</span>
+                      <Badge variant="secondary" className="w-fit">{report.passedStudents}</Badge>
+                    </div>
+                  </div>
+                  
+                  <div className="flex justify-between gap-2 pt-2 border-t">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleViewReport(report.test)}
+                      title="عرض التقرير"
+                      className="flex-1"
+                    >
+                      <Eye className="h-4 w-4 ml-1" />
+                      عرض
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleEditReport(report.test)}
+                      title="تعديل النتائج"
+                      className="flex-1"
+                    >
+                      <Edit2 className="h-4 w-4 ml-1" />
+                      تعديل
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDeleteReport(report.testId)}
+                      className="text-destructive hover:bg-destructive/10"
+                      title="حذف"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         </CardContent>
       </Card>
 
