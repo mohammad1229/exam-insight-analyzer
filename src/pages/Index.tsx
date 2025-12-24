@@ -11,6 +11,9 @@ import ParticlesBackground from "@/components/ParticlesBackground";
 import ColorCustomizer from "@/components/ColorCustomizer";
 import PageTransition from "@/components/PageTransition";
 import { useColorStore } from "@/stores/colorStore";
+import CopyrightFooter from "@/components/CopyrightFooter";
+import { motion } from "framer-motion";
+import { CheckCircle, Users, UserCog, Settings, LogIn } from "lucide-react";
 
 const Index = () => {
   const navigate = useNavigate();
@@ -124,127 +127,204 @@ const Index = () => {
     );
   }
 
-  // Main page with license info
-
-  // Main page with license info
+  // Main page - License is activated, show login options
   return (
     <PageTransition className="min-h-screen">
-      <div className="min-h-screen flex flex-col dir-rtl bg-gradient-to-b from-secondary via-background to-accent dark:from-black dark:via-gray-900 dark:to-green-900 relative">
+      <div className="min-h-screen flex flex-col dir-rtl relative overflow-hidden">
+        {/* خلفية متحركة */}
+        <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+          <div 
+            className="absolute inset-0 opacity-20"
+            style={{
+              backgroundImage: `
+                linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)
+              `,
+              backgroundSize: '50px 50px',
+            }}
+          />
+          
+          <motion.div
+            className="absolute top-20 left-20 w-72 h-72 bg-primary/30 rounded-full blur-3xl"
+            animate={{
+              scale: [1, 1.2, 1],
+              opacity: [0.3, 0.5, 0.3],
+            }}
+            transition={{
+              duration: 4,
+              repeat: Infinity,
+              ease: "easeInOut",
+            }}
+          />
+          <motion.div
+            className="absolute bottom-20 right-20 w-96 h-96 bg-accent/30 rounded-full blur-3xl"
+            animate={{
+              scale: [1.2, 1, 1.2],
+              opacity: [0.3, 0.5, 0.3],
+            }}
+            transition={{
+              duration: 5,
+              repeat: Infinity,
+              ease: "easeInOut",
+            }}
+          />
+        </div>
+
+        <ParticlesBackground particleCount={30} colors={["#E84C3D", "#34A853", "#9333ea", "#ffffff"]} />
+
         {/* أزرار التحكم */}
         <div className="absolute top-4 left-4 z-50 flex items-center gap-2">
           <ThemeToggle />
           <ColorCustomizer />
         </div>
 
-      {/* License expiry warning banner */}
-      {showExpiryWarning && (
-        <LicenseExpiryWarning
-          remainingDays={remainingDays}
-          isTrial={isTrial}
-        />
-      )}
+        {/* License expiry warning banner */}
+        {showExpiryWarning && (
+          <LicenseExpiryWarning
+            remainingDays={remainingDays}
+            isTrial={isTrial}
+          />
+        )}
 
-      <div className="flex-1 flex flex-col items-center justify-center px-4 relative">
-        <ParticlesBackground particleCount={30} />
-        
-        <div className="space-y-8 text-center max-w-3xl relative z-10">
-          <div className="mb-8">
-            <SystemLogo size={100} className="mx-auto mb-6" />
-            <h1 className="text-4xl md:text-5xl font-bold tracking-tighter text-primary dark:text-red-400 mb-4">
-              نظام تحليل نتائج الاختبارات المدرسية
-            </h1>
-            
-            <p className="text-lg md:text-xl text-foreground/80 dark:text-gray-300 font-medium">
-              منصة متكاملة لإدارة وتحليل نتائج الاختبارات وإصدار التقارير الإحصائية
-            </p>
-          </div>
+        <div className="flex-1 flex flex-col items-center justify-center px-4 relative z-10">
+          <div className="space-y-8 text-center max-w-3xl">
+            {/* الشعار */}
+            <motion.div 
+              initial={{ scale: 0, rotate: -180 }}
+              animate={{ scale: 1, rotate: 0 }}
+              transition={{ type: "spring", duration: 1 }}
+            >
+              <SystemLogo size={100} className="mx-auto mb-4" />
+            </motion.div>
 
-          {/* School and license info */}
-          <Card className="border-2 border-primary/50 bg-gradient-to-br from-primary/10 via-background to-accent/10 dark:from-primary/20 dark:via-gray-900 dark:to-accent/20 backdrop-blur max-w-lg mx-auto shadow-xl">
-            <CardContent className="pt-6 pb-6">
-              <div className="space-y-4 text-center">
-                {/* School Logo */}
-                {localStorage.getItem("schoolLogo") && (
-                  <div className="mb-4">
-                    <img 
-                      src={localStorage.getItem("schoolLogo") || ""} 
-                      alt="شعار المدرسة" 
-                      className="h-20 w-20 object-contain mx-auto rounded-lg border-2 border-primary/30"
-                    />
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+            >
+              <h1 className="text-4xl md:text-5xl font-bold text-white mb-4 drop-shadow-lg">
+                نظام تحليل نتائج الاختبارات المدرسية
+              </h1>
+              <p className="text-lg text-gray-300">
+                منصة متكاملة لإدارة وتحليل نتائج الاختبارات وإصدار التقارير الإحصائية
+              </p>
+            </motion.div>
+
+            {/* بطاقة حالة الترخيص */}
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.5 }}
+            >
+              <Card className="border border-white/20 bg-white/10 backdrop-blur-xl shadow-2xl max-w-lg mx-auto">
+                <CardContent className="pt-6 pb-6">
+                  <div className="space-y-4 text-center">
+                    {/* أيقونة الترخيص المفعل */}
+                    <div className="flex items-center justify-center gap-2 text-green-400">
+                      <CheckCircle className="h-6 w-6" />
+                      <span className="text-lg font-bold">الترخيص مفعل</span>
+                    </div>
+
+                    {/* شعار المدرسة */}
+                    {localStorage.getItem("schoolLogo") && (
+                      <div className="mb-2">
+                        <img 
+                          src={localStorage.getItem("schoolLogo") || ""} 
+                          alt="شعار المدرسة" 
+                          className="h-16 w-16 object-contain mx-auto rounded-lg border-2 border-white/30"
+                        />
+                      </div>
+                    )}
+
+                    {/* اسم المدرسة */}
+                    <div className="text-xl font-bold text-white">
+                      {schoolName || "مرحباً بكم في النظام"}
+                    </div>
+
+                    {/* اسم المدير */}
+                    {directorName && (
+                      <div className="text-sm text-gray-300 border-t border-white/20 pt-3">
+                        <span className="text-gray-400">مدير المدرسة: </span>
+                        <span className="font-semibold">{directorName}</span>
+                      </div>
+                    )}
+
+                    {/* حالة الترخيص */}
+                    <div className="flex flex-wrap items-center justify-center gap-3 border-t border-white/20 pt-3">
+                      <span className={`px-4 py-1.5 rounded-full text-sm font-medium ${
+                        isTrial 
+                          ? 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/30' 
+                          : 'bg-green-500/20 text-green-300 border border-green-500/30'
+                      }`}>
+                        {isTrial ? "فترة تجريبية" : "ترخيص مفعل ✓"}
+                      </span>
+                      <span className="text-gray-300 flex items-center gap-1 text-sm">
+                        <span>📅</span>
+                        متبقي <span className="font-bold text-primary text-lg mx-1">{remainingDays}</span> يوم
+                      </span>
+                    </div>
                   </div>
-                )}
+                </CardContent>
+              </Card>
+            </motion.div>
 
-                {/* School Name */}
-                <div className="text-2xl font-bold">
-                  <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-                    {schoolName || "مرحباً بكم في النظام"}
-                  </span>
-                </div>
-
-                {/* Director Name */}
-                {directorName && (
-                  <div className="text-base border-t border-primary/20 pt-3">
-                    <span className="text-muted-foreground">مدير المدرسة: </span>
-                    <span className="font-semibold text-foreground">
-                      {directorName}
-                    </span>
-                  </div>
-                )}
-
-                {/* License Status */}
-                <div className="text-sm border-t border-primary/20 pt-3 flex flex-wrap items-center justify-center gap-3">
-                  <span className={`px-4 py-1.5 rounded-full font-medium ${
-                    isTrial 
-                      ? 'bg-yellow-100 dark:bg-yellow-900/50 text-yellow-800 dark:text-yellow-200 border border-yellow-300' 
-                      : 'bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-200 border border-green-300'
-                  }`}>
-                    {isTrial ? "فترة تجريبية" : "ترخيص مفعل ✓"}
-                  </span>
-                  <span className="text-muted-foreground flex items-center gap-1">
-                    <span className="text-lg">📅</span>
-                    متبقي <span className="font-bold text-primary text-lg mx-1">{remainingDays}</span> يوم
-                  </span>
-                </div>
+            {/* أزرار تسجيل الدخول */}
+            <motion.div 
+              className="space-y-4"
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.7 }}
+            >
+              <p className="text-gray-300 text-lg font-medium flex items-center justify-center gap-2">
+                <LogIn className="h-5 w-5" />
+                تسجيل الدخول إلى النظام
+              </p>
+              
+              <div className="flex flex-wrap justify-center gap-4">
+                <Button 
+                  size="lg" 
+                  className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold shadow-lg transition-all duration-200 hover:scale-105 flex items-center gap-2 px-8"
+                  onClick={() => navigate("/teacher-login")}
+                >
+                  <Users className="h-5 w-5" />
+                  دخول المعلمين
+                </Button>
+                
+                <Button 
+                  size="lg"
+                  className="bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white font-semibold shadow-lg transition-all duration-200 hover:scale-105 flex items-center gap-2 px-8"
+                  onClick={() => navigate("/admin-dashboard")}
+                >
+                  <UserCog className="h-5 w-5" />
+                  لوحة تحكم المدير
+                </Button>
               </div>
-            </CardContent>
-          </Card>
-          
-          <div className="pt-6 flex flex-wrap justify-center gap-4">
-            <Button 
-              size="lg" 
-              className="bg-secondary text-secondary-foreground hover:bg-secondary/90 dark:bg-gray-800 dark:hover:bg-gray-700"
-              onClick={() => navigate("/teacher-login")}
-            >
-              دخول المعلمين
-            </Button>
-            
-            <Button 
-              variant="outline" 
-              size="lg"
-              className="border-primary text-primary hover:bg-primary hover:text-primary-foreground dark:border-red-400 dark:text-red-400"
-              onClick={() => navigate("/admin-dashboard")}
-            >
-              لوحة تحكم المدير
-            </Button>
-            
-            
-            <Button 
-              variant="outline" 
-              size="lg"
-              className="border-muted-foreground text-muted-foreground hover:bg-muted-foreground hover:text-background dark:border-gray-400 dark:text-gray-400"
-              onClick={() => navigate("/system-admin")}
-            >
-              مسؤول النظام
-            </Button>
+              
+              <div className="pt-4">
+                <Button 
+                  variant="ghost"
+                  size="sm"
+                  className="text-gray-400 hover:text-white hover:bg-white/10 flex items-center gap-2"
+                  onClick={() => navigate("/system-admin")}
+                >
+                  <Settings className="h-4 w-4" />
+                  مسؤول النظام
+                </Button>
+              </div>
+            </motion.div>
           </div>
         </div>
         
-        <div className="absolute bottom-6 text-center text-sm text-foreground/60 dark:text-gray-400">
-          <p>جميع الحقوق محفوظة © {new Date().getFullYear()} - محمد الشوامرة للبرمجة والتصميم</p>
-          <p>0566000140</p>
-        </div>
+        {/* تذييل الصفحة */}
+        <motion.div 
+          className="relative z-10 pb-6"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1 }}
+        >
+          <CopyrightFooter className="text-white/70" />
+        </motion.div>
       </div>
-    </div>
     </PageTransition>
   );
 };
