@@ -23,6 +23,7 @@ import ImportSchoolData from "@/components/admin/ImportSchoolData";
 import SystemBackupTab from "@/components/admin/SystemBackupTab";
 import SchoolsDataTab from "@/components/admin/SchoolsDataTab";
 import WisdomsTab from "@/components/admin/WisdomsTab";
+import CopyrightSettingsForm from "@/components/admin/CopyrightSettingsForm";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useSessionTimeout, clearSensitiveData } from "@/hooks/useSessionTimeout";
@@ -1237,6 +1238,15 @@ const SystemAdmin = () => {
                       حفظ إعدادات التذييل
                     </Button>
                   </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-2 border-blue-500">
+                <CardHeader className="bg-gradient-to-r from-blue-100 to-white border-b border-blue-500">
+                  <CardTitle>إعدادات حقوق النشر (تذييل الصفحة الرئيسية)</CardTitle>
+                </CardHeader>
+                <CardContent className="pt-6">
+                  <CopyrightSettingsForm />
                 </CardContent>
               </Card>
 
