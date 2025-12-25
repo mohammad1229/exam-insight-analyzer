@@ -460,6 +460,36 @@ serve(async (req) => {
       }
 
       case "addTest": {
+        // Check for duplicate test (same teacher + subject + class + section + date + name)
+        const { data: existingTest, error: checkError } = await supabase
+          .from("tests")
+          .select("id, name")
+          .eq("school_id", schoolId)
+          .eq("teacher_id", data.teacher_id)
+          .eq("subject_id", data.subject_id)
+          .eq("class_id", data.class_id)
+          .eq("section_id", data.section_id)
+          .eq("test_date", data.test_date || new Date().toISOString().split('T')[0])
+          .eq("name", data.name)
+          .maybeSingle();
+
+        if (checkError) {
+          console.error("Error checking for duplicate test:", checkError);
+        }
+
+        if (existingTest) {
+          // Return the existing test ID so the frontend can use it
+          return new Response(JSON.stringify({ 
+            success: false, 
+            error: "يوجد اختبار بنفس البيانات (المعلم، المادة، الصف، الشعبة، التاريخ، الاسم) مسجل مسبقاً",
+            duplicate: true,
+            existingTestId: existingTest.id,
+            existingTestName: existingTest.name
+          }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
         const { data: newTest, error } = await supabase
           .from("tests")
           .insert({ 

@@ -115,7 +115,14 @@ const callSchoolDataAPI = async (action: string, data?: any) => {
   });
 
   if (error) throw error;
-  if (!result.success) throw new Error(result.error);
+  if (!result.success) {
+    // Include extra info for duplicate errors
+    const err = new Error(result.error) as any;
+    err.duplicate = result.duplicate;
+    err.existingTestId = result.existingTestId;
+    err.existingTestName = result.existingTestName;
+    throw err;
+  }
   
   return result.data;
 };
