@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Printer, Download, FileText, X, Loader2 } from "lucide-react";
 import { getStudentById, getClassById, getSectionById, getSubjectById, getTeacherById } from "@/services/dataService";
+import { getClassesDB, getSectionsDB, getSubjectsDB, getTeachersDB, getStudentsDB } from "@/services/databaseService";
 import { loadAmiriFont, ARABIC_FONT_NAME } from "@/utils/fontLoader";
 import { toast } from "sonner";
 
@@ -75,22 +76,35 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({ test, open, onClose }) =>
     };
   };
 
-  const getStudentName = (studentId: string): string => {
+  const getStudentName = (studentId: string, studentNameFromResult?: string, studentNameLookup?: Map<string, string>): string => {
+    if (studentNameFromResult && studentNameFromResult !== studentId) return studentNameFromResult;
+    const fromLookup = studentNameLookup?.get(studentId);
+    if (fromLookup) return fromLookup;
     const student = getStudentById(studentId);
     return student?.name || "طالب غير معروف";
   };
 
-  const getTestDetails = () => {
-    const classInfo = getClassById(test.classId);
-    const sectionInfo = getSectionById(test.classId, test.sectionId);
-    const subjectInfo = getSubjectById(test.subjectId);
-    const teacherInfo = getTeacherById(test.teacherId);
-    
+  const getTestDetails = (lookups?: {
+    classById?: Map<string, string>;
+    sectionById?: Map<string, string>;
+    subjectById?: Map<string, string>;
+    teacherById?: Map<string, string>;
+  }) => {
+    const classNameFromLookup = lookups?.classById?.get(test.classId);
+    const sectionNameFromLookup = lookups?.sectionById?.get(test.sectionId);
+    const subjectNameFromLookup = lookups?.subjectById?.get(test.subjectId);
+    const teacherNameFromLookup = lookups?.teacherById?.get(test.teacherId);
+
+    const classInfo = !classNameFromLookup ? getClassById(test.classId) : undefined;
+    const sectionInfo = !sectionNameFromLookup ? getSectionById(test.classId, test.sectionId) : undefined;
+    const subjectInfo = !subjectNameFromLookup ? getSubjectById(test.subjectId) : undefined;
+    const teacherInfo = !teacherNameFromLookup ? getTeacherById(test.teacherId) : undefined;
+
     return {
-      className: classInfo?.name || test.className || "غير محدد",
-      sectionName: sectionInfo?.name || test.sectionName || "غير محدد",
-      subjectName: subjectInfo?.name || test.subjectName || "غير محدد",
-      teacherName: teacherInfo?.name || test.teacherName || "غير محدد",
+      className: classNameFromLookup || classInfo?.name || test.className || "غير محدد",
+      sectionName: sectionNameFromLookup || sectionInfo?.name || test.sectionName || "غير محدد",
+      subjectName: subjectNameFromLookup || subjectInfo?.name || test.subjectName || "غير محدد",
+      teacherName: teacherNameFromLookup || teacherInfo?.name || test.teacherName || "غير محدد",
     };
   };
 
@@ -193,7 +207,48 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({ test, open, onClose }) =>
 
   const generatePDF = async (): Promise<jsPDF> => {
     const { schoolName, directorName, ministryName, directorateName } = getSchoolInfo();
-    const { className, sectionName, subjectName, teacherName } = getTestDetails();
+
+    // Load lookups from backend (DB) to ensure names are available even when localStorage dataService is empty
+    let lookups: {
+      classById: Map<string, string>;
+      sectionById: Map<string, string>;
+      subjectById: Map<string, string>;
+      teacherById: Map<string, string>;
+      studentById: Map<string, string>;
+    } | null = null;
+
+    try {
+      const [classes, sections, subjects, teachers, students] = await Promise.all([
+        getClassesDB(),
+        getSectionsDB(),
+        getSubjectsDB(),
+        getTeachersDB(),
+        getStudentsDB(),
+      ]);
+
+      lookups = {
+        classById: new Map((classes || []).map((c: any) => [c.id, c.name])),
+        sectionById: new Map((sections || []).map((s: any) => [s.id, s.name])),
+        subjectById: new Map((subjects || []).map((s: any) => [s.id, s.name])),
+        teacherById: new Map((teachers || []).map((t: any) => [t.id, t.name])),
+        studentById: new Map((students || []).map((st: any) => [st.id, st.name])),
+      };
+    } catch (e) {
+      // Silent fallback to localStorage-based lookups
+      lookups = null;
+    }
+
+    const { className, sectionName, subjectName, teacherName } = getTestDetails(
+      lookups
+        ? {
+            classById: lookups.classById,
+            sectionById: lookups.sectionById,
+            subjectById: lookups.subjectById,
+            teacherById: lookups.teacherById,
+          }
+        : undefined
+    );
+
     const stats = calculateStats();
 
     // Use portrait orientation for vertical layout
@@ -307,13 +362,11 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({ test, open, onClose }) =>
     const mainHeaders = ["ملاحظات", "النسبة", "المجموع", ...questionHeaders.reverse(), "اسم الطالب", "م"];
 
     const mainTableData = test.results.map((result: any, index: number) => {
-      // Get student name - first try stored studentName, then lookup by ID
-      let studentName = result.studentName;
-      if (!studentName || studentName === result.studentId) {
-        const student = getStudentById(result.studentId);
-        studentName = student?.name || "طالب " + (index + 1);
-      }
-      
+      const studentName = getStudentName(
+        result.studentId,
+        result.studentName,
+        lookups?.studentById
+      );
       if (result.isAbsent) {
         const emptyScores = test.questions.map(() => "-");
         return ["غائب", "-", "-", ...emptyScores.reverse(), studentName, index + 1];
