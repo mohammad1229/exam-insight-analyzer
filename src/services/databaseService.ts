@@ -318,6 +318,18 @@ export const saveTestResultsDB = async (testId: string, results: {
   await callSchoolDataAPI('saveTestResults', { test_id: testId, results });
 };
 
+export const updateTestResultsDB = async (testId: string, results: {
+  id?: string;
+  test_id: string;
+  student_id: string;
+  is_absent?: boolean;
+  scores?: Record<string, number>;
+  total_score?: number;
+  percentage?: number;
+}[]): Promise<void> => {
+  await callSchoolDataAPI('updateTestResults', { test_id: testId, results });
+};
+
 // ========== PERFORMANCE LEVELS ==========
 export const getPerformanceLevelsDB = async (): Promise<DBPerformanceLevel[]> => {
   return await callSchoolDataAPI('getPerformanceLevels');
