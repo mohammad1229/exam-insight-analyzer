@@ -108,8 +108,23 @@ const TeachersTab = () => {
         getTeachersDB(),
         getSectionsDB()
       ]);
-      setClasses(classesData);
-      setSubjects(subjectsData);
+      
+      // Deduplicate classes by name
+      const uniqueClasses = classesData.reduce((acc: DBClass[], curr) => {
+        const exists = acc.find(c => c.name.trim().toLowerCase() === curr.name.trim().toLowerCase());
+        if (!exists) acc.push(curr);
+        return acc;
+      }, []);
+      
+      // Deduplicate subjects by name
+      const uniqueSubjects = subjectsData.reduce((acc: DBSubject[], curr) => {
+        const exists = acc.find(s => s.name.trim().toLowerCase() === curr.name.trim().toLowerCase());
+        if (!exists) acc.push(curr);
+        return acc;
+      }, []);
+      
+      setClasses(uniqueClasses);
+      setSubjects(uniqueSubjects);
       setTeachers(teachersData);
       setAllSections(sectionsData);
       emitTeachersCount(teachersData?.length || 0);

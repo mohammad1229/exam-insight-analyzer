@@ -78,6 +78,9 @@ const TestForm: React.FC<TestFormProps> = ({ onFormDataChange }) => {
   const [availableClasses, setAvailableClasses] = useState<Class[]>([]);
   const [availableSubjects, setAvailableSubjects] = useState<{ id: string; name: string }[]>([]);
   const [availableTeachers, setAvailableTeachers] = useState<{ id: string; name: string }[]>([]);
+  
+  // Store all teacher's assigned sections with class info for proper filtering
+  const [allTeacherSections, setAllTeacherSections] = useState<{ id: string; name: string; class_id: string; className: string }[]>([]);
 
   // Question form state
   const [questionType, setQuestionType] = useState("");
@@ -105,6 +108,8 @@ const TestForm: React.FC<TestFormProps> = ({ onFormDataChange }) => {
           const teacherSubjects = teacher.assignedSubjects || teacher.subjects || [];
           const teacherSections = teacher.assignedSections || teacher.sections || [];
           
+          console.log("Teacher assigned data:", { teacherClasses, teacherSubjects, teacherSections });
+          
           // Fetch all classes, sections, and subjects then filter
           const [classesResponse, subjectsResponse, sectionsResponse] = await Promise.all([
             supabase.functions.invoke("school-data", {
@@ -126,57 +131,75 @@ const TestForm: React.FC<TestFormProps> = ({ onFormDataChange }) => {
           
           // Get all sections data
           const allSectionsData = sectionsResult?.success ? sectionsResult.data : [];
+          console.log("All sections from API:", allSectionsData);
+          
+          // Build a map of class_id to class_name for quick lookup
+          const classIdToName = new Map<string, string>();
+          if (classesResult?.success && classesResult.data) {
+            for (const c of classesResult.data) {
+              classIdToName.set(c.id, c.name);
+            }
+          }
+          
+          // Store ALL teacher's assigned sections with class info
+          const teacherSectionsWithClassInfo = allSectionsData
+            .filter((s: any) => teacherSections.includes(s.id))
+            .map((s: any) => ({
+              id: s.id,
+              name: s.name,
+              class_id: s.class_id,
+              className: classIdToName.get(s.class_id) || ""
+            }));
+          setAllTeacherSections(teacherSectionsWithClassInfo);
+          console.log("All teacher sections with class info:", teacherSectionsWithClassInfo);
           
           if (classesResult?.success && classesResult.data) {
-            // Filter to only teacher's assigned classes + dedupe by (id + name)
+            // Filter to only teacher's assigned classes + dedupe by name
             const byName = new Map<string, any>();
-            const seenIds = new Set<string>();
             for (const c of classesResult.data) {
               if (!teacherClasses.includes(c.id)) continue;
-              if (seenIds.has(c.id)) continue;
               const key = String(c.name || "").trim().toLowerCase();
               if (!byName.has(key)) {
-                // Add sections for this class
-                const classSections = allSectionsData.filter((s: any) => 
-                  s.class_id === c.id && teacherSections.includes(s.id)
-                );
-                byName.set(key, { ...c, sections: classSections });
+                byName.set(key, { ...c });
               }
-              seenIds.add(c.id);
             }
 
             const filteredClasses = Array.from(byName.values()).map((c: any) => ({
               id: c.id,
               name: c.name,
-              sections: c.sections || [],
+              sections: [],  // Sections will be filtered separately based on class NAME
             }));
             
+            console.log("Filtered classes:", filteredClasses);
             setAvailableClasses(filteredClasses);
             
             // Auto-select if only one class
             if (filteredClasses.length === 1) {
               setClassId(filteredClasses[0].id);
-              setSections(filteredClasses[0].sections);
+              // Filter sections by class name (not class_id) to handle duplicates
+              const className = filteredClasses[0].name;
+              const classNameLower = className.trim().toLowerCase();
+              const filteredSections = teacherSectionsWithClassInfo.filter(
+                s => s.className.trim().toLowerCase() === classNameLower
+              );
+              setSections(filteredSections);
               
               // Auto-select if only one section
-              if (filteredClasses[0].sections.length === 1) {
-                setSectionId(filteredClasses[0].sections[0].id);
+              if (filteredSections.length === 1) {
+                setSectionId(filteredSections[0].id);
               }
             }
           }
 
           if (subjectsResult?.success && subjectsResult.data) {
-            // Filter to only teacher's assigned subjects + dedupe by (id + name)
+            // Filter to only teacher's assigned subjects + dedupe by name
             const byName = new Map<string, any>();
-            const seenIds = new Set<string>();
             for (const s of subjectsResult.data) {
               if (!teacherSubjects.includes(s.id)) continue;
-              if (seenIds.has(s.id)) continue;
               const key = String(s.name || "").trim().toLowerCase();
               if (!byName.has(key)) {
                 byName.set(key, s);
               }
-              seenIds.add(s.id);
             }
 
             const filteredSubjects = Array.from(byName.values()).map((s: any) => ({
@@ -197,7 +220,7 @@ const TestForm: React.FC<TestFormProps> = ({ onFormDataChange }) => {
       } else if (schoolId) {
         // Admin mode - show all classes and subjects
         try {
-          const [classesResponse, subjectsResponse, teachersResponse] = await Promise.all([
+          const [classesResponse, subjectsResponse, teachersResponse, sectionsResponse] = await Promise.all([
             supabase.functions.invoke("school-data", {
               body: { action: "getClasses", schoolId }
             }),
@@ -206,6 +229,9 @@ const TestForm: React.FC<TestFormProps> = ({ onFormDataChange }) => {
             }),
             supabase.functions.invoke("school-data", {
               body: { action: "getTeachers", schoolId }
+            }),
+            supabase.functions.invoke("school-data", {
+              body: { action: "getSections", schoolId }
             })
           ]);
           
@@ -214,25 +240,41 @@ const TestForm: React.FC<TestFormProps> = ({ onFormDataChange }) => {
           const classesResult = classesResponse.data;
           const subjectsResult = subjectsResponse.data;
           const teachersResult = teachersResponse.data;
+          const sectionsResult = sectionsResponse.data;
+          
+          // Build a map of class_id to class_name for quick lookup
+          const classIdToName = new Map<string, string>();
+          if (classesResult?.success && classesResult.data) {
+            for (const c of classesResult.data) {
+              classIdToName.set(c.id, c.name);
+            }
+          }
+          
+          // Store ALL sections with class info for admin
+          const allSectionsData = sectionsResult?.success ? sectionsResult.data : [];
+          const allSectionsWithClassInfo = allSectionsData.map((s: any) => ({
+            id: s.id,
+            name: s.name,
+            class_id: s.class_id,
+            className: classIdToName.get(s.class_id) || ""
+          }));
+          setAllTeacherSections(allSectionsWithClassInfo);
           
           if (classesResult?.success) {
             // Dedupe classes by name (some datasets may contain duplicates with different IDs)
             const byName = new Map<string, any>();
-            const seenIds = new Set<string>();
             for (const c of classesResult.data || []) {
-              if (seenIds.has(c.id)) continue;
               const key = String(c.name || "").trim().toLowerCase();
               if (!byName.has(key)) {
                 byName.set(key, c);
               }
-              seenIds.add(c.id);
             }
 
             setAvailableClasses(
               Array.from(byName.values()).map((c: any) => ({
                 id: c.id,
                 name: c.name,
-                sections: c.sections || [],
+                sections: [],  // Sections handled separately
               }))
             );
           }
@@ -240,14 +282,11 @@ const TestForm: React.FC<TestFormProps> = ({ onFormDataChange }) => {
           if (subjectsResult?.success) {
             // Dedupe subjects by name
             const byName = new Map<string, any>();
-            const seenIds = new Set<string>();
             for (const s of subjectsResult.data || []) {
-              if (seenIds.has(s.id)) continue;
               const key = String(s.name || "").trim().toLowerCase();
               if (!byName.has(key)) {
                 byName.set(key, s);
               }
-              seenIds.add(s.id);
             }
 
             setAvailableSubjects(
@@ -288,14 +327,25 @@ const TestForm: React.FC<TestFormProps> = ({ onFormDataChange }) => {
     if (classId) {
       const selectedClass = availableClasses.find(c => c.id === classId);
       if (selectedClass) {
-        setSections(selectedClass.sections);
+        // Filter sections by class NAME (not class_id) to handle duplicate class entries
+        const classNameLower = selectedClass.name.trim().toLowerCase();
+        const filteredSections = allTeacherSections.filter(
+          s => s.className.trim().toLowerCase() === classNameLower
+        );
+        console.log("Filtered sections for class:", selectedClass.name, filteredSections);
+        setSections(filteredSections);
+        
+        // Auto-select if only one section
+        if (filteredSections.length === 1) {
+          setSectionId(filteredSections[0].id);
+        }
       } else {
         setSections([]);
       }
     } else {
       setSections([]);
     }
-  }, [classId, availableClasses]);
+  }, [classId, availableClasses, allTeacherSections]);
 
   useEffect(() => {
     const finalType = type === "other" ? customType : type;
