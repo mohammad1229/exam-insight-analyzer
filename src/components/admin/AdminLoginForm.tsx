@@ -72,19 +72,31 @@ const AdminLoginForm = ({ onLoginSuccess }: AdminLoginFormProps) => {
   };
 
   const completeLogin = (admin: any) => {
+    // Verify admin has school and license
+    if (!admin.school_id) {
+      toast({
+        title: "خطأ",
+        description: "المستخدم غير مرتبط بمدرسة",
+        variant: "destructive",
+      });
+      return;
+    }
+
     // Store admin session
     localStorage.setItem("schoolAdminId", admin.id);
     localStorage.setItem("schoolAdminName", admin.full_name);
     localStorage.setItem("adminRole", admin.role || "school_admin");
-    if (admin.school_id) {
-      localStorage.setItem("currentSchoolId", admin.school_id);
+    localStorage.setItem("currentSchoolId", admin.school_id);
+    if (admin.license_id) {
+      localStorage.setItem("currentLicenseId", admin.license_id);
     }
 
     // Store admin data for backup service
     localStorage.setItem("currentAdminData", JSON.stringify({
       id: admin.id,
       school_id: admin.school_id,
-      school_name: admin.school_name,
+      license_id: admin.license_id,
+      school_name: admin.school_name || admin.schools?.name,
       full_name: admin.full_name,
       loginTime: new Date().toISOString()
     }));

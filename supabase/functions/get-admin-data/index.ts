@@ -204,8 +204,8 @@ serve(async (req) => {
         .from("school_admins")
         .select(`
           *,
-          schools(name, director_name, logo_url),
-          licenses(license_key, is_active, expiry_date)
+          schools(id, name, director_name, logo_url),
+          licenses(id, license_key, is_active, expiry_date, is_trial, trial_days, trial_start_date)
         `)
         .eq("username", username)
         .eq("is_active", true)
@@ -224,6 +224,41 @@ serve(async (req) => {
       if (admin.password_hash !== password) {
         return new Response(
           JSON.stringify({ success: false, error: "اسم المستخدم أو كلمة المرور غير صحيحة" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Check if admin has a school assigned
+      if (!admin.school_id || !admin.schools) {
+        return new Response(
+          JSON.stringify({ success: false, error: "المستخدم غير مرتبط بمدرسة - تواصل مع مدير النظام" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Verify license is valid
+      const license = admin.licenses;
+      if (!license || !license.is_active) {
+        return new Response(
+          JSON.stringify({ success: false, error: "ترخيص المدرسة غير مفعل - تواصل مع مدير النظام" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Check if license is expired
+      if (license.is_trial) {
+        const trialStart = new Date(license.trial_start_date);
+        const trialDays = license.trial_days || 15;
+        const trialEnd = new Date(trialStart.getTime() + trialDays * 24 * 60 * 60 * 1000);
+        if (new Date() > trialEnd) {
+          return new Response(
+            JSON.stringify({ success: false, error: "انتهت الفترة التجريبية - يرجى تفعيل الترخيص" }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+      } else if (license.expiry_date && new Date(license.expiry_date) < new Date()) {
+        return new Response(
+          JSON.stringify({ success: false, error: "انتهت صلاحية الترخيص - تواصل مع مدير النظام" }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
@@ -257,9 +292,9 @@ serve(async (req) => {
             school_name: admin.schools?.name,
             director_name: admin.schools?.director_name,
             logo_url: admin.schools?.logo_url,
-            license_key: admin.licenses?.license_key,
-            license_active: admin.licenses?.is_active,
-            expiry_date: admin.licenses?.expiry_date,
+            license_key: license.license_key,
+            license_active: license.is_active,
+            expiry_date: license.expiry_date,
             role: roleData?.role || "school_admin",
             must_change_password: admin.must_change_password
           }
