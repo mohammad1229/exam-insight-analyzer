@@ -15,7 +15,7 @@ import { Database, FileKey, Lock, Settings, User, Users, RefreshCw, BarChart3, C
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { getLicenses, renewLicense, getSchools, generateLicense, deleteLicense, createLicenseWithSchool } from "@/services/licenseService";
-import { downloadBackup, getBackups, createAutomaticBackup } from "@/services/backupService";
+import { downloadBackup, getBackups, createAutomaticBackup, initializeBackupScheduler } from "@/services/backupService";
 import UpdatesManagement from "@/components/admin/UpdatesManagement";
 import SchoolAdminsTab from "@/components/admin/SchoolAdminsTab";
 import DefaultDataSettings from "@/components/admin/DefaultDataSettings";
@@ -371,10 +371,21 @@ const SystemAdmin = () => {
         token: data.sessionToken
       }));
 
+      // Store system admin data for backup service
+      localStorage.setItem("systemAdminData", JSON.stringify({
+        id: data.admin.id,
+        username: data.admin.username,
+        fullName: data.admin.fullName,
+        loginTime: new Date().toISOString()
+      }));
+
       setIsLoggedIn(true);
       setCurrentAdmin(data.admin);
       setUsername("");
       setPassword("");
+      
+      // Initialize backup scheduler for system admin
+      initializeBackupScheduler();
       
       toast({
         title: "تم تسجيل الدخول بنجاح",
