@@ -53,61 +53,65 @@ const StudentList: React.FC<StudentListProps> = ({
   const [localScores, setLocalScores] = useState<Record<string, Record<string, number>>>({});
   
   useEffect(() => {
+    let isMounted = true;
+    
     const fetchStudents = async () => {
-      console.log("StudentList: Fetching students for classId:", classId, "sectionId:", sectionId);
-      
       if (classId && sectionId) {
         setLoading(true);
         try {
-          console.log("StudentList: Calling getStudentsDB...");
           const allStudents = await getStudentsDB();
-          console.log("StudentList: Got all students:", allStudents?.length, "students");
+          
+          if (!isMounted) return;
           
           // Filter students by class_id and section_id, and map to Student type
-          const filteredStudents: Student[] = allStudents
-            .filter((s: DBStudent) => {
-              const matches = s.class_id === classId && s.section_id === sectionId;
-              if (!matches) {
-                console.log("StudentList: Student doesn't match:", s.name, "class_id:", s.class_id, "vs", classId, "section_id:", s.section_id, "vs", sectionId);
-              }
-              return matches;
-            })
+          const filteredStudents: Student[] = (allStudents || [])
+            .filter((s: DBStudent) => s.class_id === classId && s.section_id === sectionId)
             .map((s: DBStudent) => ({
               id: s.id,
-              name: s.name,
+              name: s.name || "طالب",
               classId: s.class_id,
               sectionId: s.section_id
             }));
           
-          console.log("StudentList: Filtered students:", filteredStudents.length, "students");
           setStudents(filteredStudents);
           
-          // Initialize local scores for all students
+          // Initialize local scores for all students and auto-select them
           const initialScores: Record<string, Record<string, number>> = {};
           filteredStudents.forEach(student => {
             initialScores[student.id] = selectedStudents[student.id]?.scores || {};
+            // Auto-initialize student in selectedStudents if not already there
+            if (!selectedStudents[student.id]) {
+              onStudentSelect(student.id, false);
+            }
           });
           setLocalScores(initialScores);
         } catch (error) {
           console.error("StudentList: Error fetching students:", error);
-          toast({
-            title: "خطأ",
-            description: "فشل في تحميل بيانات الطلاب",
-            variant: "destructive",
-          });
-          setStudents([]);
-          setLocalScores({});
+          if (isMounted) {
+            toast({
+              title: "خطأ",
+              description: "فشل في تحميل بيانات الطلاب",
+              variant: "destructive",
+            });
+            setStudents([]);
+            setLocalScores({});
+          }
         } finally {
-          setLoading(false);
+          if (isMounted) {
+            setLoading(false);
+          }
         }
       } else {
-        console.log("StudentList: No classId or sectionId, clearing students");
         setStudents([]);
         setLocalScores({});
       }
     };
 
     fetchStudents();
+    
+    return () => {
+      isMounted = false;
+    };
   }, [classId, sectionId]);
 
   const filteredStudents = students.filter(student => 
