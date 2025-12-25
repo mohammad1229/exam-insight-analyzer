@@ -11,14 +11,123 @@ interface LicenseValidityResult {
   expiry_date?: string;
 }
 
-// Generate unique device ID
+// Generate unique hardware-based device ID that persists across sessions
 export const getDeviceId = (): string => {
-  let deviceId = localStorage.getItem("deviceId");
-  if (!deviceId) {
-    deviceId = `device_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  // Check multiple storage locations for existing device ID
+  let deviceId = localStorage.getItem("deviceId") || 
+                 localStorage.getItem("hardware_device_id") ||
+                 sessionStorage.getItem("deviceId");
+  
+  if (deviceId) {
+    // Ensure it's stored in all locations for persistence
     localStorage.setItem("deviceId", deviceId);
+    localStorage.setItem("hardware_device_id", deviceId);
+    return deviceId;
   }
+
+  // Generate hardware-like fingerprint using multiple browser properties
+  const fingerprint = generateHardwareFingerprint();
+  deviceId = `hw_${fingerprint}`;
+  
+  // Store in multiple locations for maximum persistence
+  localStorage.setItem("deviceId", deviceId);
+  localStorage.setItem("hardware_device_id", deviceId);
+  
   return deviceId;
+};
+
+// Generate a stable fingerprint based on browser/hardware properties
+const generateHardwareFingerprint = (): string => {
+  const components: string[] = [];
+  
+  // Screen properties
+  components.push(`${screen.width}x${screen.height}`);
+  components.push(`${screen.colorDepth}`);
+  components.push(`${screen.pixelDepth}`);
+  
+  // Navigator properties
+  components.push(navigator.language || 'unknown');
+  components.push(navigator.platform || 'unknown');
+  components.push(String(navigator.hardwareConcurrency || 0));
+  components.push(String(navigator.maxTouchPoints || 0));
+  
+  // Timezone
+  components.push(Intl.DateTimeFormat().resolvedOptions().timeZone || 'unknown');
+  
+  // User agent hash
+  const ua = navigator.userAgent || '';
+  components.push(hashString(ua));
+  
+  // Canvas fingerprint (optional, for extra uniqueness)
+  try {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.textBaseline = 'top';
+      ctx.font = '14px Arial';
+      ctx.fillText('fingerprint', 2, 2);
+      components.push(hashString(canvas.toDataURL()));
+    }
+  } catch (e) {
+    components.push('no-canvas');
+  }
+  
+  // Combine all components and hash
+  const combined = components.join('|');
+  return hashString(combined);
+};
+
+// Simple hash function for generating consistent IDs
+const hashString = (str: string): string => {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  // Convert to base36 for shorter representation
+  return Math.abs(hash).toString(36);
+};
+
+// Check if device is already activated (persistent check)
+export const isDeviceActivated = (): boolean => {
+  const activationData = localStorage.getItem("device_activation_status");
+  if (!activationData) return false;
+  
+  try {
+    const data = JSON.parse(activationData);
+    const storedDeviceId = data.deviceId;
+    const currentDeviceId = getDeviceId();
+    
+    // Check if same device and has valid license
+    return storedDeviceId === currentDeviceId && data.isActivated === true;
+  } catch {
+    return false;
+  }
+};
+
+// Mark device as permanently activated
+export const markDeviceActivated = (licenseKey: string, schoolId: string): void => {
+  const activationData = {
+    deviceId: getDeviceId(),
+    licenseKey,
+    schoolId,
+    isActivated: true,
+    activatedAt: new Date().toISOString(),
+    lastValidated: Date.now()
+  };
+  localStorage.setItem("device_activation_status", JSON.stringify(activationData));
+};
+
+// Get stored activation data
+export const getDeviceActivationData = (): any => {
+  const data = localStorage.getItem("device_activation_status");
+  if (!data) return null;
+  try {
+    return JSON.parse(data);
+  } catch {
+    return null;
+  }
 };
 
 // Get license info from local storage
@@ -70,10 +179,14 @@ export const startTrial = async (schoolName: string) => {
 
     storeLicense(licenseInfo);
     
+    // Mark device as permanently activated for trial
+    markDeviceActivated(data.licenseKey, data.school.id);
+    
     // Store school name in localStorage for Welcome page
     localStorage.setItem("schoolName", schoolName);
     localStorage.setItem("directorName", "");
     localStorage.setItem("currentSchoolId", data.school.id);
+    localStorage.setItem("lastLicenseValidation", Date.now().toString());
     
     return { success: true, licenseInfo };
   } catch (error: any) {
@@ -127,6 +240,9 @@ export const activateLicense = async (licenseKey: string) => {
 
     storeLicense(licenseInfo);
 
+    // Mark device as permanently activated
+    markDeviceActivated(licenseKey, licenseInfo.schoolId || '');
+
     // Store school data in localStorage for UI components
     localStorage.setItem("schoolName", licenseInfo.schoolName);
     localStorage.setItem("directorName", licenseInfo.directorName);
@@ -134,6 +250,9 @@ export const activateLicense = async (licenseKey: string) => {
     localStorage.setItem("currentSchoolId", licenseInfo.schoolId || "");
     localStorage.setItem("licenseSchoolName", licenseInfo.schoolName);
     localStorage.setItem("licenseDirectorName", licenseInfo.directorName);
+    
+    // Save validation timestamp
+    localStorage.setItem("lastLicenseValidation", Date.now().toString());
     
     // Initialize school data in database if this is first activation
     if (licenseInfo.schoolId) {
