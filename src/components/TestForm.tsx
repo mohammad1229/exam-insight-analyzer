@@ -85,6 +85,8 @@ const TestForm: React.FC<TestFormProps> = ({ onFormDataChange }) => {
   const [maxScore, setMaxScore] = useState<number>(5);
 
   useEffect(() => {
+    let isMounted = true;
+    
     const fetchData = async () => {
       // Check if there's a logged in teacher
       const loggedInTeacher = localStorage.getItem("loggedInTeacher");
@@ -93,32 +95,41 @@ const TestForm: React.FC<TestFormProps> = ({ onFormDataChange }) => {
       if (loggedInTeacher && schoolId) {
         try {
           const teacher = JSON.parse(loggedInTeacher);
+          if (!isMounted) return;
+          
           setTeacherId(teacher.id);
           setAvailableTeachers([{ id: teacher.id, name: teacher.name }]);
           
           // Fetch teacher's assigned classes from localStorage (stored on login)
-          // Support both naming conventions: assignedClasses/assignedSubjects and classes/subjects
           const teacherClasses = teacher.assignedClasses || teacher.classes || [];
           const teacherSubjects = teacher.assignedSubjects || teacher.subjects || [];
           
-          console.log("Teacher assigned classes:", teacherClasses);
-          console.log("Teacher assigned subjects:", teacherSubjects);
-          
           // Fetch all classes and subjects then filter
-          const { data: classesResult } = await supabase.functions.invoke("school-data", {
-            body: { action: "getClasses", schoolId }
-          });
+          const [classesResponse, subjectsResponse] = await Promise.all([
+            supabase.functions.invoke("school-data", {
+              body: { action: "getClasses", schoolId }
+            }),
+            supabase.functions.invoke("school-data", {
+              body: { action: "getSubjects", schoolId }
+            })
+          ]);
           
-          const { data: subjectsResult } = await supabase.functions.invoke("school-data", {
-            body: { action: "getSubjects", schoolId }
-          });
+          if (!isMounted) return;
+          
+          const classesResult = classesResponse.data;
+          const subjectsResult = subjectsResponse.data;
           
           if (classesResult?.success && classesResult.data) {
-            // Filter to only teacher's assigned classes
-            const filteredClasses = classesResult.data.filter((c: any) => 
-              teacherClasses.includes(c.id)
-            );
-            console.log("Filtered classes for teacher:", filteredClasses);
+            // Filter to only teacher's assigned classes - use Set for deduplication
+            const uniqueClassIds = new Set<string>();
+            const filteredClasses = classesResult.data.filter((c: any) => {
+              if (teacherClasses.includes(c.id) && !uniqueClassIds.has(c.id)) {
+                uniqueClassIds.add(c.id);
+                return true;
+              }
+              return false;
+            });
+            
             setAvailableClasses(filteredClasses.map((c: any) => ({
               id: c.id,
               name: c.name,
@@ -127,11 +138,16 @@ const TestForm: React.FC<TestFormProps> = ({ onFormDataChange }) => {
           }
           
           if (subjectsResult?.success && subjectsResult.data) {
-            // Filter to only teacher's assigned subjects
-            const filteredSubjects = subjectsResult.data.filter((s: any) => 
-              teacherSubjects.includes(s.id)
-            );
-            console.log("Filtered subjects for teacher:", filteredSubjects);
+            // Filter to only teacher's assigned subjects - use Set for deduplication
+            const uniqueSubjectIds = new Set<string>();
+            const filteredSubjects = subjectsResult.data.filter((s: any) => {
+              if (teacherSubjects.includes(s.id) && !uniqueSubjectIds.has(s.id)) {
+                uniqueSubjectIds.add(s.id);
+                return true;
+              }
+              return false;
+            });
+            
             setAvailableSubjects(filteredSubjects.map((s: any) => ({
               id: s.id,
               name: s.name
@@ -143,20 +159,36 @@ const TestForm: React.FC<TestFormProps> = ({ onFormDataChange }) => {
       } else if (schoolId) {
         // Admin mode - show all classes and subjects
         try {
-          const { data: classesResult } = await supabase.functions.invoke("school-data", {
-            body: { action: "getClasses", schoolId }
-          });
+          const [classesResponse, subjectsResponse, teachersResponse] = await Promise.all([
+            supabase.functions.invoke("school-data", {
+              body: { action: "getClasses", schoolId }
+            }),
+            supabase.functions.invoke("school-data", {
+              body: { action: "getSubjects", schoolId }
+            }),
+            supabase.functions.invoke("school-data", {
+              body: { action: "getTeachers", schoolId }
+            })
+          ]);
           
-          const { data: subjectsResult } = await supabase.functions.invoke("school-data", {
-            body: { action: "getSubjects", schoolId }
-          });
+          if (!isMounted) return;
           
-          const { data: teachersResult } = await supabase.functions.invoke("school-data", {
-            body: { action: "getTeachers", schoolId }
-          });
+          const classesResult = classesResponse.data;
+          const subjectsResult = subjectsResponse.data;
+          const teachersResult = teachersResponse.data;
           
           if (classesResult?.success) {
-            setAvailableClasses(classesResult.data.map((c: any) => ({
+            // Use Set for deduplication
+            const uniqueClassIds = new Set<string>();
+            const uniqueClasses = classesResult.data.filter((c: any) => {
+              if (!uniqueClassIds.has(c.id)) {
+                uniqueClassIds.add(c.id);
+                return true;
+              }
+              return false;
+            });
+            
+            setAvailableClasses(uniqueClasses.map((c: any) => ({
               id: c.id,
               name: c.name,
               sections: c.sections || []
@@ -164,7 +196,17 @@ const TestForm: React.FC<TestFormProps> = ({ onFormDataChange }) => {
           }
           
           if (subjectsResult?.success) {
-            setAvailableSubjects(subjectsResult.data.map((s: any) => ({
+            // Use Set for deduplication
+            const uniqueSubjectIds = new Set<string>();
+            const uniqueSubjects = subjectsResult.data.filter((s: any) => {
+              if (!uniqueSubjectIds.has(s.id)) {
+                uniqueSubjectIds.add(s.id);
+                return true;
+              }
+              return false;
+            });
+            
+            setAvailableSubjects(uniqueSubjects.map((s: any) => ({
               id: s.id,
               name: s.name
             })));
@@ -183,6 +225,10 @@ const TestForm: React.FC<TestFormProps> = ({ onFormDataChange }) => {
     };
     
     fetchData();
+    
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   useEffect(() => {
