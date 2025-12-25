@@ -1,13 +1,14 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { jsPDF } from "jspdf";
 import "jspdf-autotable";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Printer, Download, FileText, X, Loader2 } from "lucide-react";
+import { Printer, Download, FileText, X, Loader2, Edit } from "lucide-react";
 import { getStudentById, getClassById, getSectionById, getSubjectById, getTeacherById } from "@/services/dataService";
 import { getClassesDB, getSectionsDB, getSubjectsDB, getTeachersDB, getStudentsDB } from "@/services/databaseService";
 import { loadAmiriFont, ARABIC_FONT_NAME } from "@/utils/fontLoader";
 import { toast } from "sonner";
+import ResultsEditor from "./ResultsEditor";
 
 declare module "jspdf" {
   interface jsPDF {
@@ -20,6 +21,7 @@ interface ReportPreviewProps {
   test: any;
   open: boolean;
   onClose: () => void;
+  onTestUpdate?: (updatedTest: any) => void;
 }
 
 // Get performance levels from settings
@@ -61,9 +63,11 @@ const getHeaderSettings = () => {
   };
 };
 
-const ReportPreview: React.FC<ReportPreviewProps> = ({ test, open, onClose }) => {
+const ReportPreview: React.FC<ReportPreviewProps> = ({ test, open, onClose, onTestUpdate }) => {
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [currentTest, setCurrentTest] = useState(test);
   const pdfDocRef = useRef<jsPDF | null>(null);
 
   const getSchoolInfo = () => {
@@ -90,21 +94,21 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({ test, open, onClose }) =>
     subjectById?: Map<string, string>;
     teacherById?: Map<string, string>;
   }) => {
-    const classNameFromLookup = lookups?.classById?.get(test.classId);
-    const sectionNameFromLookup = lookups?.sectionById?.get(test.sectionId);
-    const subjectNameFromLookup = lookups?.subjectById?.get(test.subjectId);
-    const teacherNameFromLookup = lookups?.teacherById?.get(test.teacherId);
+    const classNameFromLookup = lookups?.classById?.get(currentTest.classId);
+    const sectionNameFromLookup = lookups?.sectionById?.get(currentTest.sectionId);
+    const subjectNameFromLookup = lookups?.subjectById?.get(currentTest.subjectId);
+    const teacherNameFromLookup = lookups?.teacherById?.get(currentTest.teacherId);
 
-    const classInfo = !classNameFromLookup ? getClassById(test.classId) : undefined;
-    const sectionInfo = !sectionNameFromLookup ? getSectionById(test.classId, test.sectionId) : undefined;
-    const subjectInfo = !subjectNameFromLookup ? getSubjectById(test.subjectId) : undefined;
-    const teacherInfo = !teacherNameFromLookup ? getTeacherById(test.teacherId) : undefined;
+    const classInfo = !classNameFromLookup ? getClassById(currentTest.classId) : undefined;
+    const sectionInfo = !sectionNameFromLookup ? getSectionById(currentTest.classId, currentTest.sectionId) : undefined;
+    const subjectInfo = !subjectNameFromLookup ? getSubjectById(currentTest.subjectId) : undefined;
+    const teacherInfo = !teacherNameFromLookup ? getTeacherById(currentTest.teacherId) : undefined;
 
     return {
-      className: classNameFromLookup || classInfo?.name || test.className || "غير محدد",
-      sectionName: sectionNameFromLookup || sectionInfo?.name || test.sectionName || "غير محدد",
-      subjectName: subjectNameFromLookup || subjectInfo?.name || test.subjectName || "غير محدد",
-      teacherName: teacherNameFromLookup || teacherInfo?.name || test.teacherName || "غير محدد",
+      className: classNameFromLookup || classInfo?.name || currentTest.className || "غير محدد",
+      sectionName: sectionNameFromLookup || sectionInfo?.name || currentTest.sectionName || "غير محدد",
+      subjectName: subjectNameFromLookup || subjectInfo?.name || currentTest.subjectName || "غير محدد",
+      teacherName: teacherNameFromLookup || teacherInfo?.name || currentTest.teacherName || "غير محدد",
     };
   };
 
@@ -121,8 +125,8 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({ test, open, onClose }) =>
 
   const calculateStats = () => {
     const levels = getPerformanceLevels();
-    const presentStudents = test.results.filter((r: any) => !r.isAbsent);
-    const totalMaxScore = test.questions.reduce((sum: number, q: any) => sum + q.maxScore, 0);
+    const presentStudents = currentTest.results.filter((r: any) => !r.isAbsent);
+    const totalMaxScore = currentTest.questions.reduce((sum: number, q: any) => sum + q.maxScore, 0);
     
     // Dynamic performance levels calculation
     const excellentStudents = presentStudents.filter((r: any) => r.percentage >= levels.excellent.min);
@@ -130,7 +134,7 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({ test, open, onClose }) =>
     const averageStudents = presentStudents.filter((r: any) => r.percentage >= levels.average.min && r.percentage < levels.good.min);
     const lowStudents = presentStudents.filter((r: any) => r.percentage >= levels.low.min && r.percentage < levels.average.min);
     const failedStudents = presentStudents.filter((r: any) => r.percentage < levels.low.min);
-    const absentStudents = test.results.filter((r: any) => r.isAbsent);
+    const absentStudents = currentTest.results.filter((r: any) => r.isAbsent);
 
     const scores = presentStudents.map((r: any) => r.percentage);
     const totalScores = presentStudents.map((r: any) => r.totalScore);
@@ -143,7 +147,7 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({ test, open, onClose }) =>
     const passRate = presentStudents.length > 0 ? ((presentStudents.length - failedStudents.length) / presentStudents.length) * 100 : 0;
 
     // Calculate stats for each question
-    const questionStats = test.questions.map((question: any, idx: number) => {
+    const questionStats = currentTest.questions.map((question: any, idx: number) => {
       const questionScores: number[] = [];
       
       presentStudents.forEach((result: any) => {
@@ -184,7 +188,7 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({ test, open, onClose }) =>
     });
 
     return {
-      totalStudents: test.results.length,
+      totalStudents: currentTest.results.length,
       presentCount: presentStudents.length,
       absentCount: absentStudents.length,
       excellentCount: excellentStudents.length,
@@ -328,10 +332,10 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({ test, open, onClose }) =>
     currentY = 28;
 
     // Report Title with test type
-    const testTypeLabel = test.type ? ` (${getTestTypeLabel(test.type)})` : "";
+    const testTypeLabel = currentTest.type ? ` (${getTestTypeLabel(currentTest.type)})` : "";
     doc.setFontSize(10);
     doc.setTextColor(0, 100, 0);
-    doc.text(`تحليل امتحان ${test.name}${testTypeLabel}`, centerCol, currentY, { align: "center" });
+    doc.text(`تحليل امتحان ${currentTest.name}${testTypeLabel}`, centerCol, currentY, { align: "center" });
     
     currentY += 4;
 
@@ -339,7 +343,7 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({ test, open, onClose }) =>
     doc.autoTable({
       startY: currentY,
       head: [["علامة الاختبار", "معلم المادة", "التاريخ", "الصف / الشعبة", "المبحث"]],
-      body: [[`${stats.totalMaxScore} درجة`, teacherName, test.date, `${className} / ${sectionName}`, subjectName]],
+      body: [[`${stats.totalMaxScore} درجة`, teacherName, currentTest.date, `${className} / ${sectionName}`, subjectName]],
       theme: "grid",
       styles: { 
         halign: "center", 
@@ -358,10 +362,10 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({ test, open, onClose }) =>
     currentY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 2 : currentY + 12;
 
     // === MAIN RESULTS TABLE - Optimized for portrait A4 ===
-    const questionHeaders = test.questions.map((q: any) => q.type);
+    const questionHeaders = currentTest.questions.map((q: any) => q.type);
     const mainHeaders = ["ملاحظات", "النسبة", "المجموع", ...questionHeaders.reverse(), "اسم الطالب", "م"];
 
-    const mainTableData = test.results.map((result: any, index: number) => {
+    const mainTableData = currentTest.results.map((result: any, index: number) => {
       const sid = result.studentId || result.student_id;
       const studentName = getStudentName(
         sid,
@@ -369,11 +373,11 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({ test, open, onClose }) =>
         lookups?.studentById
       );
       if (result.isAbsent) {
-        const emptyScores = test.questions.map(() => "-");
+        const emptyScores = currentTest.questions.map(() => "-");
         return ["غائب", "-", "-", ...emptyScores.reverse(), studentName, index + 1];
       }
 
-      const questionScores = test.questions.map((q: any) => result.scores[q.id] || 0);
+      const questionScores = currentTest.questions.map((q: any) => result.scores[q.id] || 0);
       let status = "";
       if (result.percentage < 50) status = "راسب";
       else if (result.percentage < 65) status = "متدني";
@@ -392,7 +396,7 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({ test, open, onClose }) =>
     });
 
     // Calculate dynamic font size based on number of students - smaller for portrait
-    const studentCount = test.results.length;
+    const studentCount = currentTest.results.length;
     const fontSize = studentCount > 35 ? 5 : studentCount > 25 ? 6 : studentCount > 15 ? 7 : 8;
     const cellPadding = studentCount > 35 ? 0.5 : studentCount > 25 ? 0.7 : 0.8;
 
@@ -557,8 +561,55 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({ test, open, onClose }) =>
     return doc;
   };
 
+  // Update currentTest when test prop changes
   useEffect(() => {
-    if (open && test) {
+    if (test) {
+      setCurrentTest(test);
+    }
+  }, [test]);
+
+  const regeneratePDF = useCallback(async () => {
+    if (!currentTest) return;
+    
+    setIsLoading(true);
+    try {
+      const doc = await generatePDF();
+      pdfDocRef.current = doc;
+      
+      // Revoke old URL
+      if (pdfUrl) {
+        URL.revokeObjectURL(pdfUrl);
+      }
+      
+      const blob = doc.output("blob");
+      const url = URL.createObjectURL(blob);
+      setPdfUrl(url);
+      toast.success("تم تحديث التقرير");
+    } catch (error) {
+      console.error("Error regenerating PDF:", error);
+      toast.error("حدث خطأ في تحديث التقرير");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [currentTest, pdfUrl]);
+
+  const handleSaveResults = useCallback(async (updatedTest: any) => {
+    setCurrentTest(updatedTest);
+    setIsEditMode(false);
+    
+    // Notify parent of update
+    if (onTestUpdate) {
+      onTestUpdate(updatedTest);
+    }
+    
+    // Wait a bit for state to update, then regenerate
+    setTimeout(async () => {
+      await regeneratePDF();
+    }, 100);
+  }, [onTestUpdate, regeneratePDF]);
+
+  useEffect(() => {
+    if (open && currentTest) {
       setIsLoading(true);
       generatePDF()
         .then((doc) => {
@@ -581,7 +632,7 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({ test, open, onClose }) =>
         URL.revokeObjectURL(pdfUrl);
       }
     };
-  }, [open, test]);
+  }, [open, currentTest]);
 
   const handlePrint = () => {
     if (pdfUrl) {
@@ -596,60 +647,79 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({ test, open, onClose }) =>
 
   const handleDownload = () => {
     if (pdfDocRef.current) {
-      pdfDocRef.current.save(`تقرير_${test.name}_${test.date}.pdf`);
+      pdfDocRef.current.save(`تقرير_${currentTest.name}_${currentTest.date}.pdf`);
       toast.success("تم تحميل التقرير بنجاح");
     }
   };
 
   return (
-    <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-      <DialogContent className="max-w-6xl h-[95vh] flex flex-col p-0 gap-0">
-        <DialogHeader className="p-4 border-b bg-gradient-to-r from-[#000000] via-[#008000] to-[#CE1126]">
-          <DialogTitle className="text-white flex items-center gap-2">
-            <FileText className="h-5 w-5" />
-            معاينة التقرير - {test?.name}
-          </DialogTitle>
-        </DialogHeader>
+    <>
+      <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
+        <DialogContent className="max-w-6xl h-[95vh] flex flex-col p-0 gap-0">
+          <DialogHeader className="p-4 border-b bg-gradient-to-r from-[#000000] via-[#008000] to-[#CE1126]">
+            <DialogTitle className="text-white flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              معاينة التقرير - {currentTest?.name}
+            </DialogTitle>
+          </DialogHeader>
 
-        <div className="flex-1 overflow-hidden">
-          {isLoading ? (
-            <div className="flex items-center justify-center h-full">
-              <div className="text-center space-y-4">
-                <Loader2 className="h-12 w-12 animate-spin mx-auto text-[#008000]" />
-                <p className="text-muted-foreground">جاري إنشاء التقرير...</p>
+          <div className="flex-1 overflow-hidden">
+            {isLoading ? (
+              <div className="flex items-center justify-center h-full">
+                <div className="text-center space-y-4">
+                  <Loader2 className="h-12 w-12 animate-spin mx-auto text-[#008000]" />
+                  <p className="text-muted-foreground">جاري إنشاء التقرير...</p>
+                </div>
               </div>
-            </div>
-          ) : pdfUrl ? (
-            <iframe
-              src={pdfUrl}
-              className="w-full h-full"
-              title="معاينة التقرير"
-            />
-          ) : (
-            <div className="flex items-center justify-center h-full">
-              <p className="text-muted-foreground">لا يمكن عرض التقرير</p>
-            </div>
-          )}
-        </div>
-
-        <div className="p-4 border-t flex justify-between items-center bg-muted/30">
-          <Button variant="outline" onClick={onClose}>
-            <X className="ml-2 h-4 w-4" />
-            إغلاق
-          </Button>
-          <div className="flex gap-2">
-            <Button onClick={handlePrint} disabled={!pdfUrl}>
-              <Printer className="ml-2 h-4 w-4" />
-              طباعة
-            </Button>
-            <Button onClick={handleDownload} disabled={!pdfUrl} className="bg-[#008000] hover:bg-[#006000]">
-              <Download className="ml-2 h-4 w-4" />
-              تحميل PDF
-            </Button>
+            ) : pdfUrl ? (
+              <iframe
+                src={pdfUrl}
+                className="w-full h-full"
+                title="معاينة التقرير"
+              />
+            ) : (
+              <div className="flex items-center justify-center h-full">
+                <p className="text-muted-foreground">لا يمكن عرض التقرير</p>
+              </div>
+            )}
           </div>
-        </div>
-      </DialogContent>
-    </Dialog>
+
+          <div className="p-4 border-t flex justify-between items-center bg-muted/30">
+            <Button variant="outline" onClick={onClose}>
+              <X className="ml-2 h-4 w-4" />
+              إغلاق
+            </Button>
+            <div className="flex gap-2">
+              <Button 
+                variant="outline" 
+                onClick={() => setIsEditMode(true)} 
+                disabled={!pdfUrl || isLoading}
+                className="border-amber-500 text-amber-600 hover:bg-amber-50"
+              >
+                <Edit className="ml-2 h-4 w-4" />
+                تعديل النتائج
+              </Button>
+              <Button onClick={handlePrint} disabled={!pdfUrl}>
+                <Printer className="ml-2 h-4 w-4" />
+                طباعة
+              </Button>
+              <Button onClick={handleDownload} disabled={!pdfUrl} className="bg-[#008000] hover:bg-[#006000]">
+                <Download className="ml-2 h-4 w-4" />
+                تحميل PDF
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Results Editor Dialog */}
+      <ResultsEditor
+        test={currentTest}
+        open={isEditMode}
+        onClose={() => setIsEditMode(false)}
+        onSave={handleSaveResults}
+      />
+    </>
   );
 };
 
