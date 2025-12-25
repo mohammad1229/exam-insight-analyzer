@@ -120,38 +120,48 @@ const TestForm: React.FC<TestFormProps> = ({ onFormDataChange }) => {
           const subjectsResult = subjectsResponse.data;
           
           if (classesResult?.success && classesResult.data) {
-            // Filter to only teacher's assigned classes - use Set for deduplication
-            const uniqueClassIds = new Set<string>();
-            const filteredClasses = classesResult.data.filter((c: any) => {
-              if (teacherClasses.includes(c.id) && !uniqueClassIds.has(c.id)) {
-                uniqueClassIds.add(c.id);
-                return true;
+            // Filter to only teacher's assigned classes + dedupe by (id + name)
+            const byName = new Map<string, any>();
+            const seenIds = new Set<string>();
+            for (const c of classesResult.data) {
+              if (!teacherClasses.includes(c.id)) continue;
+              if (seenIds.has(c.id)) continue;
+              const key = String(c.name || "").trim().toLowerCase();
+              if (!byName.has(key)) {
+                byName.set(key, c);
               }
-              return false;
-            });
-            
-            setAvailableClasses(filteredClasses.map((c: any) => ({
-              id: c.id,
-              name: c.name,
-              sections: c.sections || []
-            })));
+              seenIds.add(c.id);
+            }
+
+            setAvailableClasses(
+              Array.from(byName.values()).map((c: any) => ({
+                id: c.id,
+                name: c.name,
+                sections: c.sections || [],
+              }))
+            );
           }
-          
+
           if (subjectsResult?.success && subjectsResult.data) {
-            // Filter to only teacher's assigned subjects - use Set for deduplication
-            const uniqueSubjectIds = new Set<string>();
-            const filteredSubjects = subjectsResult.data.filter((s: any) => {
-              if (teacherSubjects.includes(s.id) && !uniqueSubjectIds.has(s.id)) {
-                uniqueSubjectIds.add(s.id);
-                return true;
+            // Filter to only teacher's assigned subjects + dedupe by (id + name)
+            const byName = new Map<string, any>();
+            const seenIds = new Set<string>();
+            for (const s of subjectsResult.data) {
+              if (!teacherSubjects.includes(s.id)) continue;
+              if (seenIds.has(s.id)) continue;
+              const key = String(s.name || "").trim().toLowerCase();
+              if (!byName.has(key)) {
+                byName.set(key, s);
               }
-              return false;
-            });
-            
-            setAvailableSubjects(filteredSubjects.map((s: any) => ({
-              id: s.id,
-              name: s.name
-            })));
+              seenIds.add(s.id);
+            }
+
+            setAvailableSubjects(
+              Array.from(byName.values()).map((s: any) => ({
+                id: s.id,
+                name: s.name,
+              }))
+            );
           }
         } catch (e) {
           console.error("Error fetching teacher data:", e);
@@ -178,45 +188,60 @@ const TestForm: React.FC<TestFormProps> = ({ onFormDataChange }) => {
           const teachersResult = teachersResponse.data;
           
           if (classesResult?.success) {
-            // Use Set for deduplication
-            const uniqueClassIds = new Set<string>();
-            const uniqueClasses = classesResult.data.filter((c: any) => {
-              if (!uniqueClassIds.has(c.id)) {
-                uniqueClassIds.add(c.id);
-                return true;
+            // Dedupe classes by name (some datasets may contain duplicates with different IDs)
+            const byName = new Map<string, any>();
+            const seenIds = new Set<string>();
+            for (const c of classesResult.data || []) {
+              if (seenIds.has(c.id)) continue;
+              const key = String(c.name || "").trim().toLowerCase();
+              if (!byName.has(key)) {
+                byName.set(key, c);
               }
-              return false;
-            });
-            
-            setAvailableClasses(uniqueClasses.map((c: any) => ({
-              id: c.id,
-              name: c.name,
-              sections: c.sections || []
-            })));
+              seenIds.add(c.id);
+            }
+
+            setAvailableClasses(
+              Array.from(byName.values()).map((c: any) => ({
+                id: c.id,
+                name: c.name,
+                sections: c.sections || [],
+              }))
+            );
           }
-          
+
           if (subjectsResult?.success) {
-            // Use Set for deduplication
-            const uniqueSubjectIds = new Set<string>();
-            const uniqueSubjects = subjectsResult.data.filter((s: any) => {
-              if (!uniqueSubjectIds.has(s.id)) {
-                uniqueSubjectIds.add(s.id);
-                return true;
+            // Dedupe subjects by name
+            const byName = new Map<string, any>();
+            const seenIds = new Set<string>();
+            for (const s of subjectsResult.data || []) {
+              if (seenIds.has(s.id)) continue;
+              const key = String(s.name || "").trim().toLowerCase();
+              if (!byName.has(key)) {
+                byName.set(key, s);
               }
-              return false;
-            });
-            
-            setAvailableSubjects(uniqueSubjects.map((s: any) => ({
-              id: s.id,
-              name: s.name
-            })));
+              seenIds.add(s.id);
+            }
+
+            setAvailableSubjects(
+              Array.from(byName.values()).map((s: any) => ({
+                id: s.id,
+                name: s.name,
+              }))
+            );
           }
-          
+
           if (teachersResult?.success) {
-            setAvailableTeachers(teachersResult.data.map((t: any) => ({
-              id: t.id,
-              name: t.name
-            })));
+            // Dedupe teachers by id (safety)
+            const seenTeacherIds = new Set<string>();
+            setAvailableTeachers(
+              (teachersResult.data || [])
+                .filter((t: any) => {
+                  if (seenTeacherIds.has(t.id)) return false;
+                  seenTeacherIds.add(t.id);
+                  return true;
+                })
+                .map((t: any) => ({ id: t.id, name: t.name }))
+            );
           }
         } catch (e) {
           console.error("Error fetching data:", e);
