@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import * as XLSX from "xlsx";
 import { jsPDF } from "jspdf";
 import "jspdf-autotable";
@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/select";
 import { Download, FileText, Eye, Loader2 } from "lucide-react";
 import { getStudentById, getClassById, getSectionById, getSubjectById, getTeacherById } from "@/services/dataService";
+import { getClassesDB, getSectionsDB, getSubjectsDB, getTeachersDB, getStudentsDB } from "@/services/databaseService";
 import { loadAmiriFont, ARABIC_FONT_NAME } from "@/utils/fontLoader";
 import ReportPreview from "./ReportPreview";
 import { toast } from "sonner";
@@ -32,10 +33,57 @@ interface ReportGeneratorProps {
   test: any;
 }
 
+interface DBLookups {
+  classById: Map<string, string>;
+  sectionById: Map<string, string>;
+  subjectById: Map<string, string>;
+  teacherById: Map<string, string>;
+  studentById: Map<string, string>;
+}
+
 const ReportGenerator: React.FC<ReportGeneratorProps> = ({ test }) => {
   const [reportType, setReportType] = useState<string>("all");
   const [showPreview, setShowPreview] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [dbLookups, setDbLookups] = useState<DBLookups | null>(null);
+
+  // Load database lookups on mount
+  useEffect(() => {
+    let isMounted = true;
+    
+    const loadLookups = async () => {
+      try {
+        const [classes, sections, subjects, teachers, students] = await Promise.all([
+          getClassesDB(),
+          getSectionsDB(),
+          getSubjectsDB(),
+          getTeachersDB(),
+          getStudentsDB()
+        ]);
+        
+        if (!isMounted) return;
+        
+        const classById = new Map<string, string>();
+        const sectionById = new Map<string, string>();
+        const subjectById = new Map<string, string>();
+        const teacherById = new Map<string, string>();
+        const studentById = new Map<string, string>();
+        
+        classes.forEach(c => classById.set(c.id, c.name));
+        sections.forEach(s => sectionById.set(s.id, s.name));
+        subjects.forEach(s => subjectById.set(s.id, s.name));
+        teachers.forEach(t => teacherById.set(t.id, t.name));
+        students.forEach(s => studentById.set(s.id, s.name));
+        
+        setDbLookups({ classById, sectionById, subjectById, teacherById, studentById });
+      } catch (error) {
+        console.error("Error loading lookups:", error);
+      }
+    };
+    
+    loadLookups();
+    return () => { isMounted = false; };
+  }, []);
 
   const getSchoolInfo = () => {
     const schoolName = localStorage.getItem("schoolName") || "المدرسة";
@@ -51,24 +99,46 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ test }) => {
     };
   };
 
-  const getStudentName = (studentId: string): string => {
+  const getStudentName = useCallback((studentId: string, studentNameFromResult?: string): string => {
+    // Priority: 1. Name from result, 2. DB lookup, 3. localStorage, 4. ID
+    if (studentNameFromResult) return studentNameFromResult;
+    if (dbLookups?.studentById.has(studentId)) return dbLookups.studentById.get(studentId)!;
     const student = getStudentById(studentId);
     return student?.name || studentId;
-  };
+  }, [dbLookups]);
 
-  const getTestDetails = () => {
-    const classInfo = getClassById(test.classId);
-    const sectionInfo = getSectionById(test.classId, test.sectionId);
-    const subjectInfo = getSubjectById(test.subjectId);
-    const teacherInfo = getTeacherById(test.teacherId);
+  const getTestDetails = useCallback(() => {
+    // Try DB lookup first, then fallback to localStorage
+    const classId = test.classId || test.class_id;
+    const sectionId = test.sectionId || test.section_id;
+    const subjectId = test.subjectId || test.subject_id;
+    const teacherId = test.teacherId || test.teacher_id;
     
-    return {
-      className: classInfo?.name || "",
-      sectionName: sectionInfo?.name || "",
-      subjectName: subjectInfo?.name || "",
-      teacherName: teacherInfo?.name || ""
-    };
-  };
+    let className = dbLookups?.classById.get(classId) || "";
+    let sectionName = dbLookups?.sectionById.get(sectionId) || "";
+    let subjectName = dbLookups?.subjectById.get(subjectId) || "";
+    let teacherName = dbLookups?.teacherById.get(teacherId) || "";
+    
+    // Fallback to localStorage if DB didn't have the data
+    if (!className) {
+      const classInfo = getClassById(classId);
+      className = classInfo?.name || "";
+    }
+    if (!sectionName) {
+      const sectionInfo = getSectionById(classId, sectionId);
+      sectionName = sectionInfo?.name || "";
+    }
+    if (!subjectName) {
+      const subjectInfo = getSubjectById(subjectId);
+      subjectName = subjectInfo?.name || "";
+    }
+    if (!teacherName) {
+      const teacherInfo = getTeacherById(teacherId);
+      teacherName = teacherInfo?.name || "";
+    }
+    
+    return { className, sectionName, subjectName, teacherName };
+  }, [test, dbLookups]);
 
   // Calculate statistics
   const calculateStats = () => {
@@ -193,16 +263,19 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ test }) => {
     const resultsData = [
       resultsHeaders,
       ...results.map((result: any) => {
-        const studentName = result.studentName || getStudentName(result.studentId);
-        const scoreItems = questions.map((q: any) => result.isAbsent ? "-" : (result.scores[q.id] || 0));
-        const status = result.isAbsent ? "غائب" : (result.percentage >= 50 ? "ناجح" : "راسب");
+        const studentName = getStudentName(result.studentId || result.student_id, result.studentName || result.students?.name);
+        const scoreItems = questions.map((q: any) => result.isAbsent || result.is_absent ? "-" : (result.scores[q.id] || 0));
+        const isAbsent = result.isAbsent || result.is_absent;
+        const percentage = result.percentage ?? 0;
+        const totalScore = result.totalScore ?? result.total_score ?? 0;
+        const status = isAbsent ? "غائب" : (percentage >= 50 ? "ناجح" : "راسب");
         
         return [
           studentName,
-          result.isAbsent ? "غائب" : "حاضر",
+          isAbsent ? "غائب" : "حاضر",
           ...scoreItems,
-          result.isAbsent ? "0" : result.totalScore,
-          result.isAbsent ? "0%" : `${result.percentage}%`,
+          isAbsent ? "0" : totalScore,
+          isAbsent ? "0%" : `${percentage}%`,
           status
         ];
       })
@@ -412,13 +485,16 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ test }) => {
         currentY += 5;
         
         const resultsTableData = test.results.map((result: any, index: number) => {
-          const studentName = result.studentName || getStudentName(result.studentId);
-          const status = result.isAbsent ? "غائب" : (result.percentage >= 50 ? "ناجح" : "راسب");
+          const studentName = getStudentName(result.studentId || result.student_id, result.studentName || result.students?.name);
+          const isAbsent = result.isAbsent || result.is_absent;
+          const percentage = result.percentage ?? 0;
+          const totalScore = result.totalScore ?? result.total_score ?? 0;
+          const status = isAbsent ? "غائب" : (percentage >= 50 ? "ناجح" : "راسب");
           return [
             status,
-            result.isAbsent ? "-" : `${result.percentage}%`,
-            result.isAbsent ? "-" : result.totalScore,
-            result.isAbsent ? "غائب" : "حاضر",
+            isAbsent ? "-" : `${percentage}%`,
+            isAbsent ? "-" : totalScore,
+            isAbsent ? "غائب" : "حاضر",
             studentName,
             index + 1
           ];
