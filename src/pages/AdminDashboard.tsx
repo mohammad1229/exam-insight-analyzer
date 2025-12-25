@@ -99,8 +99,11 @@ const AdminDashboard = () => {
         const { data: result } = await supabase.functions.invoke("school-data", {
           body: { action: "getTests", schoolId }
         });
-        if (result?.success && result.data) {
+        if (result?.success && Array.isArray(result.data) && result.data.length > 0) {
           setTests(result.data);
+        } else {
+          // Fallback to local storage if DB is empty (common before first sync)
+          setTests(getTests());
         }
       } catch (e) {
         console.error("Error fetching tests:", e);
@@ -357,9 +360,11 @@ const AdminDashboard = () => {
                   </TableHeader>
                   <TableBody>
                     {recentTests.map((test) => {
-                      const report = mockReports.find(r => r.testId === test.id);
+                      const testResults = (test.test_results || test.results || []).filter((r: any) => !r.isAbsent && !r.is_absent);
+                      const passed = testResults.filter((r: any) => (r.percentage || 0) >= 50).length;
+                      const passRate = testResults.length > 0 ? (passed / testResults.length) * 100 : 0;
                       const testDate = test.test_date || test.date;
-                      const subjectName = test.subjects?.name || report?.subjectName || "-";
+                      const subjectName = test.subjects?.name || "-";
                       return (
                         <TableRow key={test.id} className="hover:bg-blue-50">
                           <TableCell className="font-medium">{test.name}</TableCell>
@@ -367,13 +372,13 @@ const AdminDashboard = () => {
                           <TableCell>{testDate}</TableCell>
                           <TableCell>
                             <span className={`px-2 py-1 rounded text-sm ${
-                              (report?.passRate || 0) >= 75 
+                              passRate >= 75 
                                 ? "bg-green-100 text-green-700" 
-                                : (report?.passRate || 0) >= 50 
+                                : passRate >= 50 
                                   ? "bg-yellow-100 text-yellow-700"
                                   : "bg-red-100 text-red-700"
                             }`}>
-                              {report?.passRate?.toFixed(1) || 0}%
+                              {passRate.toFixed(1)}%
                             </span>
                           </TableCell>
                           <TableCell>

@@ -361,18 +361,20 @@ const Reports = () => {
                             </TableHeader>
                             <TableBody>
                               {selectedTest.results.map(result => {
-                                const studentName = getStudentName(result.studentId, (result as any).studentName);
-                                const level = !result.isAbsent ? getPerformanceLevel(result.percentage) : null;
+                                const sid = (result as any).studentId || (result as any).student_id || "";
+                                const studentName = getStudentName(sid, (result as any).studentName);
+                                const isAbsent = (result as any).isAbsent || (result as any).is_absent;
+                                const level = !isAbsent ? getPerformanceLevel((result as any).percentage || 0) : null;
                                 
                                 return (
-                                  <TableRow key={result.id} className="hover:bg-green-50">
+                                  <TableRow key={(result as any).id} className="hover:bg-green-50">
                                     <TableCell className="font-medium">{studentName}</TableCell>
-                                    <TableCell>{result.isAbsent ? 'غائب' : 'حاضر'}</TableCell>
+                                    <TableCell>{isAbsent ? 'غائب' : 'حاضر'}</TableCell>
                                     <TableCell>
-                                      {result.isAbsent ? '-' : result.totalScore}
+                                      {isAbsent ? '-' : (result as any).totalScore ?? (result as any).total_score}
                                     </TableCell>
                                     <TableCell>
-                                      {result.isAbsent ? '-' : `${result.percentage}%`}
+                                      {isAbsent ? '-' : `${(result as any).percentage || 0}%`}
                                     </TableCell>
                                     <TableCell>
                                       {result.isAbsent ? '-' : (
