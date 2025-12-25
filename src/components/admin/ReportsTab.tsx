@@ -18,8 +18,8 @@ import {
   TableRow 
 } from "@/components/ui/table";
 import { Label } from "@/components/ui/label";
-import { FileText, Download, Users, Filter, Eye, Edit2, Trash2 } from "lucide-react";
-import { getTests, getStudents, getClasses, getTeachers, getSubjects, getClassById, getSectionById, getSubjectById, getTeacherById, deleteTest, updateTest } from "@/services/dataService";
+import { FileText, Download, Users, Filter, Eye } from "lucide-react";
+import { getTests, getStudents, getClasses, getTeachers, getSubjects, getClassById, getSectionById, getSubjectById, getTeacherById } from "@/services/dataService";
 import { jsPDF } from "jspdf";
 import "jspdf-autotable";
 import { loadAmiriFont, ARABIC_FONT_NAME } from "@/utils/fontLoader";
@@ -28,18 +28,7 @@ import { getPerformanceLevels } from "./PerformanceLevelsTab";
 import { getFooterSettings } from "./SettingsTab";
 import { getHeaderSettings } from "./HeaderSettingsTab";
 import ReportPreview from "@/components/ReportPreview";
-import TestResultsEditor from "@/components/TestResultsEditor";
 import { Test } from "@/types";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 
 // Mock reports type
 interface Report {
@@ -74,13 +63,10 @@ const ReportsTab = ({ mockReports }: ReportsTabProps) => {
   const [reportTeacherFilter, setReportTeacherFilter] = useState("all");
   const [reportSubjectFilter, setReportSubjectFilter] = useState("all");
 
-  // Report preview and edit states
+  // Report preview states
   const [allTests, setAllTests] = useState<Test[]>([]);
   const [selectedTest, setSelectedTest] = useState<Test | null>(null);
   const [showReportPreview, setShowReportPreview] = useState(false);
-  const [showEditDialog, setShowEditDialog] = useState(false);
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [testToDelete, setTestToDelete] = useState<string | null>(null);
 
   // Load tests from localStorage
   useEffect(() => {
@@ -118,38 +104,6 @@ const ReportsTab = ({ mockReports }: ReportsTabProps) => {
       setSelectedTest(test);
       setShowReportPreview(true);
     }
-  };
-
-  // Handle edit report
-  const handleEditReport = (testId: string) => {
-    const test = allTests.find(t => t.id === testId);
-    if (test) {
-      setSelectedTest(test);
-      setShowEditDialog(true);
-    }
-  };
-
-  // Handle delete report
-  const handleDeleteReport = (testId: string) => {
-    setTestToDelete(testId);
-    setShowDeleteDialog(true);
-  };
-
-  // Confirm delete
-  const confirmDelete = () => {
-    if (testToDelete) {
-      deleteTest(testToDelete);
-      setAllTests(getTests());
-      toast.success("تم حذف التقرير بنجاح");
-      setShowDeleteDialog(false);
-      setTestToDelete(null);
-    }
-  };
-
-  // Handle save edited test
-  const handleSaveEditedTest = (updatedTest: Test) => {
-    setAllTests(getTests());
-    setSelectedTest(updatedTest);
   };
 
   // Generate comprehensive school report
@@ -923,35 +877,16 @@ const ReportsTab = ({ mockReports }: ReportsTabProps) => {
                         </div>
                       </div>
                       
-                      <div className="flex justify-between gap-2 pt-2 border-t">
+                      <div className="flex justify-center pt-2 border-t">
                         <Button 
                           variant="outline" 
                           size="sm"
                           onClick={() => handleViewReport(report.testId)}
                           title="عرض التقرير"
-                          className="flex-1"
+                          className="w-full"
                         >
                           <Eye className="h-4 w-4 ml-1" />
-                          عرض
-                        </Button>
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => handleEditReport(report.testId)}
-                          title="تعديل النتائج"
-                          className="flex-1"
-                        >
-                          <Edit2 className="h-4 w-4 ml-1" />
-                          تعديل
-                        </Button>
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => handleDeleteReport(report.testId)}
-                          className="text-red-500 hover:bg-red-50"
-                          title="حذف"
-                        >
-                          <Trash2 className="h-4 w-4" />
+                          عرض التقرير
                         </Button>
                       </div>
                     </CardContent>
@@ -979,37 +914,6 @@ const ReportsTab = ({ mockReports }: ReportsTabProps) => {
           }}
         />
       )}
-
-      {/* Edit Results Dialog */}
-      {selectedTest && (
-        <TestResultsEditor
-          test={selectedTest}
-          open={showEditDialog}
-          onClose={() => {
-            setShowEditDialog(false);
-            setSelectedTest(null);
-          }}
-          onSave={handleSaveEditedTest}
-        />
-      )}
-
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>هل أنت متأكد من الحذف؟</AlertDialogTitle>
-            <AlertDialogDescription>
-              سيتم حذف هذا التقرير نهائياً ولا يمكن استرجاعه.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>إلغاء</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} className="bg-red-500 hover:bg-red-600">
-              حذف
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 };
