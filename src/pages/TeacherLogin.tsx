@@ -174,12 +174,14 @@ const TeacherLogin = () => {
       }
 
       if (teacher) {
-        // Get classes and subjects from the API response
+        // Get classes, subjects, and sections from the API response
         const teacherClasses = teacher.classes || [];
         const teacherSubjects = teacher.subjects || [];
+        const teacherSections = teacher.sections || [];
         
         console.log("Teacher login - classes:", teacherClasses);
         console.log("Teacher login - subjects:", teacherSubjects);
+        console.log("Teacher login - sections:", teacherSections);
         
         // Store teacher info before checking password change
         localStorage.setItem(
@@ -187,15 +189,20 @@ const TeacherLogin = () => {
           JSON.stringify({
             id: teacher.id,
             name: teacher.name,
+            school_id: teacher.school_id,
+            license_id: teacher.license_id,
             // Store both naming conventions for compatibility
             classes: teacherClasses,
             subjects: teacherSubjects,
+            sections: teacherSections,
             assignedClasses: teacherClasses,
             assignedSubjects: teacherSubjects,
+            assignedSections: teacherSections,
             role: teacher.role || "teacher",
           })
         );
         localStorage.setItem("currentTeacherId", teacher.id);
+        localStorage.setItem("currentSchoolId", teacher.school_id);
 
         // Check if must change password
         if (teacher.must_change_password) {
@@ -226,6 +233,7 @@ const TeacherLogin = () => {
   const completeTeacherLogin = (teacher: any) => {
     const teacherClasses = teacher.assignedClasses || teacher.classes || [];
     const teacherSubjects = teacher.assignedSubjects || teacher.subjects || [];
+    const teacherSections = teacher.assignedSections || teacher.sections || [];
 
     // Store teacher info in localStorage for session management
     localStorage.setItem(
@@ -233,17 +241,22 @@ const TeacherLogin = () => {
       JSON.stringify({
         id: teacher.id,
         name: teacher.name,
+        school_id: teacher.school_id,
+        license_id: teacher.license_id,
         // Store both naming conventions for compatibility
         classes: teacherClasses,
         subjects: teacherSubjects,
+        sections: teacherSections,
         assignedClasses: teacherClasses,
         assignedSubjects: teacherSubjects,
+        assignedSections: teacherSections,
         role: teacher.role || "teacher",
       })
     );
 
-    // Also set currentTeacherId for compatibility
+    // Also set currentTeacherId and schoolId for compatibility
     localStorage.setItem("currentTeacherId", teacher.id);
+    localStorage.setItem("currentSchoolId", teacher.school_id);
 
     // Save last logged in user
     saveLastUser({

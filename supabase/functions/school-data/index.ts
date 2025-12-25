@@ -729,7 +729,7 @@ serve(async (req) => {
         // Search for teacher by username across all schools
         const { data: teacher, error } = await supabase
           .from("teachers")
-          .select("*, teacher_subjects(subject_id), teacher_classes(class_id)")
+          .select("*, teacher_subjects(subject_id), teacher_classes(class_id), teacher_sections(section_id)")
           .eq("username", data.username)
           .eq("is_active", true)
           .maybeSingle();
@@ -750,6 +750,54 @@ serve(async (req) => {
           });
         }
 
+        // Get the school's license to verify it's active
+        const { data: school, error: schoolError } = await supabase
+          .from("schools")
+          .select("id, name")
+          .eq("id", teacher.school_id)
+          .single();
+        
+        if (schoolError || !school) {
+          return new Response(JSON.stringify({ success: false, error: "المدرسة غير موجودة" }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        // Check if there's an active license for this school
+        const { data: license, error: licenseError } = await supabase
+          .from("licenses")
+          .select("id, is_active, expiry_date, is_trial, trial_days, trial_start_date")
+          .eq("school_id", teacher.school_id)
+          .eq("is_active", true)
+          .maybeSingle();
+        
+        if (licenseError) {
+          console.error("Error checking license:", licenseError);
+        }
+        
+        // Verify license is valid
+        if (!license) {
+          return new Response(JSON.stringify({ success: false, error: "ترخيص المدرسة غير مفعل - تواصل مع مدير النظام" }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        // Check if license is expired
+        if (license.is_trial) {
+          const trialStart = new Date(license.trial_start_date);
+          const trialDays = license.trial_days || 15;
+          const trialEnd = new Date(trialStart.getTime() + trialDays * 24 * 60 * 60 * 1000);
+          if (new Date() > trialEnd) {
+            return new Response(JSON.stringify({ success: false, error: "انتهت الفترة التجريبية - يرجى تفعيل الترخيص" }), {
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
+        } else if (license.expiry_date && new Date(license.expiry_date) < new Date()) {
+          return new Response(JSON.stringify({ success: false, error: "انتهت صلاحية الترخيص - تواصل مع مدير النظام" }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
         // Update last login
         await supabase.from("teachers").update({ last_login_at: new Date().toISOString() }).eq("id", teacher.id);
 
@@ -764,8 +812,10 @@ serve(async (req) => {
             phone: teacher.phone,
             role: teacher.role,
             school_id: teacher.school_id,
+            license_id: license.id,
             subjects: teacher.teacher_subjects?.map((ts: any) => ts.subject_id) || [],
-            classes: teacher.teacher_classes?.map((tc: any) => tc.class_id) || []
+            classes: teacher.teacher_classes?.map((tc: any) => tc.class_id) || [],
+            sections: teacher.teacher_sections?.map((ts: any) => ts.section_id) || []
           }
         }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
