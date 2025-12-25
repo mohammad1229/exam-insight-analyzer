@@ -44,12 +44,14 @@ import {
   getClassesDB, 
   getSubjectsDB, 
   getTeachersDB,
+  getSectionsDB,
   addTeacherDB, 
   updateTeacherDB, 
   deleteTeacherDB,
   DBClass,
   DBSubject,
-  DBTeacher 
+  DBTeacher,
+  DBSection
 } from "@/services/databaseService";
 import * as XLSX from "xlsx";
 
@@ -59,6 +61,7 @@ const TeachersTab = () => {
   const [teachers, setTeachers] = useState<DBTeacher[]>([]);
   const [classes, setClasses] = useState<DBClass[]>([]);
   const [subjects, setSubjects] = useState<DBSubject[]>([]);
+  const [allSections, setAllSections] = useState<DBSection[]>([]);
   const [showAddTeacherModal, setShowAddTeacherModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingTeacher, setEditingTeacher] = useState<DBTeacher | null>(null);
@@ -72,6 +75,7 @@ const TeachersTab = () => {
     username: z.string().min(3, { message: "يجب أن يحتوي اسم المستخدم على 3 أحرف على الأقل" }),
     password: z.string().min(5, { message: "يجب أن تحتوي كلمة المرور على 5 أحرف على الأقل" }),
     classes: z.array(z.string()).min(1, { message: "يجب اختيار صف واحد على الأقل" }),
+    sections: z.array(z.string()).min(1, { message: "يجب اختيار شعبة واحدة على الأقل" }),
     subjects: z.array(z.string()).min(1, { message: "يجب اختيار مادة واحدة على الأقل" })
   });
   
@@ -82,6 +86,7 @@ const TeachersTab = () => {
       username: "",
       password: "",
       classes: [],
+      sections: [],
       subjects: []
     }
   });
@@ -97,14 +102,16 @@ const TeachersTab = () => {
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const [classesData, subjectsData, teachersData] = await Promise.all([
+      const [classesData, subjectsData, teachersData, sectionsData] = await Promise.all([
         getClassesDB(),
         getSubjectsDB(),
-        getTeachersDB()
+        getTeachersDB(),
+        getSectionsDB()
       ]);
       setClasses(classesData);
       setSubjects(subjectsData);
       setTeachers(teachersData);
+      setAllSections(sectionsData);
       emitTeachersCount(teachersData?.length || 0);
     } catch (error: any) {
       console.error("Error loading data:", error);
@@ -126,6 +133,10 @@ const TeachersTab = () => {
     return teacher.teacher_classes?.map(tc => tc.class_id) || [];
   };
 
+  const getTeacherSections = (teacher: DBTeacher): string[] => {
+    return teacher.teacher_sections?.map(ts => ts.section_id) || [];
+  };
+
   // Add new teacher
   const handleAddTeacher = async (data: z.infer<typeof teacherFormSchema>) => {
     setIsSaving(true);
@@ -136,6 +147,7 @@ const TeachersTab = () => {
         password: data.password,
         subjects: data.subjects,
         classes: data.classes,
+        sections: data.sections,
         must_change_password: true,
       });
       
@@ -172,6 +184,7 @@ const TeachersTab = () => {
         password: data.password,
         subjects: data.subjects,
         classes: data.classes,
+        sections: data.sections,
       });
       
       // Reload to get updated data
@@ -267,6 +280,7 @@ const TeachersTab = () => {
       username: teacher.username,
       password: "",
       classes: getTeacherClasses(teacher),
+      sections: getTeacherSections(teacher),
       subjects: getTeacherSubjects(teacher),
     });
     setShowEditModal(true);
@@ -370,6 +384,7 @@ const TeachersTab = () => {
       "اسم المعلم": teacher.name,
       "اسم المستخدم": teacher.username,
       "الصفوف": getTeacherClasses(teacher).map(id => classes.find(c => c.id === id)?.name || "").filter(Boolean).join("، "),
+      "الشعب": getTeacherSections(teacher).map(id => allSections.find(s => s.id === id)?.name || "").filter(Boolean).join("، "),
       "المواد": getTeacherSubjects(teacher).map(id => subjects.find(s => s.id === id)?.name || "").filter(Boolean).join("، "),
     }));
 
@@ -475,6 +490,56 @@ const TeachersTab = () => {
                 <FormMessage />
               </FormItem>
             )}
+          />
+
+          <FormField
+            control={teacherForm.control}
+            name="sections"
+            render={({ field }) => {
+              // Get sections for selected classes only
+              const selectedClassIds = teacherForm.watch("classes");
+              const availableSections = allSections.filter(s => 
+                selectedClassIds.includes(s.class_id)
+              );
+              
+              return (
+                <FormItem>
+                  <FormLabel>الشعب المخصصة للمعلم</FormLabel>
+                  <div className="flex flex-wrap gap-2 border rounded p-2 max-h-40 overflow-y-auto">
+                    {selectedClassIds.length === 0 ? (
+                      <span className="text-muted-foreground text-sm">اختر صفاً أولاً لعرض الشعب</span>
+                    ) : availableSections.length > 0 ? availableSections.map(section => {
+                      const className = classes.find(c => c.id === section.class_id)?.name || "";
+                      return (
+                        <div key={section.id} className="flex items-center">
+                          <input
+                            type="checkbox"
+                            id={`section-${section.id}`}
+                            value={section.id}
+                            checked={field.value.includes(section.id)}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              if (e.target.checked) {
+                                field.onChange([...field.value, value]);
+                              } else {
+                                field.onChange(field.value.filter(v => v !== value));
+                              }
+                            }}
+                            className="ml-1"
+                          />
+                          <label htmlFor={`section-${section.id}`} className="ml-3">
+                            {className} - {section.name}
+                          </label>
+                        </div>
+                      );
+                    }) : (
+                      <span className="text-muted-foreground text-sm">لا توجد شعب للصفوف المختارة</span>
+                    )}
+                  </div>
+                  <FormMessage />
+                </FormItem>
+              );
+            }}
           />
           
           <FormField
@@ -604,6 +669,7 @@ const TeachersTab = () => {
                 <TableHead className="text-white">اسم المعلم</TableHead>
                 <TableHead className="text-white">اسم المستخدم</TableHead>
                 <TableHead className="text-white">الصفوف</TableHead>
+                <TableHead className="text-white">الشعب</TableHead>
                 <TableHead className="text-white">المواد</TableHead>
                 <TableHead className="text-white">الإجراءات</TableHead>
               </TableRow>
@@ -621,6 +687,19 @@ const TeachersTab = () => {
                           return cls ? (
                             <span key={classId} className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs">
                               {cls.name}
+                            </span>
+                          ) : null;
+                        })}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-1">
+                        {getTeacherSections(teacher).map(sectionId => {
+                          const section = allSections.find(s => s.id === sectionId);
+                          const className = section ? classes.find(c => c.id === section.class_id)?.name : "";
+                          return section ? (
+                            <span key={sectionId} className="bg-purple-100 text-purple-800 px-2 py-1 rounded text-xs">
+                              {className} - {section.name}
                             </span>
                           ) : null;
                         })}

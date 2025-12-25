@@ -100,17 +100,21 @@ const TestForm: React.FC<TestFormProps> = ({ onFormDataChange }) => {
           setTeacherId(teacher.id);
           setAvailableTeachers([{ id: teacher.id, name: teacher.name }]);
           
-          // Fetch teacher's assigned classes from localStorage (stored on login)
+          // Fetch teacher's assigned classes, sections, and subjects from localStorage (stored on login)
           const teacherClasses = teacher.assignedClasses || teacher.classes || [];
           const teacherSubjects = teacher.assignedSubjects || teacher.subjects || [];
+          const teacherSections = teacher.assignedSections || teacher.sections || [];
           
-          // Fetch all classes and subjects then filter
-          const [classesResponse, subjectsResponse] = await Promise.all([
+          // Fetch all classes, sections, and subjects then filter
+          const [classesResponse, subjectsResponse, sectionsResponse] = await Promise.all([
             supabase.functions.invoke("school-data", {
               body: { action: "getClasses", schoolId }
             }),
             supabase.functions.invoke("school-data", {
               body: { action: "getSubjects", schoolId }
+            }),
+            supabase.functions.invoke("school-data", {
+              body: { action: "getSections", schoolId }
             })
           ]);
           
@@ -118,6 +122,10 @@ const TestForm: React.FC<TestFormProps> = ({ onFormDataChange }) => {
           
           const classesResult = classesResponse.data;
           const subjectsResult = subjectsResponse.data;
+          const sectionsResult = sectionsResponse.data;
+          
+          // Get all sections data
+          const allSectionsData = sectionsResult?.success ? sectionsResult.data : [];
           
           if (classesResult?.success && classesResult.data) {
             // Filter to only teacher's assigned classes + dedupe by (id + name)
@@ -128,18 +136,33 @@ const TestForm: React.FC<TestFormProps> = ({ onFormDataChange }) => {
               if (seenIds.has(c.id)) continue;
               const key = String(c.name || "").trim().toLowerCase();
               if (!byName.has(key)) {
-                byName.set(key, c);
+                // Add sections for this class
+                const classSections = allSectionsData.filter((s: any) => 
+                  s.class_id === c.id && teacherSections.includes(s.id)
+                );
+                byName.set(key, { ...c, sections: classSections });
               }
               seenIds.add(c.id);
             }
 
-            setAvailableClasses(
-              Array.from(byName.values()).map((c: any) => ({
-                id: c.id,
-                name: c.name,
-                sections: c.sections || [],
-              }))
-            );
+            const filteredClasses = Array.from(byName.values()).map((c: any) => ({
+              id: c.id,
+              name: c.name,
+              sections: c.sections || [],
+            }));
+            
+            setAvailableClasses(filteredClasses);
+            
+            // Auto-select if only one class
+            if (filteredClasses.length === 1) {
+              setClassId(filteredClasses[0].id);
+              setSections(filteredClasses[0].sections);
+              
+              // Auto-select if only one section
+              if (filteredClasses[0].sections.length === 1) {
+                setSectionId(filteredClasses[0].sections[0].id);
+              }
+            }
           }
 
           if (subjectsResult?.success && subjectsResult.data) {
@@ -156,12 +179,17 @@ const TestForm: React.FC<TestFormProps> = ({ onFormDataChange }) => {
               seenIds.add(s.id);
             }
 
-            setAvailableSubjects(
-              Array.from(byName.values()).map((s: any) => ({
-                id: s.id,
-                name: s.name,
-              }))
-            );
+            const filteredSubjects = Array.from(byName.values()).map((s: any) => ({
+              id: s.id,
+              name: s.name,
+            }));
+            
+            setAvailableSubjects(filteredSubjects);
+            
+            // Auto-select if only one subject
+            if (filteredSubjects.length === 1) {
+              setSubjectId(filteredSubjects[0].id);
+            }
           }
         } catch (e) {
           console.error("Error fetching teacher data:", e);

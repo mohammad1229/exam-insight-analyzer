@@ -55,6 +55,7 @@ export interface DBTeacher {
   must_change_password: boolean;
   teacher_subjects?: { subject_id: string; subjects?: { name: string } }[];
   teacher_classes?: { class_id: string; classes?: { name: string } }[];
+  teacher_sections?: { section_id: string; sections?: { name: string; class_id: string } }[];
 }
 
 export interface DBTest {
@@ -224,6 +225,7 @@ export const addTeacherDB = async (teacherData: {
   role?: string;
   subjects?: string[];
   classes?: string[];
+  sections?: string[];
   must_change_password?: boolean;
 }): Promise<DBTeacher> => {
   return await callSchoolDataAPI('addTeacher', teacherData);
@@ -239,6 +241,7 @@ export const updateTeacherDB = async (id: string, teacherData: {
   is_active?: boolean;
   subjects?: string[];
   classes?: string[];
+  sections?: string[];
   must_change_password?: boolean;
 }): Promise<void> => {
   await callSchoolDataAPI('updateTeacher', { id, ...teacherData });
