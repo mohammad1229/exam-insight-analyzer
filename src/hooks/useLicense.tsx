@@ -7,6 +7,9 @@ import {
   startTrial,
   storeLicense,
   clearLicense,
+  isDeviceActivated,
+  getDeviceActivationData,
+  markDeviceActivated,
 } from "@/services/licenseService";
 
 interface LicenseState {
@@ -43,11 +46,67 @@ export const useLicense = () => {
     showExpiryWarning: false,
   });
 
+  // Background validation function - runs silently without blocking UI
+  const performBackgroundValidation = useCallback(async (licenseKey: string) => {
+    try {
+      const result = await checkLicenseValidity();
+      if (result.valid) {
+        // Update activation data with new validation timestamp
+        const stored = getStoredLicense();
+        if (stored) {
+          markDeviceActivated(licenseKey, stored.schoolId || '');
+        }
+        localStorage.setItem("lastLicenseValidation", Date.now().toString());
+      }
+    } catch (error) {
+      console.log("Background validation failed, using cached data:", error);
+    }
+  }, []);
+
   const checkLicense = useCallback(async () => {
     setState(prev => ({ ...prev, isLoading: true }));
     
     try {
       const stored = getStoredLicense();
+      
+      // First check if device is already permanently activated
+      if (isDeviceActivated()) {
+        const activationData = getDeviceActivationData();
+        
+        if (stored && stored.licenseKey) {
+          // Device is activated - use stored data without online check
+          const remainingDays = stored.remainingDays || 0;
+          const showWarning = remainingDays <= 7 && remainingDays > 0;
+          
+          setState({
+            isLoading: false,
+            isActivated: true,
+            isTrial: stored.isTrial || false,
+            remainingDays: remainingDays,
+            schoolId: stored.schoolId || activationData?.schoolId,
+            schoolName: stored.schoolName,
+            directorName: stored.directorName || null,
+            schoolLogo: stored.schoolLogo || null,
+            licenseKey: stored.licenseKey,
+            devicesUsed: stored.devicesUsed || 0,
+            maxDevices: stored.maxDevices || 1,
+            expiryDate: stored.expiryDate || null,
+            showExpiryWarning: showWarning,
+          });
+          
+          // Perform background validation only once per day
+          const lastValidation = activationData?.lastValidated || 0;
+          const now = Date.now();
+          const dayInMs = 24 * 60 * 60 * 1000;
+          
+          if (now - lastValidation > dayInMs) {
+            // Background validation - don't block UI
+            performBackgroundValidation(stored.licenseKey);
+          }
+          
+          return;
+        }
+      }
       
       if (!stored || !stored.licenseKey) {
         setState(prev => ({
