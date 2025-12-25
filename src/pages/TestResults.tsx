@@ -206,11 +206,40 @@ const TestResults = () => {
 
         return testData;
       }
-    } catch (e) {
-      // Fallback to local only
+    } catch (e: any) {
+      // Check if this is a duplicate error
+      if (e.duplicate) {
+        toast({
+          title: "اختبار مكرر",
+          description: `يوجد اختبار بنفس البيانات مسجل مسبقاً: "${e.existingTestName || testFormData.name}"`,
+          variant: "destructive",
+        });
+        return null;
+      }
+      // Fallback to local only for other errors
+      console.error("Error saving to DB:", e);
     }
 
-    // Local-only fallback
+    // Local-only fallback - also check for duplicates
+    const existingTests = getTests();
+    const isDuplicate = existingTests.some(t =>
+      t.name === testFormData.name &&
+      t.teacherId === testFormData.teacherId &&
+      t.subjectId === testFormData.subjectId &&
+      t.classId === testFormData.classId &&
+      t.sectionId === testFormData.sectionId &&
+      t.date === testFormData.date
+    );
+
+    if (isDuplicate) {
+      toast({
+        title: "اختبار مكرر",
+        description: "يوجد اختبار بنفس البيانات (المعلم، المادة، الصف، الشعبة، التاريخ، الاسم) محفوظ محلياً",
+        variant: "destructive",
+      });
+      return null;
+    }
+
     addTest(testData);
 
     toast({
