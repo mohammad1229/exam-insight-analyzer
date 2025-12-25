@@ -195,9 +195,9 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({ test, open, onClose }) =>
     const { className, sectionName, subjectName, teacherName } = getTestDetails();
     const stats = calculateStats();
 
-    // Always use landscape for better fit with 50 students
+    // Use portrait orientation for vertical layout
     const doc = new jsPDF({ 
-      orientation: "landscape", 
+      orientation: "portrait", 
       unit: "mm", 
       format: "a4" 
     });
@@ -215,67 +215,63 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({ test, open, onClose }) =>
 
     const pageWidth = doc.internal.pageSize.width;
     const pageHeight = doc.internal.pageSize.height;
-    const margin = 8;
+    const margin = 6;
 
-    // === HEADER SECTION - Classic Frame Layout ===
-    let currentY = 8;
+    // === HEADER SECTION - Compact ===
+    let currentY = 6;
 
     // Classic double-line frame border at top
     doc.setDrawColor(80, 80, 80);
-    doc.setLineWidth(0.8);
-    doc.rect(margin, 6, pageWidth - margin * 2, 22);
-    doc.setLineWidth(0.3);
-    doc.rect(margin + 1, 7, pageWidth - margin * 2 - 2, 20);
+    doc.setLineWidth(0.6);
+    doc.rect(margin, 4, pageWidth - margin * 2, 18);
+    doc.setLineWidth(0.2);
+    doc.rect(margin + 0.8, 4.8, pageWidth - margin * 2 - 1.6, 16.4);
 
-    currentY = 12;
+    currentY = 8;
 
     // Get header settings
     const headerSettings = getHeaderSettings();
 
-    // Three-column header
-    const leftCol = pageWidth - margin - 60;
+    // Three-column header - more compact
+    const leftCol = pageWidth - margin - 35;
     const centerCol = pageWidth / 2;
-    const rightCol = margin + 60;
+    const rightCol = margin + 35;
 
     // Right side - Ministry info
-    doc.setFontSize(9);
+    doc.setFontSize(7);
     doc.setTextColor(0, 0, 0);
     doc.text(headerSettings.rightLine1, rightCol, currentY, { align: "center" });
-    doc.text(headerSettings.rightLine1En, rightCol, currentY + 4, { align: "center" });
-    doc.text(headerSettings.rightLine2 || ministryName, rightCol, currentY + 8, { align: "center" });
-    doc.text(headerSettings.rightLine3 || directorateName, rightCol, currentY + 12, { align: "center" });
+    doc.text(headerSettings.rightLine2 || ministryName, rightCol, currentY + 4, { align: "center" });
+    doc.text(headerSettings.rightLine3 || directorateName, rightCol, currentY + 8, { align: "center" });
 
     // Center - Logo/School Name
     const schoolLogo = getSchoolInfo().schoolLogo;
     if (schoolLogo) {
       try {
-        doc.addImage(schoolLogo, "PNG", centerCol - 8, currentY - 2, 16, 16);
+        doc.addImage(schoolLogo, "PNG", centerCol - 6, currentY - 2, 12, 12);
       } catch (e) {
         // If logo fails, just show school name
       }
     }
-    doc.setFontSize(10);
-    doc.text(schoolName, centerCol, currentY + 14, { align: "center" });
+    doc.setFontSize(8);
+    doc.text(schoolName, centerCol, currentY + 11, { align: "center" });
 
     // Left side - English info
-    doc.setFontSize(9);
-    doc.text(headerSettings.leftLine1, leftCol, currentY + 4, { align: "center" });
-    doc.text(headerSettings.leftLine2, leftCol, currentY + 8, { align: "center" });
-    if (headerSettings.leftLine3) {
-      doc.text(headerSettings.leftLine3, leftCol, currentY + 12, { align: "center" });
-    }
+    doc.setFontSize(7);
+    doc.text(headerSettings.leftLine1, leftCol, currentY + 2, { align: "center" });
+    doc.text(headerSettings.leftLine2, leftCol, currentY + 6, { align: "center" });
 
-    currentY = 32;
+    currentY = 24;
 
     // Report Title with test type
     const testTypeLabel = test.type ? ` (${getTestTypeLabel(test.type)})` : "";
-    doc.setFontSize(12);
+    doc.setFontSize(10);
     doc.setTextColor(0, 100, 0);
     doc.text(`تحليل امتحان ${test.name}${testTypeLabel}`, centerCol, currentY, { align: "center" });
     
-    currentY += 6;
+    currentY += 4;
 
-    // === TEST INFO ROW ===
+    // === TEST INFO ROW - Compact with Teacher Name ===
     doc.autoTable({
       startY: currentY,
       head: [["علامة الاختبار", "معلم المادة", "التاريخ", "الصف / الشعبة", "المبحث"]],
@@ -283,25 +279,26 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({ test, open, onClose }) =>
       theme: "grid",
       styles: { 
         halign: "center", 
-        fontSize: 8, 
-        cellPadding: 1.5, 
+        fontSize: 7, 
+        cellPadding: 1, 
         font: ARABIC_FONT_NAME 
       },
       headStyles: { 
         fillColor: [0, 100, 0], 
         textColor: [255, 255, 255], 
-        fontSize: 8 
+        fontSize: 7 
       },
       margin: { left: margin, right: margin },
     });
 
-    currentY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 3 : currentY + 15;
+    currentY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 2 : currentY + 12;
 
-    // === MAIN RESULTS TABLE - Optimized for 50 students ===
+    // === MAIN RESULTS TABLE - Optimized for portrait A4 ===
     const questionHeaders = test.questions.map((q: any) => q.type);
     const mainHeaders = ["ملاحظات", "النسبة", "المجموع", ...questionHeaders.reverse(), "اسم الطالب", "م"];
 
     const mainTableData = test.results.map((result: any, index: number) => {
+      // Get student name - prefer stored studentName, fallback to lookup
       const studentName = result.studentName || getStudentName(result.studentId);
       
       if (result.isAbsent) {
@@ -327,10 +324,10 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({ test, open, onClose }) =>
       ];
     });
 
-    // Calculate dynamic font size based on number of students
+    // Calculate dynamic font size based on number of students - smaller for portrait
     const studentCount = test.results.length;
-    const fontSize = studentCount > 40 ? 6 : studentCount > 30 ? 7 : 8;
-    const cellPadding = studentCount > 40 ? 0.8 : studentCount > 30 ? 1 : 1.5;
+    const fontSize = studentCount > 35 ? 5 : studentCount > 25 ? 6 : studentCount > 15 ? 7 : 8;
+    const cellPadding = studentCount > 35 ? 0.5 : studentCount > 25 ? 0.7 : 0.8;
 
     doc.autoTable({
       startY: currentY,
@@ -342,18 +339,18 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({ test, open, onClose }) =>
         fontSize: fontSize, 
         cellPadding: cellPadding, 
         font: ARABIC_FONT_NAME,
-        lineWidth: 0.1,
+        lineWidth: 0.08,
       },
       headStyles: { 
         fillColor: [0, 100, 0], 
         textColor: [255, 255, 255], 
         fontSize: fontSize,
-        cellPadding: 1.5,
+        cellPadding: 1,
       },
       columnStyles: {
-        0: { cellWidth: 14 },
-        1: { cellWidth: 12 },
-        2: { cellWidth: 12 },
+        0: { cellWidth: 12 },
+        1: { cellWidth: 10 },
+        2: { cellWidth: 10 },
       },
       margin: { left: margin, right: margin },
       didParseCell: (data: any) => {
@@ -382,109 +379,62 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({ test, open, onClose }) =>
       },
     });
 
-    currentY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 4 : currentY + 50;
+    currentY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 3 : currentY + 50;
 
     // === COMPACT STATISTICS SECTION - Always at Bottom ===
-    // Check if we need a new page
-    if (currentY > pageHeight - 50) {
+    // Check if we need a new page - only if very close to bottom
+    if (currentY > pageHeight - 40) {
       doc.addPage();
-      currentY = 15;
+      currentY = 10;
     }
 
-    doc.setFontSize(9);
-    doc.setTextColor(0, 0, 0);
-    doc.text("الإحصائيات", pageWidth - margin, currentY, { align: "right" });
-    currentY += 3;
-
-    // Small stats table (right side) - 60mm width
-    const statsTableWidth = 55;
-    const chartWidth = 90;
-    const chartStartX = margin;
-
-    // Performance levels summary table - smaller
+    // Performance levels summary table - compact horizontal layout
+    const statsTableWidth = pageWidth - margin * 2;
+    
     doc.autoTable({
       startY: currentY,
-      head: [["النسبة", "العدد", "المستوى"]],
-      body: [
-        [`${((stats.excellentCount / stats.presentCount) * 100 || 0).toFixed(0)}%`, stats.excellentCount, "ممتاز (85%+)"],
-        [`${((stats.goodCount / stats.presentCount) * 100 || 0).toFixed(0)}%`, stats.goodCount, "جيد (75-84%)"],
-        [`${((stats.averageCount / stats.presentCount) * 100 || 0).toFixed(0)}%`, stats.averageCount, "متوسط (65-74%)"],
-        [`${((stats.lowCount / stats.presentCount) * 100 || 0).toFixed(0)}%`, stats.lowCount, "متدني (50-64%)"],
-        [`${((stats.failedCount / stats.presentCount) * 100 || 0).toFixed(0)}%`, stats.failedCount, "راسب (<50%)"],
-      ],
+      head: [["راسب (<50%)", "متدني (50-64%)", "متوسط (65-74%)", "جيد (75-84%)", "ممتاز (85%+)", "المستوى"]],
+      body: [[
+        `${stats.failedCount} (${((stats.failedCount / stats.presentCount) * 100 || 0).toFixed(0)}%)`,
+        `${stats.lowCount} (${((stats.lowCount / stats.presentCount) * 100 || 0).toFixed(0)}%)`,
+        `${stats.averageCount} (${((stats.averageCount / stats.presentCount) * 100 || 0).toFixed(0)}%)`,
+        `${stats.goodCount} (${((stats.goodCount / stats.presentCount) * 100 || 0).toFixed(0)}%)`,
+        `${stats.excellentCount} (${((stats.excellentCount / stats.presentCount) * 100 || 0).toFixed(0)}%)`,
+        "العدد (النسبة)"
+      ]],
       theme: "grid",
       styles: { 
         halign: "center", 
-        fontSize: 7, 
-        cellPadding: 1, 
+        fontSize: 6, 
+        cellPadding: 0.8, 
         font: ARABIC_FONT_NAME 
       },
       headStyles: { 
         fillColor: [50, 50, 50], 
         textColor: [255, 255, 255], 
-        fontSize: 7 
+        fontSize: 6 
       },
-      margin: { left: pageWidth - margin - statsTableWidth, right: margin },
-      tableWidth: statsTableWidth,
+      margin: { left: margin, right: margin },
       didParseCell: (data: any) => {
         if (data.section === "body") {
-          const rowIndex = data.row.index;
-          if (rowIndex === 0) data.cell.styles.fillColor = [200, 255, 200];
-          else if (rowIndex === 1) data.cell.styles.fillColor = [200, 220, 255];
-          else if (rowIndex === 2) data.cell.styles.fillColor = [255, 255, 200];
-          else if (rowIndex === 3) data.cell.styles.fillColor = [255, 230, 200];
-          else if (rowIndex === 4) data.cell.styles.fillColor = [255, 200, 200];
+          const colIndex = data.column.index;
+          if (colIndex === 4) data.cell.styles.fillColor = [200, 255, 200];
+          else if (colIndex === 3) data.cell.styles.fillColor = [200, 220, 255];
+          else if (colIndex === 2) data.cell.styles.fillColor = [255, 255, 200];
+          else if (colIndex === 1) data.cell.styles.fillColor = [255, 230, 200];
+          else if (colIndex === 0) data.cell.styles.fillColor = [255, 200, 200];
         }
       },
     });
 
-    // Draw smaller bar chart on the left side
-    const chartY = currentY;
-    const chartHeight = 28;
-    const barWidth = (chartWidth - 30) / 5;
-    
-    const levels = [
-      { count: stats.excellentCount, label: "ممتاز", color: [34, 197, 94] },
-      { count: stats.goodCount, label: "جيد", color: [59, 130, 246] },
-      { count: stats.averageCount, label: "متوسط", color: [245, 158, 11] },
-      { count: stats.lowCount, label: "متدني", color: [239, 68, 68] },
-      { count: stats.failedCount, label: "راسب", color: [220, 38, 38] },
-    ];
-
-    const maxCount = Math.max(...levels.map(l => l.count), 1);
-
-    // Chart border
-    doc.setDrawColor(150, 150, 150);
-    doc.setLineWidth(0.2);
-    doc.rect(chartStartX, chartY, chartWidth, chartHeight);
-
-    // Draw bars
-    levels.forEach((level, i) => {
-      const barHeight = (level.count / maxCount) * (chartHeight - 8);
-      const barX = chartStartX + 5 + i * (barWidth + 5);
-      const barY = chartY + chartHeight - barHeight - 4;
-
-      doc.setFillColor(level.color[0], level.color[1], level.color[2]);
-      doc.rect(barX, barY, barWidth, barHeight, "F");
-
-      // Label
-      doc.setFontSize(5);
-      doc.setTextColor(0, 0, 0);
-      doc.text(level.label, barX + barWidth / 2, chartY + chartHeight - 1, { align: "center" });
-      doc.text(String(level.count), barX + barWidth / 2, barY - 1, { align: "center" });
-    });
-
-    currentY = Math.max(
-      doc.lastAutoTable ? doc.lastAutoTable.finalY : currentY,
-      chartY + chartHeight
-    ) + 3;
+    currentY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 2 : currentY + 15;
 
     // Removed detailed question statistics table
 
-    // === SUMMARY BOX ===
-    if (currentY > pageHeight - 25) {
+    // === SUMMARY BOX - Compact ===
+    if (currentY > pageHeight - 20) {
       doc.addPage();
-      currentY = 15;
+      currentY = 10;
     }
 
     doc.autoTable({
@@ -501,40 +451,40 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({ test, open, onClose }) =>
       theme: "grid",
       styles: { 
         halign: "center", 
-        fontSize: 8, 
-        cellPadding: 1.5, 
+        fontSize: 6, 
+        cellPadding: 0.8, 
         font: ARABIC_FONT_NAME 
       },
       headStyles: { 
         fillColor: [100, 100, 100], 
         textColor: [255, 255, 255], 
-        fontSize: 8 
+        fontSize: 6 
       },
       margin: { left: margin, right: margin },
     });
 
-    // === FOOTER ON EACH PAGE ===
+    // === FOOTER ON EACH PAGE - Compact ===
     const pageCount = doc.internal.pages.length - 1;
     for (let i = 1; i <= pageCount; i++) {
       doc.setPage(i);
       
       doc.setDrawColor(0, 100, 0);
-      doc.setLineWidth(0.5);
-      doc.line(margin, pageHeight - 12, pageWidth - margin, pageHeight - 12);
+      doc.setLineWidth(0.3);
+      doc.line(margin, pageHeight - 10, pageWidth - margin, pageHeight - 10);
 
-      doc.setFontSize(8);
+      doc.setFontSize(7);
       doc.setTextColor(80, 80, 80);
-      doc.text(`مدير/ة المدرسة: ${directorName}`, pageWidth - margin, pageHeight - 7, { align: "right" });
-      doc.text(`نسبة النجاح: ${stats.passRate.toFixed(1)}%`, centerCol, pageHeight - 7, { align: "center" });
-      doc.text(`صفحة ${i} من ${pageCount}`, margin, pageHeight - 7);
+      doc.text(`مدير/ة المدرسة: ${directorName}`, pageWidth - margin, pageHeight - 6, { align: "right" });
+      doc.text(`نسبة النجاح: ${stats.passRate.toFixed(1)}%`, centerCol, pageHeight - 6, { align: "center" });
+      doc.text(`صفحة ${i} من ${pageCount}`, margin, pageHeight - 6);
 
-      // Palestinian flag bar at bottom
+      // Palestinian flag bar at bottom - smaller
       doc.setFillColor(0, 0, 0);
-      doc.rect(0, pageHeight - 4, pageWidth, 1.3, "F");
+      doc.rect(0, pageHeight - 3, pageWidth, 1, "F");
       doc.setFillColor(255, 255, 255);
-      doc.rect(0, pageHeight - 2.7, pageWidth, 1.3, "F");
+      doc.rect(0, pageHeight - 2, pageWidth, 1, "F");
       doc.setFillColor(0, 128, 0);
-      doc.rect(0, pageHeight - 1.4, pageWidth, 1.4, "F");
+      doc.rect(0, pageHeight - 1, pageWidth, 1, "F");
     }
 
     return doc;
