@@ -67,45 +67,58 @@ export const useLicense = () => {
     setState(prev => ({ ...prev, isLoading: true }));
     
     try {
-      const stored = getStoredLicense();
+      let stored = getStoredLicense();
+      const activationData = getDeviceActivationData();
       
       // First check if device is already permanently activated
-      if (isDeviceActivated()) {
-        const activationData = getDeviceActivationData();
-        
-        if (stored && stored.licenseKey) {
-          // Device is activated - use stored data without online check
-          const remainingDays = stored.remainingDays || 0;
-          const showWarning = remainingDays <= 7 && remainingDays > 0;
-          
-          setState({
-            isLoading: false,
-            isActivated: true,
-            isTrial: stored.isTrial || false,
-            remainingDays: remainingDays,
-            schoolId: stored.schoolId || activationData?.schoolId,
-            schoolName: stored.schoolName,
-            directorName: stored.directorName || null,
-            schoolLogo: stored.schoolLogo || null,
-            licenseKey: stored.licenseKey,
-            devicesUsed: stored.devicesUsed || 0,
-            maxDevices: stored.maxDevices || 1,
-            expiryDate: stored.expiryDate || null,
-            showExpiryWarning: showWarning,
-          });
-          
-          // Perform background validation only once per day
-          const lastValidation = activationData?.lastValidated || 0;
-          const now = Date.now();
-          const dayInMs = 24 * 60 * 60 * 1000;
-          
-          if (now - lastValidation > dayInMs) {
-            // Background validation - don't block UI
-            performBackgroundValidation(stored.licenseKey);
-          }
-          
-          return;
+      if (isDeviceActivated() && activationData) {
+        // If licenseInfo was cleared but device is still activated, restore from activation data
+        if (!stored || !stored.licenseKey) {
+          // Restore license info from activation data
+          const restoredLicense = {
+            licenseKey: activationData.licenseKey,
+            schoolId: activationData.schoolId,
+            schoolName: localStorage.getItem("schoolName") || localStorage.getItem("licenseSchoolName") || "",
+            directorName: localStorage.getItem("directorName") || localStorage.getItem("licenseDirectorName") || "",
+            schoolLogo: localStorage.getItem("schoolLogo") || "",
+            isTrial: false,
+            remainingDays: 365, // Will be updated by background validation
+          };
+          storeLicense(restoredLicense);
+          stored = restoredLicense;
         }
+        
+        // Device is activated - use stored data without online check
+        const remainingDays = stored.remainingDays || 0;
+        const showWarning = remainingDays <= 7 && remainingDays > 0;
+        
+        setState({
+          isLoading: false,
+          isActivated: true,
+          isTrial: stored.isTrial || false,
+          remainingDays: remainingDays,
+          schoolId: stored.schoolId || activationData?.schoolId,
+          schoolName: stored.schoolName,
+          directorName: stored.directorName || null,
+          schoolLogo: stored.schoolLogo || null,
+          licenseKey: stored.licenseKey,
+          devicesUsed: stored.devicesUsed || 0,
+          maxDevices: stored.maxDevices || 1,
+          expiryDate: stored.expiryDate || null,
+          showExpiryWarning: showWarning,
+        });
+        
+        // Perform background validation only once per day
+        const lastValidation = activationData?.lastValidated || 0;
+        const now = Date.now();
+        const dayInMs = 24 * 60 * 60 * 1000;
+        
+        if (now - lastValidation > dayInMs) {
+          // Background validation - don't block UI
+          performBackgroundValidation(stored.licenseKey);
+        }
+        
+        return;
       }
       
       if (!stored || !stored.licenseKey) {
