@@ -18,8 +18,8 @@ import {
   TableRow 
 } from "@/components/ui/table";
 import { Label } from "@/components/ui/label";
-import { FileText, Download, Users, Filter, Eye, Trash2 } from "lucide-react";
-import { getTests, getStudents, getClasses, getTeachers, getSubjects, getClassById, getSectionById, getSubjectById, getTeacherById, deleteTest } from "@/services/dataService";
+import { FileText, Download, Users, Filter, Eye, Trash2, RotateCcw, Trash } from "lucide-react";
+import { getTests, getStudents, getClasses, getTeachers, getSubjects, getClassById, getSectionById, getSubjectById, getTeacherById, deleteTest, getDeletedTests, restoreTest, permanentlyDeleteTest, clearDeletedTests } from "@/services/dataService";
 import { jsPDF } from "jspdf";
 import "jspdf-autotable";
 import { loadAmiriFont, ARABIC_FONT_NAME } from "@/utils/fontLoader";
@@ -79,10 +79,15 @@ const ReportsTab = ({ mockReports }: ReportsTabProps) => {
   const [showReportPreview, setShowReportPreview] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [testToDelete, setTestToDelete] = useState<string | null>(null);
+  const [showRecycleBin, setShowRecycleBin] = useState(false);
+  const [deletedTests, setDeletedTests] = useState<any[]>([]);
+  const [showPermanentDeleteDialog, setShowPermanentDeleteDialog] = useState(false);
+  const [testToPermanentDelete, setTestToPermanentDelete] = useState<string | null>(null);
 
   // Load tests from localStorage
   useEffect(() => {
     setAllTests(getTests());
+    setDeletedTests(getDeletedTests());
   }, []);
 
   // Get data for filters
@@ -124,15 +129,47 @@ const ReportsTab = ({ mockReports }: ReportsTabProps) => {
     setShowDeleteDialog(true);
   };
 
-  // Confirm delete
+  // Confirm delete (move to recycle bin)
   const confirmDelete = () => {
     if (testToDelete) {
       deleteTest(testToDelete);
       setAllTests(getTests());
-      toast.success("تم حذف التقرير بنجاح");
+      setDeletedTests(getDeletedTests());
+      toast.success("تم نقل التقرير إلى سلة المهملات");
       setShowDeleteDialog(false);
       setTestToDelete(null);
     }
+  };
+
+  // Restore from recycle bin
+  const handleRestore = (testId: string) => {
+    restoreTest(testId);
+    setAllTests(getTests());
+    setDeletedTests(getDeletedTests());
+    toast.success("تم استعادة التقرير بنجاح");
+  };
+
+  // Permanent delete
+  const handlePermanentDelete = (testId: string) => {
+    setTestToPermanentDelete(testId);
+    setShowPermanentDeleteDialog(true);
+  };
+
+  const confirmPermanentDelete = () => {
+    if (testToPermanentDelete) {
+      permanentlyDeleteTest(testToPermanentDelete);
+      setDeletedTests(getDeletedTests());
+      toast.success("تم حذف التقرير نهائياً");
+      setShowPermanentDeleteDialog(false);
+      setTestToPermanentDelete(null);
+    }
+  };
+
+  // Clear all deleted tests
+  const handleClearRecycleBin = () => {
+    clearDeletedTests();
+    setDeletedTests([]);
+    toast.success("تم تفريغ سلة المهملات");
   };
 
   // Generate comprehensive school report
@@ -941,6 +978,108 @@ const ReportsTab = ({ mockReports }: ReportsTabProps) => {
         </CardContent>
       </Card>
 
+      {/* Recycle Bin Section */}
+      <Card className="border-2 border-orange-500">
+        <CardHeader className="bg-gradient-to-r from-orange-100 to-white border-b border-orange-500">
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <Trash className="h-5 w-5" />
+              سلة المهملات ({deletedTests.length})
+            </CardTitle>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowRecycleBin(!showRecycleBin)}
+              >
+                {showRecycleBin ? "إخفاء" : "عرض"}
+              </Button>
+              {deletedTests.length > 0 && (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={handleClearRecycleBin}
+                >
+                  تفريغ السلة
+                </Button>
+              )}
+            </div>
+          </div>
+        </CardHeader>
+        {showRecycleBin && (
+          <CardContent className="pt-6">
+            {deletedTests.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {deletedTests.map((test: any) => {
+                  const classInfo = getClassById(test.classId);
+                  const sectionInfo = getSectionById(test.classId, test.sectionId);
+                  const subjectInfo = getSubjectById(test.subjectId);
+                  const teacherInfo = getTeacherById(test.teacherId);
+                  
+                  return (
+                    <Card key={test.id} className="border border-orange-200 bg-orange-50/50 hover:shadow-lg transition-shadow">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-base flex items-center justify-between">
+                          <span className="truncate">{test.name}</span>
+                          <span className="text-xs text-muted-foreground">
+                            حُذف: {new Date(test.deletedAt).toLocaleDateString('ar-SA')}
+                          </span>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        <div className="grid grid-cols-2 gap-2 text-sm">
+                          <div className="flex flex-col">
+                            <span className="text-muted-foreground text-xs">الصف / الشعبة</span>
+                            <span className="font-medium">{classInfo?.name} {sectionInfo?.name}</span>
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-muted-foreground text-xs">المادة</span>
+                            <span className="font-medium">{subjectInfo?.name}</span>
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-muted-foreground text-xs">المعلم</span>
+                            <span className="font-medium">{teacherInfo?.name}</span>
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-muted-foreground text-xs">التاريخ</span>
+                            <span className="font-medium">{test.date}</span>
+                          </div>
+                        </div>
+                        
+                        <div className="flex justify-between gap-2 pt-2 border-t">
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => handleRestore(test.id)}
+                            className="flex-1 text-green-600 hover:bg-green-50 border-green-300"
+                          >
+                            <RotateCcw className="h-4 w-4 ml-1" />
+                            استعادة
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => handlePermanentDelete(test.id)}
+                            className="text-destructive hover:bg-destructive/10"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                <Trash className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>سلة المهملات فارغة</p>
+              </div>
+            )}
+          </CardContent>
+        )}
+      </Card>
+
       {/* Report Preview Dialog */}
       {selectedTest && (
         <ReportPreview
@@ -957,15 +1096,33 @@ const ReportsTab = ({ mockReports }: ReportsTabProps) => {
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>هل أنت متأكد من الحذف؟</AlertDialogTitle>
+            <AlertDialogTitle>نقل إلى سلة المهملات</AlertDialogTitle>
             <AlertDialogDescription>
-              سيتم حذف هذا التقرير نهائياً ولا يمكن استرجاعه.
+              سيتم نقل هذا التقرير إلى سلة المهملات. يمكنك استعادته لاحقاً من قسم سلة المهملات.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>إلغاء</AlertDialogCancel>
             <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">
-              حذف
+              نقل للسلة
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Permanent Delete Confirmation Dialog */}
+      <AlertDialog open={showPermanentDeleteDialog} onOpenChange={setShowPermanentDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>حذف نهائي</AlertDialogTitle>
+            <AlertDialogDescription>
+              هل أنت متأكد من الحذف النهائي؟ لا يمكن استرجاع هذا التقرير بعد الحذف.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>إلغاء</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmPermanentDelete} className="bg-destructive hover:bg-destructive/90">
+              حذف نهائي
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
