@@ -269,7 +269,7 @@ serve(async (req) => {
       case "getTeachers": {
         const { data: teachers, error } = await supabase
           .from("teachers")
-          .select("*, teacher_subjects(subject_id, subjects(name)), teacher_classes(class_id, classes(name))")
+          .select("*, teacher_subjects(subject_id, subjects(name)), teacher_classes(class_id, classes(name)), teacher_sections(section_id, sections(name, class_id))")
           .eq("school_id", schoolId)
           .order("name", { ascending: true });
         
@@ -323,6 +323,15 @@ serve(async (req) => {
             class_id: classId
           }));
           await supabase.from("teacher_classes").insert(classAssignments);
+        }
+
+        // Add section assignments
+        if (data.sections && data.sections.length > 0) {
+          const sectionAssignments = data.sections.map((sectionId: string) => ({
+            teacher_id: newTeacher.id,
+            section_id: sectionId
+          }));
+          await supabase.from("teacher_sections").insert(sectionAssignments);
         }
 
         // Remove password_hash from response
@@ -382,6 +391,18 @@ serve(async (req) => {
           }
         }
 
+        // Update section assignments
+        if (data.sections !== undefined) {
+          await supabase.from("teacher_sections").delete().eq("teacher_id", data.id);
+          if (data.sections.length > 0) {
+            const sectionAssignments = data.sections.map((sectionId: string) => ({
+              teacher_id: data.id,
+              section_id: sectionId
+            }));
+            await supabase.from("teacher_sections").insert(sectionAssignments);
+          }
+        }
+
         return new Response(JSON.stringify({ success: true }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -402,7 +423,7 @@ serve(async (req) => {
       case "verifyTeacherLogin": {
         const { data: teacher, error } = await supabase
           .from("teachers")
-          .select("*, teacher_subjects(subject_id), teacher_classes(class_id)")
+          .select("*, teacher_subjects(subject_id), teacher_classes(class_id), teacher_sections(section_id)")
           .eq("school_id", schoolId)
           .eq("username", data.username)
           .eq("is_active", true)
@@ -438,7 +459,8 @@ serve(async (req) => {
             phone: teacher.phone,
             role: teacher.role,
             subjects: teacher.teacher_subjects?.map((ts: any) => ts.subject_id) || [],
-            classes: teacher.teacher_classes?.map((tc: any) => tc.class_id) || []
+            classes: teacher.teacher_classes?.map((tc: any) => tc.class_id) || [],
+            sections: teacher.teacher_sections?.map((ts: any) => ts.section_id) || []
           }
         }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
