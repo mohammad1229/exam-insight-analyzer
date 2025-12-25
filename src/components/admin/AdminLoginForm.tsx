@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { verifySchoolAdminLogin } from "@/services/licenseService";
+import { initializeBackupScheduler } from "@/services/backupService";
 import { Loader2, ArrowRight, Key } from "lucide-react";
 import ChangePasswordDialog from "@/components/ChangePasswordDialog";
 import { saveLastUser } from "@/pages/Index";
@@ -78,6 +79,18 @@ const AdminLoginForm = ({ onLoginSuccess }: AdminLoginFormProps) => {
     if (admin.school_id) {
       localStorage.setItem("currentSchoolId", admin.school_id);
     }
+
+    // Store admin data for backup service
+    localStorage.setItem("currentAdminData", JSON.stringify({
+      id: admin.id,
+      school_id: admin.school_id,
+      school_name: admin.school_name,
+      full_name: admin.full_name,
+      loginTime: new Date().toISOString()
+    }));
+
+    // Initialize backup scheduler for school admin
+    initializeBackupScheduler();
 
     // Save last logged in user
     saveLastUser({

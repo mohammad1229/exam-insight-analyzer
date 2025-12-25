@@ -1,6 +1,54 @@
 import { supabase } from "@/integrations/supabase/client";
 import { getStoredLicense } from "@/services/licenseService";
 
+// Get current user context (school admin or system admin)
+export const getCurrentUserContext = () => {
+  // Check for school admin license first
+  const license = getStoredLicense();
+  if (license && license.schoolId) {
+    return {
+      type: 'school_admin' as const,
+      schoolId: license.schoolId,
+      schoolName: license.schoolName || 'Unknown',
+      userId: license.schoolId
+    };
+  }
+
+  // Check for system admin
+  const systemAdmin = localStorage.getItem("systemAdminData");
+  if (systemAdmin) {
+    try {
+      const adminData = JSON.parse(systemAdmin);
+      return {
+        type: 'system_admin' as const,
+        schoolId: 'system',
+        schoolName: 'مسؤول النظام',
+        userId: adminData.id || 'system'
+      };
+    } catch {
+      // Invalid JSON, ignore
+    }
+  }
+
+  // Check for school admin login data
+  const schoolAdminData = localStorage.getItem("currentAdminData");
+  if (schoolAdminData) {
+    try {
+      const adminData = JSON.parse(schoolAdminData);
+      return {
+        type: 'school_admin' as const,
+        schoolId: adminData.school_id || adminData.schoolId,
+        schoolName: adminData.school_name || adminData.schoolName || 'Unknown',
+        userId: adminData.id
+      };
+    } catch {
+      // Invalid JSON, ignore
+    }
+  }
+
+  return null;
+};
+
 // Create a backup record in the database
 export const createBackupRecord = async (
   schoolId: string,
@@ -60,33 +108,59 @@ export const getBackups = async (schoolId?: string) => {
 
 // Create automatic backup
 export const createAutomaticBackup = async () => {
-  const license = getStoredLicense();
-  if (!license || !license.schoolId) {
-    console.log("No active license found for backup");
+  const userContext = getCurrentUserContext();
+  
+  if (!userContext) {
+    console.log("No active user context found for backup");
     return null;
   }
+
+  console.log(`Creating automatic backup for: ${userContext.type} - ${userContext.schoolName}`);
 
   try {
     // Create backup record
     const backup = await createBackupRecord(
-      license.schoolId,
-      license.schoolName || 'Unknown',
+      userContext.schoolId,
+      userContext.schoolName,
       'automatic'
     );
 
-    // Get all data from localStorage
+    // Get all data from localStorage based on user type
     const backupData: Record<string, any> = {};
-    const keysToBackup = [
+    
+    // Common keys to backup
+    const commonKeys = [
       'app_students', 'app_teachers', 'app_classes', 
-      'app_subjects', 'app_tests', 'app_school'
+      'app_subjects', 'app_tests', 'app_school',
+      'licenseInfo', 'schoolName', 'directorName'
     ];
+    
+    // Additional keys for system admin
+    const systemAdminKeys = userContext.type === 'system_admin' 
+      ? ['systemAdminData', 'all_schools_data'] 
+      : [];
+    
+    const keysToBackup = [...commonKeys, ...systemAdminKeys];
 
     keysToBackup.forEach(key => {
       const value = localStorage.getItem(key);
       if (value) {
-        backupData[key] = JSON.parse(value);
+        try {
+          backupData[key] = JSON.parse(value);
+        } catch {
+          backupData[key] = value;
+        }
       }
     });
+
+    // Add metadata
+    backupData._metadata = {
+      backupType: 'automatic',
+      userType: userContext.type,
+      schoolId: userContext.schoolId,
+      schoolName: userContext.schoolName,
+      createdAt: new Date().toISOString()
+    };
 
     // Convert to JSON string
     const jsonData = JSON.stringify(backupData, null, 2);
@@ -97,6 +171,8 @@ export const createAutomaticBackup = async () => {
 
     // Store backup data reference
     localStorage.setItem(`backup_${backup.id}`, jsonData);
+
+    console.log(`Automatic backup completed: ${backup.id} (${(dataSize / 1024).toFixed(1)} KB)`);
 
     return backup;
   } catch (error) {
@@ -136,10 +212,21 @@ export const scheduleAutomaticBackup = () => {
 
 // Initialize backup scheduler
 export const initializeBackupScheduler = () => {
-  const license = getStoredLicense();
-  if (license && license.schoolId) {
+  const userContext = getCurrentUserContext();
+  
+  if (userContext) {
     scheduleAutomaticBackup();
-    console.log("Backup scheduler initialized");
+    console.log(`Backup scheduler initialized for ${userContext.type}: ${userContext.schoolName}`);
+  } else {
+    console.log("No user context found - backup scheduler not started");
+    // Retry after 5 seconds in case user logs in later
+    setTimeout(() => {
+      const retryContext = getCurrentUserContext();
+      if (retryContext) {
+        scheduleAutomaticBackup();
+        console.log(`Backup scheduler initialized (delayed) for ${retryContext.type}: ${retryContext.schoolName}`);
+      }
+    }, 5000);
   }
 };
 
