@@ -362,8 +362,9 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({ test, open, onClose }) =>
     const mainHeaders = ["ملاحظات", "النسبة", "المجموع", ...questionHeaders.reverse(), "اسم الطالب", "م"];
 
     const mainTableData = test.results.map((result: any, index: number) => {
+      const sid = result.studentId || result.student_id;
       const studentName = getStudentName(
-        result.studentId,
+        sid,
         result.studentName,
         lookups?.studentById
       );

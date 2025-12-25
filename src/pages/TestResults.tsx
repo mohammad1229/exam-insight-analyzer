@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Navbar from "@/components/Navbar";
 import Sidebar from "@/components/Sidebar";
 import LicenseBanner from "@/components/LicenseBanner";
@@ -14,7 +14,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import { Question, TestResult, Test } from "@/types";
-import { addTest, getTests, getCurrentTeacher, getStudentById } from "@/services/dataService";
+import { addTest, getTests, getCurrentTeacher, getStudentById, updateTest } from "@/services/dataService";
+import { addTestDB, saveTestResultsDB } from "@/services/databaseService";
 import { Save, Printer, Eye, FileDown } from "lucide-react";
 
 const TestResults = () => {
@@ -43,8 +44,9 @@ const TestResults = () => {
   // Report preview state
   const [showReportPreview, setShowReportPreview] = useState(false);
   
-  // Generate test ID
-  const testId = "test_" + Date.now();
+  // Generate test ID (stable for the lifetime of this screen)
+  const testIdRef = useRef("test_" + Date.now());
+  const testId = testIdRef.current;
 
   // Generate test results based on current state
   const generateTestResults = (): TestResult[] => {
@@ -109,7 +111,7 @@ const TestResults = () => {
     });
   };
 
-  const handleSaveTest = (asDraft = false) => {
+  const handleSaveTest = async (asDraft = false) => {
     if (!testFormData.name || 
         !testFormData.type || 
         !testFormData.subjectId || 
@@ -136,8 +138,8 @@ const TestResults = () => {
     
     const results = generateTestResults();
 
-    // Create test object with student names
-    const testData: Test = {
+    // Prepare local test object
+    let testData: Test = {
       id: testId,
       name: testFormData.name,
       type: testFormData.type,
@@ -151,32 +153,85 @@ const TestResults = () => {
       draft: asDraft,
       results: results.map(r => ({
         ...r,
-        studentName: getStudentById(r.studentId)?.name || r.studentId
+        studentName: getStudentById(r.studentId)?.name || (r as any).studentName || r.studentId
       })),
     };
-    
-    // Save to dataService (localStorage) - shared with admin dashboard
+
+    // Try saving to database first so المدير يراه في "آخر التقارير"
+    try {
+      const created = await addTestDB({
+        teacher_id: testFormData.teacherId,
+        subject_id: testFormData.subjectId,
+        class_id: testFormData.classId,
+        section_id: testFormData.sectionId,
+        name: testFormData.name,
+        test_type: testFormData.type,
+        test_date: testFormData.date,
+        questions: testFormData.questions,
+        notes: testFormData.notes,
+        is_draft: asDraft,
+      });
+
+      if (created?.id) {
+        const dbResults = results.map(r => ({
+          student_id: r.studentId,
+          is_absent: r.isAbsent,
+          scores: r.scores,
+          total_score: r.totalScore,
+          percentage: r.percentage,
+        }));
+
+        await saveTestResultsDB(created.id, dbResults);
+
+        // Keep local storage in sync using DB id to avoid duplicates
+        testData = { ...testData, id: created.id, test_id: created.id } as any;
+        testData.results = (testData.results || []).map(res => ({ ...res, testId: created.id }));
+
+        // Upsert locally: remove any old temp test with same name+date (best-effort)
+        const existing = getTests();
+        const filtered = existing.filter(t => t.id !== testId);
+        filtered.push(testData);
+        // Use updateTest/addTest helpers
+        // (save via updateTest if exists, else addTest)
+        try {
+          updateTest(created.id, testData);
+        } catch {
+          addTest(testData);
+        }
+
+        toast({
+          title: asDraft ? "تم حفظ المسودة" : "تم حفظ النتائج",
+          description: asDraft ? "تم حفظ الاختبار كمسودة" : "تم حفظ النتائج في قاعدة البيانات وأصبحت متاحة للمدير",
+        });
+
+        return testData;
+      }
+    } catch (e) {
+      // Fallback to local only
+    }
+
+    // Local-only fallback
     addTest(testData);
-    
+
     toast({
       title: asDraft ? "تم حفظ المسودة" : "تم حفظ النتائج وإرسالها للمدير",
       description: asDraft 
         ? "تم حفظ بيانات الاختبار كمسودة" 
-        : "تم حفظ نتائج الاختبار بنجاح وأصبحت متاحة في لوحة تحكم المدير",
+        : "تم حفظ نتائج الاختبار محلياً (قد لا تظهر في لوحة المدير حتى تتم المزامنة)",
     });
-    
+
     return testData;
   };
 
-  const handleSaveAndPrint = () => {
-    const savedTest = handleSaveTest(false);
+  const handleSaveAndPrint = async () => {
+    const savedTest = await handleSaveTest(false);
     if (savedTest) {
       setShowReportPreview(true);
     }
   };
 
-  const handlePreviewAndSave = () => {
-    const savedTest = handleSaveTest(false);
+  const handlePreviewAndSave = async () => {
+    const savedTest = await handleSaveTest(false);
     if (savedTest) {
       setShowReportPreview(true);
     }
@@ -330,7 +385,7 @@ const TestResults = () => {
                 {/* Action Buttons */}
                 <div className="flex flex-wrap gap-3 mb-6 justify-center">
                   <Button 
-                    onClick={() => handleSaveTest(false)}
+                    onClick={async () => { await handleSaveTest(false); }}
                     className="gap-2"
                   >
                     <Save className="h-4 w-4" />
@@ -369,8 +424,8 @@ const TestResults = () => {
                     رجوع
                   </Button>
                   <Button 
-                    onClick={() => {
-                      handleSaveTest(false);
+                    onClick={async () => {
+                      await handleSaveTest(false);
                       navigate("/dashboard");
                     }}
                     className="bg-green-600 hover:bg-green-700"
