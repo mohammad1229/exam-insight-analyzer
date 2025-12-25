@@ -23,6 +23,7 @@ const BASE_STORAGE_KEYS = {
   TEACHERS: "teachers",
   TESTS: "tests",
   SCHOOL: "school",
+  DELETED_TESTS: "deleted_tests",
 };
 
 // Extended types
@@ -242,7 +243,51 @@ export const updateTest = (testId: string, updates: Partial<Test>): void => {
 
 export const deleteTest = (testId: string): void => {
   const tests = getTests();
+  const testToDelete = tests.find(t => t.id === testId);
+  
+  // Move to deleted tests instead of permanent delete
+  if (testToDelete) {
+    const deletedTests = getDeletedTests();
+    deletedTests.push({
+      ...testToDelete,
+      deletedAt: new Date().toISOString(),
+    });
+    saveData(BASE_STORAGE_KEYS.DELETED_TESTS, deletedTests);
+  }
+  
   saveTests(tests.filter(t => t.id !== testId));
+};
+
+// Deleted Tests (Recycle Bin)
+export const getDeletedTests = (): (Test & { deletedAt: string })[] => {
+  return initializeData(BASE_STORAGE_KEYS.DELETED_TESTS, []);
+};
+
+export const restoreTest = (testId: string): void => {
+  const deletedTests = getDeletedTests();
+  const testToRestore = deletedTests.find(t => t.id === testId);
+  
+  if (testToRestore) {
+    // Remove deletedAt property before restoring
+    const { deletedAt, ...restoredTest } = testToRestore;
+    
+    // Add back to active tests
+    const tests = getTests();
+    tests.push(restoredTest as Test);
+    saveTests(tests);
+    
+    // Remove from deleted tests
+    saveData(BASE_STORAGE_KEYS.DELETED_TESTS, deletedTests.filter(t => t.id !== testId));
+  }
+};
+
+export const permanentlyDeleteTest = (testId: string): void => {
+  const deletedTests = getDeletedTests();
+  saveData(BASE_STORAGE_KEYS.DELETED_TESTS, deletedTests.filter(t => t.id !== testId));
+};
+
+export const clearDeletedTests = (): void => {
+  saveData(BASE_STORAGE_KEYS.DELETED_TESTS, []);
 };
 
 // School

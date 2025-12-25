@@ -77,7 +77,7 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({ test, open, onClose }) =>
 
   const getStudentName = (studentId: string): string => {
     const student = getStudentById(studentId);
-    return student?.name || studentId;
+    return student?.name || "طالب غير معروف";
   };
 
   const getTestDetails = () => {
@@ -85,11 +85,12 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({ test, open, onClose }) =>
     const sectionInfo = getSectionById(test.classId, test.sectionId);
     const subjectInfo = getSubjectById(test.subjectId);
     const teacherInfo = getTeacherById(test.teacherId);
+    
     return {
-      className: classInfo?.name || "",
-      sectionName: sectionInfo?.name || "",
-      subjectName: subjectInfo?.name || "",
-      teacherName: teacherInfo?.name || "",
+      className: classInfo?.name || test.className || "غير محدد",
+      sectionName: sectionInfo?.name || test.sectionName || "غير محدد",
+      subjectName: subjectInfo?.name || test.subjectName || "غير محدد",
+      teacherName: teacherInfo?.name || test.teacherName || "غير محدد",
     };
   };
 
@@ -217,15 +218,15 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({ test, open, onClose }) =>
     const pageHeight = doc.internal.pageSize.height;
     const margin = 6;
 
-    // === HEADER SECTION - Compact ===
+    // === HEADER SECTION - Unified with Palestine Logo Only ===
     let currentY = 6;
 
     // Classic double-line frame border at top
     doc.setDrawColor(80, 80, 80);
     doc.setLineWidth(0.6);
-    doc.rect(margin, 4, pageWidth - margin * 2, 18);
+    doc.rect(margin, 4, pageWidth - margin * 2, 22);
     doc.setLineWidth(0.2);
-    doc.rect(margin + 0.8, 4.8, pageWidth - margin * 2 - 1.6, 16.4);
+    doc.rect(margin + 0.8, 4.8, pageWidth - margin * 2 - 1.6, 20.4);
 
     currentY = 8;
 
@@ -237,31 +238,39 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({ test, open, onClose }) =>
     const centerCol = pageWidth / 2;
     const rightCol = margin + 35;
 
-    // Right side - Ministry info
+    // Right side - Ministry info (Arabic)
     doc.setFontSize(7);
     doc.setTextColor(0, 0, 0);
-    doc.text(headerSettings.rightLine1, rightCol, currentY, { align: "center" });
-    doc.text(headerSettings.rightLine2 || ministryName, rightCol, currentY + 4, { align: "center" });
-    doc.text(headerSettings.rightLine3 || directorateName, rightCol, currentY + 8, { align: "center" });
+    doc.text(headerSettings.rightLine1 || "دولة فلسطين", rightCol, currentY, { align: "center" });
+    doc.setFontSize(6);
+    doc.text(headerSettings.rightLine1En || "State of Palestine", rightCol, currentY + 3, { align: "center" });
+    doc.setFontSize(7);
+    doc.text(headerSettings.rightLine2 || ministryName, rightCol, currentY + 7, { align: "center" });
+    doc.text(headerSettings.rightLine3 || directorateName, rightCol, currentY + 11, { align: "center" });
 
-    // Center - Logo/School Name
-    const schoolLogo = getSchoolInfo().schoolLogo;
-    if (schoolLogo) {
-      try {
-        doc.addImage(schoolLogo, "PNG", centerCol - 6, currentY - 2, 12, 12);
-      } catch (e) {
-        // If logo fails, just show school name
-      }
-    }
+    // Center - Palestinian Eagle Logo ONLY (not school logo)
+    // Draw Palestinian national emblem placeholder or use standard emblem
+    doc.setFillColor(0, 100, 0);
+    doc.setDrawColor(0, 0, 0);
+    doc.setLineWidth(0.3);
+    doc.circle(centerCol, currentY + 5, 6, "S");
+    doc.setFontSize(5);
+    doc.text("🇵🇸", centerCol, currentY + 6, { align: "center" });
+    
+    // School name below emblem
     doc.setFontSize(8);
-    doc.text(schoolName, centerCol, currentY + 11, { align: "center" });
+    doc.setTextColor(0, 0, 0);
+    doc.text(schoolName, centerCol, currentY + 14, { align: "center" });
 
     // Left side - English info
     doc.setFontSize(7);
-    doc.text(headerSettings.leftLine1, leftCol, currentY + 2, { align: "center" });
-    doc.text(headerSettings.leftLine2, leftCol, currentY + 6, { align: "center" });
+    doc.text(headerSettings.leftLine1 || "Ministry of Education", leftCol, currentY + 2, { align: "center" });
+    doc.text(headerSettings.leftLine2 || "Directorate of Education", leftCol, currentY + 6, { align: "center" });
+    if (headerSettings.leftLine3) {
+      doc.text(headerSettings.leftLine3, leftCol, currentY + 10, { align: "center" });
+    }
 
-    currentY = 24;
+    currentY = 28;
 
     // Report Title with test type
     const testTypeLabel = test.type ? ` (${getTestTypeLabel(test.type)})` : "";
@@ -298,8 +307,12 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({ test, open, onClose }) =>
     const mainHeaders = ["ملاحظات", "النسبة", "المجموع", ...questionHeaders.reverse(), "اسم الطالب", "م"];
 
     const mainTableData = test.results.map((result: any, index: number) => {
-      // Get student name - prefer stored studentName, fallback to lookup
-      const studentName = result.studentName || getStudentName(result.studentId);
+      // Get student name - first try stored studentName, then lookup by ID
+      let studentName = result.studentName;
+      if (!studentName || studentName === result.studentId) {
+        const student = getStudentById(result.studentId);
+        studentName = student?.name || "طالب " + (index + 1);
+      }
       
       if (result.isAbsent) {
         const emptyScores = test.questions.map(() => "-");
