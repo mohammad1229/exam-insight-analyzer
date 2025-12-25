@@ -18,8 +18,8 @@ import {
   TableRow 
 } from "@/components/ui/table";
 import { Label } from "@/components/ui/label";
-import { FileText, Download, Users, Filter, Eye } from "lucide-react";
-import { getTests, getStudents, getClasses, getTeachers, getSubjects, getClassById, getSectionById, getSubjectById, getTeacherById } from "@/services/dataService";
+import { FileText, Download, Users, Filter, Eye, Trash2 } from "lucide-react";
+import { getTests, getStudents, getClasses, getTeachers, getSubjects, getClassById, getSectionById, getSubjectById, getTeacherById, deleteTest } from "@/services/dataService";
 import { jsPDF } from "jspdf";
 import "jspdf-autotable";
 import { loadAmiriFont, ARABIC_FONT_NAME } from "@/utils/fontLoader";
@@ -29,6 +29,16 @@ import { getFooterSettings } from "./SettingsTab";
 import { getHeaderSettings } from "./HeaderSettingsTab";
 import ReportPreview from "@/components/ReportPreview";
 import { Test } from "@/types";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 // Mock reports type
 interface Report {
@@ -63,10 +73,12 @@ const ReportsTab = ({ mockReports }: ReportsTabProps) => {
   const [reportTeacherFilter, setReportTeacherFilter] = useState("all");
   const [reportSubjectFilter, setReportSubjectFilter] = useState("all");
 
-  // Report preview states
+  // Report preview and delete states
   const [allTests, setAllTests] = useState<Test[]>([]);
   const [selectedTest, setSelectedTest] = useState<Test | null>(null);
   const [showReportPreview, setShowReportPreview] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [testToDelete, setTestToDelete] = useState<string | null>(null);
 
   // Load tests from localStorage
   useEffect(() => {
@@ -103,6 +115,23 @@ const ReportsTab = ({ mockReports }: ReportsTabProps) => {
     if (test) {
       setSelectedTest(test);
       setShowReportPreview(true);
+    }
+  };
+
+  // Handle delete report
+  const handleDeleteReport = (testId: string) => {
+    setTestToDelete(testId);
+    setShowDeleteDialog(true);
+  };
+
+  // Confirm delete
+  const confirmDelete = () => {
+    if (testToDelete) {
+      deleteTest(testToDelete);
+      setAllTests(getTests());
+      toast.success("تم حذف التقرير بنجاح");
+      setShowDeleteDialog(false);
+      setTestToDelete(null);
     }
   };
 
@@ -877,16 +906,25 @@ const ReportsTab = ({ mockReports }: ReportsTabProps) => {
                         </div>
                       </div>
                       
-                      <div className="flex justify-center pt-2 border-t">
+                      <div className="flex justify-between gap-2 pt-2 border-t">
                         <Button 
                           variant="outline" 
                           size="sm"
                           onClick={() => handleViewReport(report.testId)}
                           title="عرض التقرير"
-                          className="w-full"
+                          className="flex-1"
                         >
                           <Eye className="h-4 w-4 ml-1" />
-                          عرض التقرير
+                          عرض
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => handleDeleteReport(report.testId)}
+                          className="text-destructive hover:bg-destructive/10"
+                          title="حذف"
+                        >
+                          <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
                     </CardContent>
@@ -914,6 +952,24 @@ const ReportsTab = ({ mockReports }: ReportsTabProps) => {
           }}
         />
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>هل أنت متأكد من الحذف؟</AlertDialogTitle>
+            <AlertDialogDescription>
+              سيتم حذف هذا التقرير نهائياً ولا يمكن استرجاعه.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>إلغاء</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">
+              حذف
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
