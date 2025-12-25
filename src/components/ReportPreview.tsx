@@ -307,14 +307,29 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({ test, open, onClose, onTe
     doc.text(headerSettings.rightLine2 || ministryName, rightCol, currentY + 7, { align: "center" });
     doc.text(headerSettings.rightLine3 || directorateName, rightCol, currentY + 11, { align: "center" });
 
-    // Center - Palestinian Eagle Logo ONLY (not school logo)
-    // Draw Palestinian national emblem placeholder or use standard emblem
-    doc.setFillColor(0, 100, 0);
-    doc.setDrawColor(0, 0, 0);
-    doc.setLineWidth(0.3);
-    doc.circle(centerCol, currentY + 5, 6, "S");
-    doc.setFontSize(5);
-    doc.text("🇵🇸", centerCol, currentY + 6, { align: "center" });
+    // Center - Header Logo from settings (for reports only)
+    const headerLogo = headerSettings.headerLogo || "";
+    if (headerLogo) {
+      try {
+        doc.addImage(headerLogo, "PNG", centerCol - 6, currentY, 12, 12);
+      } catch (e) {
+        // Fallback if image fails
+        doc.setFillColor(0, 100, 0);
+        doc.setDrawColor(0, 0, 0);
+        doc.setLineWidth(0.3);
+        doc.circle(centerCol, currentY + 5, 6, "S");
+        doc.setFontSize(5);
+        doc.text("🇵🇸", centerCol, currentY + 6, { align: "center" });
+      }
+    } else {
+      // Default emblem placeholder
+      doc.setFillColor(0, 100, 0);
+      doc.setDrawColor(0, 0, 0);
+      doc.setLineWidth(0.3);
+      doc.circle(centerCol, currentY + 5, 6, "S");
+      doc.setFontSize(5);
+      doc.text("🇵🇸", centerCol, currentY + 6, { align: "center" });
+    }
     
     // School name below emblem
     doc.setFontSize(8);

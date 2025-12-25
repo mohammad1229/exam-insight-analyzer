@@ -88,13 +88,17 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ test }) => {
   const getSchoolInfo = () => {
     const schoolName = localStorage.getItem("schoolName") || "المدرسة";
     const directorName = localStorage.getItem("directorName") || "المدير";
-    const schoolLogo = localStorage.getItem("schoolLogo") || "";
     const isActivated = localStorage.getItem("systemActivated") === "true";
+    
+    // Get header logo from header settings (for reports only)
+    const headerSettingsSaved = localStorage.getItem("headerSettings");
+    const headerSettings = headerSettingsSaved ? JSON.parse(headerSettingsSaved) : {};
+    const headerLogo = headerSettings.headerLogo || "";
     
     return {
       schoolName,
       directorName,
-      schoolLogo,
+      headerLogo,
       isActivated
     };
   };
@@ -316,7 +320,7 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ test }) => {
   const generatePDFReport = async () => {
     setIsGenerating(true);
     try {
-      const { schoolName, directorName, schoolLogo } = getSchoolInfo();
+      const { schoolName, directorName, headerLogo } = getSchoolInfo();
       const { className, sectionName, subjectName, teacherName } = getTestDetails();
       const stats = calculateStats();
       
@@ -353,10 +357,10 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ test }) => {
       
       let currentY = 25;
       
-      // Logo
-      if (schoolLogo) {
+      // Header Logo (from header settings, for reports only)
+      if (headerLogo) {
         try {
-          doc.addImage(schoolLogo, 'PNG', pageWidth - margin - 25, currentY, 25, 25);
+          doc.addImage(headerLogo, 'PNG', pageWidth - margin - 25, currentY, 25, 25);
         } catch (e) {
           console.error('Error adding logo:', e);
         }

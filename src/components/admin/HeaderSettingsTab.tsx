@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Save, FileText, Eye, Plus, Trash2 } from "lucide-react";
+import { Save, FileText, Eye, Plus, Trash2, Image } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
   Select,
@@ -33,6 +33,9 @@ const DEFAULT_HEADER_SETTINGS = {
   leftLine2: "Directorate of Education",
   leftLine3: "",
   
+  // Header logo (for reports only)
+  headerLogo: "",
+  
   // Custom fields
   customFields: [] as HeaderTextField[],
 };
@@ -58,6 +61,7 @@ const HeaderSettingsTab = () => {
   const [leftLine1, setLeftLine1] = useState(DEFAULT_HEADER_SETTINGS.leftLine1);
   const [leftLine2, setLeftLine2] = useState(DEFAULT_HEADER_SETTINGS.leftLine2);
   const [leftLine3, setLeftLine3] = useState(DEFAULT_HEADER_SETTINGS.leftLine3);
+  const [headerLogo, setHeaderLogo] = useState("");
   const [customFields, setCustomFields] = useState<HeaderTextField[]>([]);
 
   // Load saved settings on mount
@@ -70,8 +74,34 @@ const HeaderSettingsTab = () => {
     setLeftLine1(settings.leftLine1 || DEFAULT_HEADER_SETTINGS.leftLine1);
     setLeftLine2(settings.leftLine2 || DEFAULT_HEADER_SETTINGS.leftLine2);
     setLeftLine3(settings.leftLine3 || DEFAULT_HEADER_SETTINGS.leftLine3);
+    setHeaderLogo(settings.headerLogo || "");
     setCustomFields(settings.customFields || []);
   }, []);
+
+  const handleLogoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      toast({
+        title: "خطأ",
+        description: "حجم الصورة يجب أن لا يتجاوز 2 ميجابايت",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const result = e.target?.result as string;
+      setHeaderLogo(result);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveLogo = () => {
+    setHeaderLogo("");
+  };
 
   const handleSave = () => {
     setIsSaving(true);
@@ -84,6 +114,7 @@ const HeaderSettingsTab = () => {
       leftLine1,
       leftLine2,
       leftLine3,
+      headerLogo,
       customFields,
     };
 
@@ -121,7 +152,6 @@ const HeaderSettingsTab = () => {
     setCustomFields(customFields.filter((field) => field.id !== id));
   };
 
-  const schoolLogo = localStorage.getItem("schoolLogo");
   const schoolName = localStorage.getItem("schoolName") || "اسم المدرسة";
 
   // Group custom fields by position
@@ -139,8 +169,54 @@ const HeaderSettingsTab = () => {
       </CardHeader>
       <CardContent className="pt-6">
         <p className="text-sm text-muted-foreground mb-6">
-          قم بتعديل محتوى الترويسة التي تظهر في جميع التقارير. الشعار يظهر في المنتصف ويمكنك تغييره من تبويب الإعدادات.
+          قم بتعديل محتوى الترويسة التي تظهر في جميع التقارير. شعار الترويسة منفصل عن شعار المدرسة.
         </p>
+
+        {/* Header Logo Section */}
+        <div className="flex flex-col items-center gap-4 p-4 border rounded-lg bg-amber-50 border-amber-200 mb-8">
+          <Label className="text-lg font-semibold flex items-center gap-2 text-amber-800">
+            <Image className="h-5 w-5" />
+            شعار الترويسة (للتقارير فقط)
+          </Label>
+          
+          {headerLogo ? (
+            <div className="relative">
+              <img 
+                src={headerLogo} 
+                alt="شعار الترويسة" 
+                className="h-24 w-24 object-contain rounded-lg border"
+              />
+              <Button
+                variant="destructive"
+                size="sm"
+                className="absolute -top-2 -left-2 h-6 w-6 p-0 rounded-full"
+                onClick={handleRemoveLogo}
+              >
+                ×
+              </Button>
+            </div>
+          ) : (
+            <div className="h-24 w-24 border-2 border-dashed rounded-lg flex items-center justify-center bg-white border-amber-300">
+              <Image className="h-10 w-10 text-amber-300" />
+            </div>
+          )}
+          
+          <input
+            type="file"
+            accept="image/*"
+            onChange={handleLogoUpload}
+            className="hidden"
+            id="header-logo-upload"
+          />
+          <Label htmlFor="header-logo-upload" className="cursor-pointer">
+            <Button variant="outline" asChild className="border-amber-500 text-amber-700 hover:bg-amber-100">
+              <span>
+                {headerLogo ? "تغيير الشعار" : "رفع شعار الترويسة"}
+              </span>
+            </Button>
+          </Label>
+          <p className="text-xs text-muted-foreground">الحد الأقصى: 2 ميجابايت - يظهر في منتصف ترويسة التقارير</p>
+        </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Right Side (Arabic - Ministry) */}
@@ -339,8 +415,8 @@ const HeaderSettingsTab = () => {
 
                   {/* Center - Logo */}
                   <div className="text-center">
-                    {schoolLogo ? (
-                      <img src={schoolLogo} alt="Logo" className="h-16 w-16 mx-auto object-contain" />
+                    {headerLogo ? (
+                      <img src={headerLogo} alt="Logo" className="h-16 w-16 mx-auto object-contain" />
                     ) : (
                       <div className="h-16 w-16 mx-auto border-2 border-gray-400 rounded flex items-center justify-center text-gray-400">
                         شعار
