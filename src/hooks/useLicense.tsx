@@ -107,6 +107,12 @@ export const useLicense = () => {
           expiryDate: stored.expiryDate || null,
           showExpiryWarning: showWarning,
         });
+
+        // Ensure school context is always set for database reads
+        const effectiveSchoolId = stored.schoolId || activationData?.schoolId || "";
+        if (effectiveSchoolId) {
+          localStorage.setItem("currentSchoolId", effectiveSchoolId);
+        }
         
         // Perform background validation only once per day
         const lastValidation = activationData?.lastValidated || 0;
@@ -155,6 +161,11 @@ export const useLicense = () => {
           expiryDate: stored.expiryDate || null,
           showExpiryWarning: showWarning,
         });
+
+        // Ensure school context is always set for database reads
+        if (stored.schoolId) {
+          localStorage.setItem("currentSchoolId", stored.schoolId);
+        }
         return;
       }
 
@@ -185,6 +196,11 @@ export const useLicense = () => {
           expiryDate: stored.expiryDate || null,
           showExpiryWarning: showWarning,
         });
+
+        // Ensure school context is always set for database reads
+        if (stored.schoolId) {
+          localStorage.setItem("currentSchoolId", stored.schoolId);
+        }
 
         // Save validation timestamp to avoid repeated checks
         localStorage.setItem("lastLicenseValidation", Date.now().toString());
