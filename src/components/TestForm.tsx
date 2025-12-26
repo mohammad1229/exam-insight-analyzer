@@ -142,14 +142,28 @@ const TestForm: React.FC<TestFormProps> = ({ onFormDataChange }) => {
           }
           
           // Store ALL teacher's assigned sections with class info
-          const teacherSectionsWithClassInfo = allSectionsData
-            .filter((s: any) => teacherSections.includes(s.id))
-            .map((s: any) => ({
-              id: s.id,
-              name: s.name,
-              class_id: s.class_id,
-              className: classIdToName.get(s.class_id) || ""
-            }));
+          // If teacher has no specific sections assigned, allow all sections for their classes
+          let teacherSectionsWithClassInfo;
+          if (teacherSections.length > 0) {
+            teacherSectionsWithClassInfo = allSectionsData
+              .filter((s: any) => teacherSections.includes(s.id))
+              .map((s: any) => ({
+                id: s.id,
+                name: s.name,
+                class_id: s.class_id,
+                className: classIdToName.get(s.class_id) || ""
+              }));
+          } else {
+            // No specific sections - allow all sections for teacher's classes
+            teacherSectionsWithClassInfo = allSectionsData
+              .filter((s: any) => teacherClasses.includes(s.class_id))
+              .map((s: any) => ({
+                id: s.id,
+                name: s.name,
+                class_id: s.class_id,
+                className: classIdToName.get(s.class_id) || ""
+              }));
+          }
           setAllTeacherSections(teacherSectionsWithClassInfo);
           console.log("All teacher sections with class info:", teacherSectionsWithClassInfo);
           
@@ -507,14 +521,18 @@ const TestForm: React.FC<TestFormProps> = ({ onFormDataChange }) => {
               disabled={!classId}
             >
               <SelectTrigger id="section">
-                <SelectValue placeholder={classId ? "اختر الشعبة" : "اختر الصف أولاً"} />
+                <SelectValue placeholder={classId ? (sections.length > 0 ? "اختر الشعبة" : "لا توجد شعب لهذا الصف") : "اختر الصف أولاً"} />
               </SelectTrigger>
               <SelectContent>
-                {sections.map((section) => (
-                  <SelectItem key={section.id} value={section.id}>
-                    {section.name}
-                  </SelectItem>
-                ))}
+                {sections.length > 0 ? (
+                  sections.map((section) => (
+                    <SelectItem key={section.id} value={section.id}>
+                      {section.name}
+                    </SelectItem>
+                  ))
+                ) : (
+                  <SelectItem value="none" disabled>لا توجد شعب مخصصة لك لهذا الصف</SelectItem>
+                )}
               </SelectContent>
             </Select>
           </div>
