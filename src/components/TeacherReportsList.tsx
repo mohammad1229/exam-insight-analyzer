@@ -10,16 +10,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Eye, Edit2, Trash2, FileText } from "lucide-react";
+import { Eye, Edit2, Trash2, FileText, Loader2 } from "lucide-react";
 import { Test } from "@/types";
 import {
   getTests,
-  getClassById,
-  getSectionById,
-  getSubjectById,
-  getCurrentTeacher,
   deleteTest,
 } from "@/services/dataService";
+import { getClassesDB, getSectionsDB, getSubjectsDB, getTestsDB, deleteTestDB } from "@/services/databaseService";
 import ReportPreview from "@/components/ReportPreview";
 import TestResultsEditor from "@/components/TestResultsEditor";
 import {
@@ -56,53 +53,143 @@ const TeacherReportsList = () => {
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [testToDelete, setTestToDelete] = useState<string | null>(null);
-  const currentTeacher = getCurrentTeacher();
+  const [loading, setLoading] = useState(true);
+  
+  // Lookup maps for names
+  const [classesMap, setClassesMap] = useState<Map<string, string>>(new Map());
+  const [sectionsMap, setSectionsMap] = useState<Map<string, string>>(new Map());
+  const [subjectsMap, setSubjectsMap] = useState<Map<string, string>>(new Map());
 
   useEffect(() => {
     loadReports();
   }, []);
 
-  const loadReports = () => {
-    const allTests = getTests();
-    // Filter tests by current teacher
-    const teacherTests = currentTeacher
-      ? allTests.filter((t) => t.teacherId === currentTeacher.id && !t.draft)
-      : [];
+  const loadReports = async () => {
+    setLoading(true);
+    try {
+      // Load lookup data from database
+      const [classesData, sectionsData, subjectsData, testsData] = await Promise.all([
+        getClassesDB(),
+        getSectionsDB(),
+        getSubjectsDB(),
+        getTestsDB(),
+      ]);
 
-    const reportsData: Report[] = teacherTests.map((test) => {
-      const classObj = getClassById(test.classId);
-      const section = getSectionById(test.classId, test.sectionId);
-      const subject = getSubjectById(test.subjectId);
+      // Create lookup maps
+      const classMap = new Map<string, string>();
+      (classesData || []).forEach((c: any) => classMap.set(c.id, c.name));
+      setClassesMap(classMap);
 
-      const presentResults = test.results.filter((r) => !r.isAbsent);
-      const passedCount = presentResults.filter(
-        (r) => r.percentage >= 50
-      ).length;
-      const passRate =
-        presentResults.length > 0
-          ? Math.round((passedCount / presentResults.length) * 100)
-          : 0;
+      const sectionMap = new Map<string, string>();
+      (sectionsData || []).forEach((s: any) => sectionMap.set(s.id, s.name));
+      setSectionsMap(sectionMap);
 
-      // Calculate total max score from questions
-      const totalMaxScore = test.questions?.reduce((sum: number, q: any) => sum + (q.maxScore || 0), 0) || 0;
+      const subjectMap = new Map<string, string>();
+      (subjectsData || []).forEach((s: any) => subjectMap.set(s.id, s.name));
+      setSubjectsMap(subjectMap);
 
-      return {
-        id: `report_${test.id}`,
-        testId: test.id,
-        testName: test.name,
-        className: classObj?.name || "",
-        sectionName: section?.name || "",
-        subjectName: subject?.name || "",
-        date: test.date,
-        totalStudents: presentResults.length,
-        passedStudents: passedCount,
-        passRate,
-        totalMaxScore,
-        test,
-      };
-    });
+      // Get current teacher ID
+      const currentTeacherId = localStorage.getItem("currentTeacherId");
+      
+      // Filter tests by current teacher
+      const teacherTests = currentTeacherId
+        ? (testsData || []).filter((t: any) => t.teacher_id === currentTeacherId && !t.is_draft)
+        : [];
 
-    setReports(reportsData);
+      const reportsData: Report[] = teacherTests.map((test: any) => {
+        // Map database test to Test type with proper field names
+        const mappedTest: Test = {
+          id: test.id,
+          name: test.name,
+          type: test.test_type,
+          subjectId: test.subject_id,
+          teacherId: test.teacher_id,
+          classId: test.class_id,
+          sectionId: test.section_id,
+          date: test.test_date,
+          questions: test.questions || [],
+          notes: test.notes,
+          draft: test.is_draft,
+          results: (test.test_results || []).map((r: any) => ({
+            id: r.id,
+            testId: r.test_id,
+            studentId: r.student_id,
+            studentName: r.students?.name || r.student_id,
+            isAbsent: r.is_absent,
+            scores: r.scores || {},
+            totalScore: r.total_score,
+            percentage: r.percentage,
+          })),
+          // Add names from lookup
+          className: classMap.get(test.class_id) || test.classes?.name || "",
+          sectionName: sectionMap.get(test.section_id) || test.sections?.name || "",
+          subjectName: subjectMap.get(test.subject_id) || test.subjects?.name || "",
+          teacherName: test.teachers?.name || "",
+        };
+
+        const presentResults = mappedTest.results.filter((r) => !r.isAbsent);
+        const passedCount = presentResults.filter(
+          (r) => r.percentage >= 50
+        ).length;
+        const passRate =
+          presentResults.length > 0
+            ? Math.round((passedCount / presentResults.length) * 100)
+            : 0;
+
+        const totalMaxScore = mappedTest.questions?.reduce((sum: number, q: any) => sum + (q.maxScore || 0), 0) || 0;
+
+        return {
+          id: `report_${mappedTest.id}`,
+          testId: mappedTest.id,
+          testName: mappedTest.name,
+          className: mappedTest.className || classMap.get(test.class_id) || "",
+          sectionName: mappedTest.sectionName || sectionMap.get(test.section_id) || "",
+          subjectName: mappedTest.subjectName || subjectMap.get(test.subject_id) || "",
+          date: mappedTest.date,
+          totalStudents: presentResults.length,
+          passedStudents: passedCount,
+          passRate,
+          totalMaxScore,
+          test: mappedTest,
+        };
+      });
+
+      setReports(reportsData);
+    } catch (error) {
+      console.error("Error loading reports:", error);
+      // Fallback to localStorage
+      const allTests = getTests();
+      const currentTeacherId = localStorage.getItem("currentTeacherId");
+      const teacherTests = currentTeacherId
+        ? allTests.filter((t) => t.teacherId === currentTeacherId && !t.draft)
+        : [];
+
+      const reportsData: Report[] = teacherTests.map((test) => {
+        const presentResults = test.results.filter((r) => !r.isAbsent);
+        const passedCount = presentResults.filter((r) => r.percentage >= 50).length;
+        const passRate = presentResults.length > 0 ? Math.round((passedCount / presentResults.length) * 100) : 0;
+        const totalMaxScore = test.questions?.reduce((sum: number, q: any) => sum + (q.maxScore || 0), 0) || 0;
+
+        return {
+          id: `report_${test.id}`,
+          testId: test.id,
+          testName: test.name,
+          className: test.className || "",
+          sectionName: test.sectionName || "",
+          subjectName: test.subjectName || "",
+          date: test.date,
+          totalStudents: presentResults.length,
+          passedStudents: passedCount,
+          passRate,
+          totalMaxScore,
+          test,
+        };
+      });
+
+      setReports(reportsData);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleViewReport = (test: Test) => {
@@ -120,11 +207,19 @@ const TeacherReportsList = () => {
     setShowDeleteDialog(true);
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (testToDelete) {
-      deleteTest(testToDelete);
-      loadReports();
-      toast.success("تم حذف التقرير بنجاح");
+      try {
+        // Delete from database first
+        await deleteTestDB(testToDelete);
+        // Also delete from localStorage
+        deleteTest(testToDelete);
+        loadReports();
+        toast.success("تم حذف التقرير بنجاح");
+      } catch (error) {
+        console.error("Error deleting test:", error);
+        toast.error("حدث خطأ أثناء حذف التقرير");
+      }
       setShowDeleteDialog(false);
       setTestToDelete(null);
     }
@@ -136,6 +231,25 @@ const TeacherReportsList = () => {
     setSelectedTest(null);
     toast.success("تم حفظ التعديلات بنجاح");
   };
+
+  if (loading) {
+    return (
+      <Card className="border-2 border-primary/20">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <FileText className="h-5 w-5" />
+            تقاريري
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+            <Loader2 className="h-12 w-12 mb-4 animate-spin" />
+            <p>جاري تحميل التقارير...</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   if (reports.length === 0) {
     return (

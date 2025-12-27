@@ -15,10 +15,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Edit2, Save, X, User, Plus, Trash2, FileText, Users } from "lucide-react";
+import { Edit2, Save, X, User, Plus, Trash2, FileText, Users, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Test, TestResult, Question } from "@/types";
 import { getStudentById, updateTest } from "@/services/dataService";
+import { getStudentsDB } from "@/services/databaseService";
 import { supabase } from "@/integrations/supabase/client";
 
 interface TestResultsEditorProps {
@@ -58,6 +59,29 @@ const TestResultsEditor: React.FC<TestResultsEditorProps> = ({ test, open, onClo
   const [testNotes, setTestNotes] = useState("");
   const [questions, setQuestions] = useState<Question[]>([]);
   const [saving, setSaving] = useState(false);
+  const [studentNamesMap, setStudentNamesMap] = useState<Map<string, string>>(new Map());
+  const [loadingStudents, setLoadingStudents] = useState(false);
+
+  // Load student names from database
+  useEffect(() => {
+    const loadStudentNames = async () => {
+      setLoadingStudents(true);
+      try {
+        const students = await getStudentsDB();
+        const namesMap = new Map<string, string>();
+        (students || []).forEach((s: any) => namesMap.set(s.id, s.name));
+        setStudentNamesMap(namesMap);
+      } catch (error) {
+        console.error("Error loading student names:", error);
+      } finally {
+        setLoadingStudents(false);
+      }
+    };
+
+    if (open) {
+      loadStudentNames();
+    }
+  }, [open]);
 
   useEffect(() => {
     if (test) {
@@ -132,11 +156,16 @@ const TestResultsEditor: React.FC<TestResultsEditorProps> = ({ test, open, onClo
   const handleSave = async () => {
     setSaving(true);
     try {
-      // Add student names to results
-      const resultsWithNames = editedResults.map(r => ({
-        ...r,
-        studentName: getStudentById(r.studentId)?.name || r.studentName || r.studentId
-      }));
+      // Add student names to results - prioritize from loaded DB names
+      const resultsWithNames = editedResults.map(r => {
+        const sid = r.studentId || (r as any).student_id;
+        const nameFromDb = studentNamesMap.get(sid);
+        const nameFromLocal = getStudentById(sid)?.name;
+        return {
+          ...r,
+          studentName: nameFromDb || nameFromLocal || r.studentName || sid
+        };
+      });
 
       const schoolId = localStorage.getItem("currentSchoolId");
       
@@ -224,10 +253,15 @@ const TestResultsEditor: React.FC<TestResultsEditorProps> = ({ test, open, onClo
   };
 
   const getStudentName = (studentId: string, result?: any): string => {
-    if (result?.studentName) return result.studentName;
+    // First try from result data
+    if (result?.studentName && result.studentName !== studentId) return result.studentName;
     if (result?.students?.name) return result.students.name;
+    // Then from loaded database names
+    const fromDb = studentNamesMap.get(studentId);
+    if (fromDb) return fromDb;
+    // Fallback to local storage
     const student = getStudentById(studentId);
-    return student?.name || studentId;
+    return student?.name || "طالب غير معروف";
   };
 
   const getPerformanceLevel = (percentage: number): { label: string; color: string } => {
