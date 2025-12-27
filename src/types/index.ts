@@ -70,6 +70,11 @@ export interface Test {
   notes?: string;
   draft?: boolean;
   is_draft?: boolean;
+  // Name lookups from related tables
+  className?: string;
+  sectionName?: string;
+  subjectName?: string;
+  teacherName?: string;
   subjects?: { name: string };
   teachers?: { name: string };
   classes?: { name: string };

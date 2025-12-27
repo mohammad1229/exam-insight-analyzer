@@ -15,7 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import { Question, TestResult, Test } from "@/types";
 import { addTest, getTests, getCurrentTeacher, getStudentById, updateTest } from "@/services/dataService";
-import { addTestDB, saveTestResultsDB } from "@/services/databaseService";
+import { addTestDB, saveTestResultsDB, getStudentsDB } from "@/services/databaseService";
 import { Save, Printer, Eye, FileDown } from "lucide-react";
 
 const TestResults = () => {
@@ -44,9 +44,37 @@ const TestResults = () => {
   // Report preview state
   const [showReportPreview, setShowReportPreview] = useState(false);
   
+  // Student names from database
+  const [studentNamesMap, setStudentNamesMap] = useState<Map<string, string>>(new Map());
+  
   // Generate test ID (stable for the lifetime of this screen)
   const testIdRef = useRef("test_" + Date.now());
   const testId = testIdRef.current;
+
+  // Load student names from database when classId and sectionId change
+  useEffect(() => {
+    const loadStudentNames = async () => {
+      if (testFormData.classId && testFormData.sectionId) {
+        try {
+          const students = await getStudentsDB();
+          const namesMap = new Map<string, string>();
+          (students || []).forEach((s: any) => namesMap.set(s.id, s.name));
+          setStudentNamesMap(namesMap);
+        } catch (error) {
+          console.error("Error loading student names:", error);
+        }
+      }
+    };
+    loadStudentNames();
+  }, [testFormData.classId, testFormData.sectionId]);
+
+  // Helper to get student name from database or fallback
+  const getStudentNameById = (studentId: string): string => {
+    const fromDb = studentNamesMap.get(studentId);
+    if (fromDb) return fromDb;
+    const student = getStudentById(studentId);
+    return student?.name || "طالب غير معروف";
+  };
 
   // Generate test results based on current state
   const generateTestResults = (): TestResult[] => {
@@ -70,6 +98,7 @@ const TestResults = () => {
         id: `result_${studentId}`,
         testId: testId,
         studentId,
+        studentName: getStudentNameById(studentId),
         isAbsent,
         scores,
         totalScore,
@@ -153,7 +182,7 @@ const TestResults = () => {
       draft: asDraft,
       results: results.map(r => ({
         ...r,
-        studentName: getStudentById(r.studentId)?.name || (r as any).studentName || r.studentId
+        studentName: r.studentName || getStudentNameById(r.studentId)
       })),
     };
 
