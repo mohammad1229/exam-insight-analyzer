@@ -726,6 +726,9 @@ serve(async (req) => {
 
       // ========== VERIFY TEACHER LOGIN BY USERNAME ONLY ==========
       case "verifyTeacherLoginByUsername": {
+        // Get the activated school ID from the request
+        const activatedSchoolId = data.activatedSchoolId;
+        
         // Search for teacher by username across all schools
         const { data: teacher, error } = await supabase
           .from("teachers")
@@ -746,6 +749,17 @@ serve(async (req) => {
 
         if (!isValid) {
           return new Response(JSON.stringify({ success: false, error: "اسم المستخدم أو كلمة المرور غير صحيحة" }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        // SECURITY CHECK: Verify teacher's school matches the activated school on this device
+        if (activatedSchoolId && teacher.school_id !== activatedSchoolId) {
+          console.log(`Security: Teacher ${data.username} from school ${teacher.school_id} tried to login on device with school ${activatedSchoolId}`);
+          return new Response(JSON.stringify({ 
+            success: false, 
+            error: "لا يمكنك تسجيل الدخول على هذا الجهاز - أنت مسجل في مدرسة أخرى" 
+          }), {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }

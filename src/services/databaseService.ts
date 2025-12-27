@@ -258,9 +258,16 @@ export const verifyTeacherLoginDB = async (username: string, password: string): 
   teacher?: any;
 }> => {
   try {
+    // Get the activated school ID from localStorage to verify teacher belongs to this school
+    const activatedSchoolId = localStorage.getItem("currentSchoolId");
+    
     // Use the special action that doesn't require schoolId
     const { data: result, error } = await supabase.functions.invoke('school-data', {
-      body: { action: 'verifyTeacherLoginByUsername', schoolId: 'none', data: { username, password } }
+      body: { 
+        action: 'verifyTeacherLoginByUsername', 
+        schoolId: 'none', 
+        data: { username, password, activatedSchoolId } 
+      }
     });
 
     if (error) throw error;
