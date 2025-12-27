@@ -197,7 +197,7 @@ serve(async (req) => {
 
     // ========== VERIFY SCHOOL ADMIN LOGIN ==========
     if (action === "verifySchoolAdminLogin") {
-      const { username, password } = body;
+      const { username, password, activatedLicenseId } = body;
       
       // Find admin with matching username
       const { data: admin, error } = await supabase
@@ -241,6 +241,18 @@ serve(async (req) => {
       if (!license || !license.is_active) {
         return new Response(
           JSON.stringify({ success: false, error: "ترخيص المدرسة غير مفعل - تواصل مع مدير النظام" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // SECURITY CHECK: Verify admin's license matches the activated license on this device
+      if (activatedLicenseId && admin.license_id !== activatedLicenseId) {
+        console.log(`Security: Admin ${username} tried to login with license ${admin.license_id} but device has license ${activatedLicenseId}`);
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            error: "لا يمكنك تسجيل الدخول على هذا الجهاز - الترخيص المفعل لا يتطابق مع ترخيص حسابك" 
+          }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }

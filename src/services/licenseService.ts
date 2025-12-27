@@ -685,8 +685,16 @@ export const deleteSchoolAdmin = async (adminId: string) => {
 // Verify school admin login using edge function (service role)
 export const verifySchoolAdminLogin = async (username: string, password: string) => {
   try {
+    // Get the activated license ID from localStorage to verify admin belongs to this license
+    const activatedLicenseId = localStorage.getItem("currentLicenseId");
+    
     const { data, error } = await supabase.functions.invoke('get-admin-data', {
-      body: { action: 'verifySchoolAdminLogin', username, password }
+      body: { 
+        action: 'verifySchoolAdminLogin', 
+        username, 
+        password,
+        activatedLicenseId 
+      }
     });
 
     if (error) throw error;
