@@ -168,6 +168,7 @@ export const startTrial = async (schoolName: string) => {
 
     const licenseInfo = {
       licenseKey: data.licenseKey,
+      licenseId: data.license?.id,
       schoolId: data.school.id,
       schoolName,
       directorName: "",
@@ -186,7 +187,10 @@ export const startTrial = async (schoolName: string) => {
     localStorage.setItem("schoolName", schoolName);
     localStorage.setItem("directorName", "");
     localStorage.setItem("currentSchoolId", data.school.id);
+    localStorage.setItem("currentLicenseId", data.license?.id || ""); // Store license ID for security checks
     localStorage.setItem("lastLicenseValidation", Date.now().toString());
+    
+    console.log(`Trial started - schoolId: ${data.school.id}, licenseId: ${data.license?.id}`);
     
     return { success: true, licenseInfo };
   } catch (error: any) {
@@ -248,11 +252,14 @@ export const activateLicense = async (licenseKey: string) => {
     localStorage.setItem("directorName", licenseInfo.directorName);
     localStorage.setItem("schoolLogo", licenseInfo.schoolLogo);
     localStorage.setItem("currentSchoolId", licenseInfo.schoolId || "");
+    localStorage.setItem("currentLicenseId", license?.id || ""); // Store license ID for security checks
     localStorage.setItem("licenseSchoolName", licenseInfo.schoolName);
     localStorage.setItem("licenseDirectorName", licenseInfo.directorName);
     
     // Save validation timestamp
     localStorage.setItem("lastLicenseValidation", Date.now().toString());
+    
+    console.log(`License activated - schoolId: ${licenseInfo.schoolId}, licenseId: ${license?.id}`);
     
     // Initialize school data in database if this is first activation
     if (licenseInfo.schoolId) {
@@ -308,6 +315,7 @@ export const checkLicenseValidity = async () => {
           stored.directorName = license?.schools?.director_name || stored.directorName;
           stored.schoolLogo = license?.schools?.logo_url || stored.schoolLogo || "";
           stored.schoolId = license?.school_id || stored.schoolId;
+          stored.licenseId = license?.id || stored.licenseId;
           storeLicense(stored);
 
           // Update localStorage for UI components
@@ -315,6 +323,7 @@ export const checkLicenseValidity = async () => {
           localStorage.setItem("directorName", stored.directorName || "");
           localStorage.setItem("schoolLogo", stored.schoolLogo || "");
           localStorage.setItem("currentSchoolId", stored.schoolId || "");
+          localStorage.setItem("currentLicenseId", stored.licenseId || ""); // Update license ID
           localStorage.setItem("licenseSchoolName", stored.schoolName || "");
           localStorage.setItem("licenseDirectorName", stored.directorName || "");
         }
