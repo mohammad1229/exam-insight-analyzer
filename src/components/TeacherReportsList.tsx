@@ -67,6 +67,18 @@ const TeacherReportsList = () => {
   const loadReports = async () => {
     setLoading(true);
     try {
+      // Get current teacher ID - CRITICAL for filtering
+      const currentTeacherId = localStorage.getItem("currentTeacherId");
+      console.log("TeacherReportsList: Loading reports for teacher:", currentTeacherId);
+      console.log("TeacherReportsList: currentSchoolId:", localStorage.getItem("currentSchoolId"));
+      
+      if (!currentTeacherId) {
+        console.warn("TeacherReportsList: No currentTeacherId found, showing empty list");
+        setReports([]);
+        setLoading(false);
+        return;
+      }
+
       // Load lookup data from database
       const [classesData, sectionsData, subjectsData, testsData] = await Promise.all([
         getClassesDB(),
@@ -74,6 +86,8 @@ const TeacherReportsList = () => {
         getSubjectsDB(),
         getTestsDB(),
       ]);
+
+      console.log("TeacherReportsList: Got tests from DB:", testsData?.length || 0);
 
       // Create lookup maps
       const classMap = new Map<string, string>();
@@ -88,13 +102,9 @@ const TeacherReportsList = () => {
       (subjectsData || []).forEach((s: any) => subjectMap.set(s.id, s.name));
       setSubjectsMap(subjectMap);
 
-      // Get current teacher ID
-      const currentTeacherId = localStorage.getItem("currentTeacherId");
-      
-      // Filter tests by current teacher
-      const teacherTests = currentTeacherId
-        ? (testsData || []).filter((t: any) => t.teacher_id === currentTeacherId && !t.is_draft)
-        : [];
+      // Filter tests by current teacher - ONLY show tests belonging to this teacher
+      const teacherTests = (testsData || []).filter((t: any) => t.teacher_id === currentTeacherId && !t.is_draft);
+      console.log("TeacherReportsList: Filtered tests for this teacher:", teacherTests.length);
 
       const reportsData: Report[] = teacherTests.map((test: any) => {
         // Map database test to Test type with proper field names
