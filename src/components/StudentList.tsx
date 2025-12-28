@@ -58,8 +58,12 @@ const StudentList: React.FC<StudentListProps> = ({
     const fetchStudents = async () => {
       if (classId && sectionId) {
         setLoading(true);
+        console.log("StudentList: Fetching students for classId:", classId, "sectionId:", sectionId);
+        console.log("StudentList: currentSchoolId:", localStorage.getItem("currentSchoolId"));
+        
         try {
           const allStudents = await getStudentsDB();
+          console.log("StudentList: Got students from DB:", allStudents?.length || 0, "students");
           
           if (!isMounted) return;
           
@@ -72,6 +76,11 @@ const StudentList: React.FC<StudentListProps> = ({
               classId: s.class_id,
               sectionId: s.section_id
             }));
+          
+          console.log("StudentList: Filtered students:", filteredStudents.length, "students");
+          if (filteredStudents.length > 0) {
+            console.log("StudentList: First student name:", filteredStudents[0].name);
+          }
           
           setStudents(filteredStudents);
           
@@ -102,6 +111,7 @@ const StudentList: React.FC<StudentListProps> = ({
           }
         }
       } else {
+        console.log("StudentList: No classId or sectionId provided", { classId, sectionId });
         setStudents([]);
         setLocalScores({});
       }
