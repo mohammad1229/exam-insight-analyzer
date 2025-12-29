@@ -49,61 +49,134 @@ export const getCurrentUserContext = () => {
   return null;
 };
 
-// Create a backup record in the database
-export const createBackupRecord = async (
+// Create a cloud backup
+export const createCloudBackup = async (
   schoolId: string,
   schoolName: string,
   backupType: 'manual' | 'automatic' = 'manual'
 ) => {
-  const { data, error } = await supabase
-    .from("backups")
-    .insert({
-      school_id: schoolId,
-      school_name: schoolName,
-      backup_type: backupType,
-      status: 'pending',
-      created_by: 'system'
-    })
-    .select()
-    .single();
+  // Get all data from localStorage based on user type
+  const backupData: Record<string, any> = {};
+  
+  // Common keys to backup
+  const keysToBackup = [
+    'app_students', 'app_teachers', 'app_classes', 
+    'app_subjects', 'app_tests', 'app_school',
+    'licenseInfo', 'schoolName', 'directorName',
+    'currentAdminData'
+  ];
+
+  keysToBackup.forEach(key => {
+    const value = localStorage.getItem(key);
+    if (value) {
+      try {
+        backupData[key] = JSON.parse(value);
+      } catch {
+        backupData[key] = value;
+      }
+    }
+  });
+
+  // Add metadata
+  backupData._metadata = {
+    backupType,
+    schoolId,
+    schoolName,
+    createdAt: new Date().toISOString(),
+    version: '2.0'
+  };
+
+  // Call edge function to create backup
+  const { data, error } = await supabase.functions.invoke('create-backup', {
+    body: {
+      action: 'create',
+      schoolId,
+      schoolName,
+      backupType,
+      backupData
+    }
+  });
 
   if (error) throw error;
-  return data;
-};
-
-// Complete a backup
-export const completeBackup = async (
-  backupId: string,
-  filePath: string,
-  fileSize: number
-) => {
-  const { error } = await supabase
-    .from("backups")
-    .update({
-      status: 'completed',
-      completed_at: new Date().toISOString(),
-      file_path: filePath,
-      file_size: fileSize
-    })
-    .eq("id", backupId);
-
-  if (error) throw error;
+  if (!data?.success) throw new Error(data?.error || 'فشل في إنشاء النسخة الاحتياطية');
+  
+  return data.backup;
 };
 
 // Get all backups for a school
 export const getBackups = async (schoolId?: string) => {
-  let query = supabase
-    .from("backups")
-    .select("*")
-    .order("created_at", { ascending: false });
+  const { data, error } = await supabase.functions.invoke('create-backup', {
+    body: {
+      action: 'list',
+      schoolId: schoolId || 'all'
+    }
+  });
 
-  if (schoolId) {
-    query = query.eq("school_id", schoolId);
-  }
-
-  const { data, error } = await query;
   if (error) throw error;
+  if (!data?.success) throw new Error(data?.error || 'فشل في جلب النسخ الاحتياطية');
+  
+  return data.backups;
+};
+
+// Restore from cloud backup
+export const restoreFromCloudBackup = async (backupId: string): Promise<Record<string, any>> => {
+  const { data, error } = await supabase.functions.invoke('create-backup', {
+    body: {
+      action: 'restore',
+      backupId
+    }
+  });
+
+  if (error) throw error;
+  if (!data?.success) throw new Error(data?.error || 'فشل في استعادة النسخة الاحتياطية');
+
+  const backupData = data.backupData;
+
+  // Restore each key to localStorage (except metadata)
+  Object.keys(backupData).forEach(key => {
+    if (key !== '_metadata') {
+      if (typeof backupData[key] === 'object') {
+        localStorage.setItem(key, JSON.stringify(backupData[key]));
+      } else {
+        localStorage.setItem(key, backupData[key]);
+      }
+    }
+  });
+
+  return backupData;
+};
+
+// Download backup file
+export const downloadCloudBackup = async (backupId: string) => {
+  const { data, error } = await supabase.functions.invoke('create-backup', {
+    body: {
+      action: 'download',
+      backupId
+    }
+  });
+
+  if (error) throw error;
+  if (!data?.success) throw new Error(data?.error || 'فشل في تحميل النسخة الاحتياطية');
+
+  // Open download URL in new tab
+  window.open(data.downloadUrl, '_blank');
+  
   return data;
+};
+
+// Delete a backup
+export const deleteBackup = async (backupId: string) => {
+  const { data, error } = await supabase.functions.invoke('create-backup', {
+    body: {
+      action: 'delete',
+      backupId
+    }
+  });
+
+  if (error) throw error;
+  if (!data?.success) throw new Error(data?.error || 'فشل في حذف النسخة الاحتياطية');
+  
+  return true;
 };
 
 // Create automatic backup
@@ -118,62 +191,13 @@ export const createAutomaticBackup = async () => {
   console.log(`Creating automatic backup for: ${userContext.type} - ${userContext.schoolName}`);
 
   try {
-    // Create backup record
-    const backup = await createBackupRecord(
+    const backup = await createCloudBackup(
       userContext.schoolId,
       userContext.schoolName,
       'automatic'
     );
 
-    // Get all data from localStorage based on user type
-    const backupData: Record<string, any> = {};
-    
-    // Common keys to backup
-    const commonKeys = [
-      'app_students', 'app_teachers', 'app_classes', 
-      'app_subjects', 'app_tests', 'app_school',
-      'licenseInfo', 'schoolName', 'directorName'
-    ];
-    
-    // Additional keys for system admin
-    const systemAdminKeys = userContext.type === 'system_admin' 
-      ? ['systemAdminData', 'all_schools_data'] 
-      : [];
-    
-    const keysToBackup = [...commonKeys, ...systemAdminKeys];
-
-    keysToBackup.forEach(key => {
-      const value = localStorage.getItem(key);
-      if (value) {
-        try {
-          backupData[key] = JSON.parse(value);
-        } catch {
-          backupData[key] = value;
-        }
-      }
-    });
-
-    // Add metadata
-    backupData._metadata = {
-      backupType: 'automatic',
-      userType: userContext.type,
-      schoolId: userContext.schoolId,
-      schoolName: userContext.schoolName,
-      createdAt: new Date().toISOString()
-    };
-
-    // Convert to JSON string
-    const jsonData = JSON.stringify(backupData, null, 2);
-    const dataSize = new Blob([jsonData]).size;
-
-    // Mark backup as completed
-    await completeBackup(backup.id, `backup_${backup.id}.json`, dataSize);
-
-    // Store backup data reference
-    localStorage.setItem(`backup_${backup.id}`, jsonData);
-
-    console.log(`Automatic backup completed: ${backup.id} (${(dataSize / 1024).toFixed(1)} KB)`);
-
+    console.log(`Automatic backup completed: ${backup.id}`);
     return backup;
   } catch (error) {
     console.error("Error creating automatic backup:", error);
@@ -230,13 +254,13 @@ export const initializeBackupScheduler = () => {
   }
 };
 
-// Manual backup download
+// Manual backup download (local)
 export const downloadBackup = () => {
   const backupData: Record<string, any> = {};
   const keysToBackup = [
     'app_students', 'app_teachers', 'app_classes', 
     'app_subjects', 'app_tests', 'app_school',
-    'licenseInfo'
+    'licenseInfo', 'currentAdminData'
   ];
 
   keysToBackup.forEach(key => {
@@ -249,6 +273,13 @@ export const downloadBackup = () => {
       }
     }
   });
+
+  // Add metadata
+  backupData._metadata = {
+    backupType: 'local',
+    createdAt: new Date().toISOString(),
+    version: '2.0'
+  };
 
   const license = getStoredLicense();
   const schoolName = license?.schoolName || 'backup';
@@ -270,42 +301,26 @@ export const downloadBackup = () => {
   return { success: true, filename };
 };
 
-// Restore from cloud backup
-export const restoreFromCloudBackup = async (backupId: string): Promise<boolean> => {
-  try {
-    // Get backup data from localStorage (stored during cloud backup)
-    const backupDataStr = localStorage.getItem(`backup_${backupId}`);
-    
-    if (!backupDataStr) {
-      throw new Error("بيانات النسخة الاحتياطية غير موجودة");
-    }
+// Legacy function for compatibility
+export const createBackupRecord = async (
+  schoolId: string,
+  schoolName: string,
+  backupType: 'manual' | 'automatic' = 'manual'
+) => {
+  return createCloudBackup(schoolId, schoolName, backupType);
+};
 
-    const backupData = JSON.parse(backupDataStr);
-
-    // Restore each key
-    Object.keys(backupData).forEach(key => {
-      localStorage.setItem(key, JSON.stringify(backupData[key]));
-    });
-
-    return true;
-  } catch (error) {
-    console.error("Error restoring backup:", error);
-    throw error;
-  }
+// Legacy function for compatibility
+export const completeBackup = async (
+  backupId: string,
+  filePath: string,
+  fileSize: number
+) => {
+  // No-op - backups are completed immediately now
+  console.log("completeBackup called (legacy) - no action needed");
 };
 
 // Get available cloud backups for restore
 export const getCloudBackupsForRestore = async (schoolId: string) => {
-  const { data, error } = await supabase
-    .from("backups")
-    .select("*")
-    .eq("school_id", schoolId)
-    .eq("status", "completed")
-    .order("created_at", { ascending: false })
-    .limit(10);
-
-  if (error) throw error;
-  
-  // Filter to only include backups that have data stored locally
-  return data?.filter(backup => localStorage.getItem(`backup_${backup.id}`)) || [];
+  return getBackups(schoolId);
 };
