@@ -53,6 +53,8 @@ import WisdomsTab from "@/components/admin/WisdomsTab";
 import TestsTab from "@/components/admin/TestsTab";
 import SchoolInfoTab from "@/components/admin/SchoolInfoTab";
 import LoginCredentialsTab from "@/components/admin/LoginCredentialsTab";
+import DatabaseConnectionTab from "@/components/admin/DatabaseConnectionTab";
+import StorageSettingsTab from "@/components/admin/StorageSettingsTab";
 
 
 // Import utility functions
@@ -443,7 +445,8 @@ const AdminDashboard = () => {
             <TabsTrigger value="credentials">بيانات الدخول</TabsTrigger>
             <TabsTrigger value="features">الميزات</TabsTrigger>
             <TabsTrigger value="backup">النسخ الاحتياطي</TabsTrigger>
-            
+            <TabsTrigger value="database">قاعدة البيانات</TabsTrigger>
+            <TabsTrigger value="storage">التخزين</TabsTrigger>
             <TabsTrigger value="school">بيانات المدرسة</TabsTrigger>
             <TabsTrigger value="settings">الإعدادات</TabsTrigger>
           </TabsList>
@@ -511,6 +514,27 @@ const AdminDashboard = () => {
             <BackupTab />
           </TabsContent>
 
+          <TabsContent value="database">
+            <Card className="border-2 border-cyan-500">
+              <CardHeader className="bg-cyan-50 pb-2">
+                <CardTitle className="text-lg">إعدادات قاعدة البيانات</CardTitle>
+              </CardHeader>
+              <CardContent className="pt-4">
+                <DatabaseConnectionTab />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="storage">
+            <Card className="border-2 border-indigo-500">
+              <CardHeader className="bg-indigo-50 pb-2">
+                <CardTitle className="text-lg">إعدادات التخزين</CardTitle>
+              </CardHeader>
+              <CardContent className="pt-4">
+                <StorageSettingsTab />
+              </CardContent>
+            </Card>
+          </TabsContent>
 
           <TabsContent value="school">
             <SchoolInfoTab />
