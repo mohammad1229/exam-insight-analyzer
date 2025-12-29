@@ -1,10 +1,26 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import * as bcrypt from "https://deno.land/x/bcrypt@v0.4.1/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+// Helper function to check if password is bcrypt hashed
+function isBcryptHash(hash: string): boolean {
+  return hash.startsWith('$2a$') || hash.startsWith('$2b$');
+}
+
+// Helper function to verify password (supports legacy plain text during migration)
+async function verifyPassword(password: string, storedHash: string): Promise<boolean> {
+  if (isBcryptHash(storedHash)) {
+    return await bcrypt.compare(password, storedHash);
+  }
+  // Legacy plain text comparison (will be removed after migration)
+  console.warn('Legacy plain text password detected - migration needed');
+  return password === storedHash;
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -48,8 +64,8 @@ serve(async (req) => {
           );
         }
 
-        // Verify password - plain text comparison
-        const isValid = password === admin.password_hash;
+        // Verify password using bcrypt (with legacy fallback)
+        const isValid = await verifyPassword(password, admin.password_hash);
         
         if (!isValid) {
           return new Response(
@@ -58,15 +74,45 @@ serve(async (req) => {
           );
         }
 
+        // Clean up expired sessions
+        await supabase
+          .from("system_admin_sessions")
+          .delete()
+          .lt("expires_at", new Date().toISOString());
+
+        // Generate a secure session token
+        const sessionToken = crypto.randomUUID();
+        const sessionExpiry = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes
+
+        // Store session in database
+        const { error: sessionError } = await supabase
+          .from("system_admin_sessions")
+          .insert({
+            admin_id: admin.id,
+            token: sessionToken,
+            expires_at: sessionExpiry.toISOString()
+          });
+
+        if (sessionError) {
+          console.error("Error creating session:", sessionError);
+          throw sessionError;
+        }
+
         // Update last login
         await supabase
           .from("system_admins")
           .update({ last_login_at: new Date().toISOString() })
           .eq("id", admin.id);
 
-        // Generate a session token
-        const sessionToken = crypto.randomUUID();
-        const sessionExpiry = new Date(Date.now() + 30 * 60 * 1000).toISOString(); // 30 minutes
+        // If password was plain text, hash it now (auto-migration)
+        if (!isBcryptHash(admin.password_hash)) {
+          const hashedPassword = await bcrypt.hash(password, 10);
+          await supabase
+            .from("system_admins")
+            .update({ password_hash: hashedPassword })
+            .eq("id", admin.id);
+          console.log(`Auto-migrated password for admin: ${admin.username}`);
+        }
 
         return new Response(
           JSON.stringify({
@@ -78,7 +124,7 @@ serve(async (req) => {
               email: admin.email,
             },
             sessionToken,
-            sessionExpiry,
+            sessionExpiry: sessionExpiry.toISOString(),
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
@@ -106,18 +152,22 @@ serve(async (req) => {
           );
         }
 
-        // Verify current password - plain text
-        if (password !== admin.password_hash) {
+        // Verify current password using bcrypt (with legacy fallback)
+        const isValid = await verifyPassword(password, admin.password_hash);
+        if (!isValid) {
           return new Response(
             JSON.stringify({ success: false, error: "كلمة المرور الحالية غير صحيحة" }),
             { headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
 
-        // Update password - plain text
+        // Hash new password with bcrypt
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+        // Update password
         const { error: updateError } = await supabase
           .from("system_admins")
-          .update({ password_hash: newPassword })
+          .update({ password_hash: hashedPassword })
           .eq("id", adminId);
 
         if (updateError) {
@@ -131,6 +181,56 @@ serve(async (req) => {
       }
 
       case "verifySession": {
+        const token = req.headers.get("X-System-Admin-Token");
+        
+        if (!token) {
+          return new Response(
+            JSON.stringify({ success: false, error: "Missing authentication token" }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 401 }
+          );
+        }
+
+        const { data: session, error: sessionError } = await supabase
+          .from("system_admin_sessions")
+          .select("admin_id, expires_at")
+          .eq("token", token)
+          .single();
+
+        if (sessionError || !session) {
+          return new Response(
+            JSON.stringify({ success: false, error: "Invalid session" }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 401 }
+          );
+        }
+
+        if (new Date(session.expires_at) < new Date()) {
+          // Clean up expired session
+          await supabase.from("system_admin_sessions").delete().eq("token", token);
+          return new Response(
+            JSON.stringify({ success: false, error: "Session expired" }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 401 }
+          );
+        }
+
+        // Update last activity
+        await supabase
+          .from("system_admin_sessions")
+          .update({ last_activity: new Date().toISOString() })
+          .eq("token", token);
+
+        return new Response(
+          JSON.stringify({ success: true, adminId: session.admin_id }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      case "logout": {
+        const token = req.headers.get("X-System-Admin-Token");
+        
+        if (token) {
+          await supabase.from("system_admin_sessions").delete().eq("token", token);
+        }
+
         return new Response(
           JSON.stringify({ success: true }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }

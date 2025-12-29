@@ -1,10 +1,67 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import * as bcrypt from "https://deno.land/x/bcrypt@v0.4.1/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-system-admin-token",
 };
+
+// Helper function to check if password is bcrypt hashed
+function isBcryptHash(hash: string): boolean {
+  return hash.startsWith('$2a$') || hash.startsWith('$2b$');
+}
+
+// Helper function to verify password (supports legacy plain text during migration)
+async function verifyPassword(password: string, storedHash: string): Promise<boolean> {
+  if (isBcryptHash(storedHash)) {
+    return await bcrypt.compare(password, storedHash);
+  }
+  // Legacy plain text comparison (will be removed after migration)
+  console.warn('Legacy plain text password detected - migration needed');
+  return password === storedHash;
+}
+
+// Helper function to hash password
+async function hashPassword(password: string): Promise<string> {
+  return await bcrypt.hash(password, 10);
+}
+
+// Verify system admin session token
+async function verifySystemAdminToken(
+  req: Request,
+  supabase: any
+): Promise<{ valid: boolean; adminId?: string; error?: string }> {
+  const token = req.headers.get('X-System-Admin-Token');
+  
+  if (!token) {
+    return { valid: false, error: 'Missing authentication token' };
+  }
+
+  const { data: session, error } = await supabase
+    .from('system_admin_sessions')
+    .select('admin_id, expires_at')
+    .eq('token', token)
+    .single();
+
+  if (error || !session) {
+    return { valid: false, error: 'Invalid session' };
+  }
+
+  if (new Date(session.expires_at) < new Date()) {
+    // Clean up expired session
+    await supabase.from('system_admin_sessions').delete().eq('token', token);
+    return { valid: false, error: 'Session expired' };
+  }
+
+  // Update last activity
+  await supabase
+    .from('system_admin_sessions')
+    .update({ last_activity: new Date().toISOString() })
+    .eq('token', token);
+
+  return { valid: true, adminId: session.admin_id };
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -21,6 +78,23 @@ serve(async (req) => {
     const { action } = body;
     
     console.log("Admin data action:", action);
+
+    // Actions that require system admin authentication
+    const protectedActions = [
+      "getLicenses", "getSchools", "getSchoolAdmins", 
+      "createSchoolAdmin", "updateSchoolAdmin", "deleteSchoolAdmin",
+      "updateSchool", "deleteSchool", "updateLicense", "deleteDevice"
+    ];
+
+    if (protectedActions.includes(action)) {
+      const auth = await verifySystemAdminToken(req, supabase);
+      if (!auth.valid) {
+        return new Response(
+          JSON.stringify({ success: false, error: auth.error }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
 
     if (action === "getLicenses") {
       const { data, error } = await supabase
@@ -65,7 +139,10 @@ serve(async (req) => {
     }
 
     if (action === "createSchoolAdmin") {
-      const { adminData, passwordHash } = body;
+      const { adminData } = body;
+      
+      // Hash password with bcrypt
+      const passwordHash = await hashPassword(adminData.password || 'defaultpass123');
       
       const { data, error } = await supabase
         .from("school_admins")
@@ -91,6 +168,12 @@ serve(async (req) => {
 
     if (action === "updateSchoolAdmin") {
       const { adminId, updateData } = body;
+      
+      // If password is being updated, hash it
+      if (updateData.password) {
+        updateData.password_hash = await hashPassword(updateData.password);
+        delete updateData.password;
+      }
       
       const { data, error } = await supabase
         .from("school_admins")
@@ -196,6 +279,7 @@ serve(async (req) => {
     }
 
     // ========== VERIFY SCHOOL ADMIN LOGIN ==========
+    // This action is NOT protected - it's used for login
     if (action === "verifySchoolAdminLogin") {
       const { username, password, activatedLicenseId } = body;
       
@@ -220,12 +304,23 @@ serve(async (req) => {
         );
       }
 
-      // Verify password - plain text comparison
-      if (admin.password_hash !== password) {
+      // Verify password using bcrypt (with legacy fallback)
+      const isValid = await verifyPassword(password, admin.password_hash);
+      if (!isValid) {
         return new Response(
           JSON.stringify({ success: false, error: "اسم المستخدم أو كلمة المرور غير صحيحة" }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
+      }
+
+      // Auto-migrate plain text password to bcrypt
+      if (!isBcryptHash(admin.password_hash)) {
+        const hashedPassword = await hashPassword(password);
+        await supabase
+          .from("school_admins")
+          .update({ password_hash: hashedPassword })
+          .eq("id", admin.id);
+        console.log(`Auto-migrated password for school admin: ${admin.username}`);
       }
 
       // Check if admin has a school assigned

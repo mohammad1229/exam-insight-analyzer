@@ -12,6 +12,9 @@ verify_jwt = false
 [functions.get-all-schools-data]
 verify_jwt = false
 
+[functions.get-license-details]
+verify_jwt = false
+
 [functions.hash-password]
 verify_jwt = false
 
@@ -22,4 +25,7 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.school-data]
+verify_jwt = false
+
+[functions.system-admin-auth]
 verify_jwt = false
