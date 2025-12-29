@@ -1,14 +1,30 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import * as bcrypt from "https://deno.land/x/bcrypt@v0.4.1/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-school-admin-token, x-teacher-token",
 };
 
-// Plain text password comparison (no encryption)
-function verifyPassword(password: string, storedPassword: string): boolean {
-  return password === storedPassword;
+// Helper function to check if password is bcrypt hashed
+function isBcryptHash(hash: string): boolean {
+  return hash.startsWith('$2a$') || hash.startsWith('$2b$');
+}
+
+// Helper function to verify password (supports legacy plain text during migration)
+async function verifyPassword(password: string, storedHash: string): Promise<boolean> {
+  if (isBcryptHash(storedHash)) {
+    return await bcrypt.compare(password, storedHash);
+  }
+  // Legacy plain text comparison (will be removed after migration)
+  console.warn('Legacy plain text password detected - migration needed');
+  return password === storedHash;
+}
+
+// Helper function to hash password
+async function hashPassword(password: string): Promise<string> {
+  return await bcrypt.hash(password, 10);
 }
 
 serve(async (req) => {
@@ -287,8 +303,8 @@ serve(async (req) => {
       }
 
       case "addTeacher": {
-        // Use plain text password (no encryption)
-        const passwordHash = data.password;
+        // Hash password with bcrypt
+        const passwordHash = await hashPassword(data.password);
         
         const { data: newTeacher, error } = await supabase
           .from("teachers")
@@ -352,8 +368,8 @@ serve(async (req) => {
         };
         
         if (data.password) {
-          // Use plain text password (no encryption)
-          updates.password_hash = data.password;
+          // Hash password with bcrypt
+          updates.password_hash = await hashPassword(data.password);
         }
         
         if (data.must_change_password !== undefined) {
@@ -436,13 +452,23 @@ serve(async (req) => {
           });
         }
 
-        // Verify password - plain text comparison
-        const isValid = verifyPassword(data.password, teacher.password_hash);
+        // Verify password using bcrypt (with legacy fallback)
+        const isValid = await verifyPassword(data.password, teacher.password_hash);
 
         if (!isValid) {
           return new Response(JSON.stringify({ success: false, error: "اسم المستخدم أو كلمة المرور غير صحيحة" }), {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
+        }
+
+        // Auto-migrate plain text password to bcrypt
+        if (!isBcryptHash(teacher.password_hash)) {
+          const hashedPassword = await hashPassword(data.password);
+          await supabase
+            .from("teachers")
+            .update({ password_hash: hashedPassword })
+            .eq("id", teacher.id);
+          console.log(`Auto-migrated password for teacher: ${teacher.username}`);
         }
 
         // Update last login
@@ -500,13 +526,10 @@ serve(async (req) => {
         }
 
         if (existingTest) {
-          // Return the existing test ID so the frontend can use it
           return new Response(JSON.stringify({ 
             success: false, 
-            error: "يوجد اختبار بنفس البيانات (المعلم، المادة، الصف، الشعبة، التاريخ، الاسم) مسجل مسبقاً",
-            duplicate: true,
-            existingTestId: existingTest.id,
-            existingTestName: existingTest.name
+            error: `يوجد اختبار بنفس الاسم مسجل بالفعل: ${existingTest.name}`,
+            existingTestId: existingTest.id 
           }), {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
@@ -516,14 +539,14 @@ serve(async (req) => {
           .from("tests")
           .insert({ 
             school_id: schoolId, 
-            teacher_id: data.teacher_id,
+            name: data.name, 
             subject_id: data.subject_id,
             class_id: data.class_id,
             section_id: data.section_id,
-            name: data.name,
+            teacher_id: data.teacher_id,
             test_type: data.test_type || 'quiz',
-            test_date: data.test_date || new Date().toISOString().split('T')[0],
             questions: data.questions || [],
+            test_date: data.test_date || new Date().toISOString().split('T')[0],
             notes: data.notes,
             is_draft: data.is_draft ?? true
           })
@@ -540,10 +563,13 @@ serve(async (req) => {
         const { error } = await supabase
           .from("tests")
           .update({ 
-            name: data.name,
+            name: data.name, 
+            subject_id: data.subject_id,
+            class_id: data.class_id,
+            section_id: data.section_id,
             test_type: data.test_type,
-            test_date: data.test_date,
             questions: data.questions,
+            test_date: data.test_date,
             notes: data.notes,
             is_draft: data.is_draft
           })
@@ -556,6 +582,9 @@ serve(async (req) => {
       }
 
       case "deleteTest": {
+        // Delete test results first
+        await supabase.from("test_results").delete().eq("test_id", data.id);
+        
         const { error } = await supabase
           .from("tests")
           .delete()
@@ -569,21 +598,26 @@ serve(async (req) => {
 
       // ========== TEST RESULTS ==========
       case "saveTestResults": {
-        // Upsert test results
-        const resultsToUpsert = data.results.map((r: any) => ({
-          test_id: data.test_id,
+        // First delete existing results for this test
+        await supabase.from("test_results").delete().eq("test_id", data.testId);
+        
+        // Insert new results
+        const resultsToInsert = data.results.map((r: any) => ({
+          test_id: data.testId,
           student_id: r.student_id,
-          is_absent: r.is_absent || false,
-          scores: r.scores || {},
-          total_score: r.total_score || 0,
-          percentage: r.percentage || 0
+          scores: r.scores,
+          total_score: r.total_score,
+          percentage: r.percentage,
+          is_absent: r.is_absent || false
         }));
-
-        const { error } = await supabase
-          .from("test_results")
-          .upsert(resultsToUpsert, { onConflict: 'test_id,student_id' });
+        
+        const { error } = await supabase.from("test_results").insert(resultsToInsert);
         
         if (error) throw error;
+
+        // Update test to mark as not draft
+        await supabase.from("tests").update({ is_draft: false }).eq("id", data.testId);
+        
         return new Response(JSON.stringify({ success: true }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -608,10 +642,10 @@ serve(async (req) => {
           .from("performance_levels")
           .insert({ 
             school_id: schoolId, 
-            name: data.name,
+            name: data.name, 
             min_score: data.min_score,
             max_score: data.max_score,
-            color: data.color,
+            color: data.color || '#3b82f6',
             display_order: data.display_order || 0
           })
           .select()
@@ -653,38 +687,22 @@ serve(async (req) => {
       }
 
       case "bulkSavePerformanceLevels": {
-        console.log("Saving performance levels for school:", schoolId);
-        console.log("Levels data:", data.levels);
-        
-        // First, try to delete existing levels (ignore error if none exist)
-        const { error: deleteError } = await supabase
-          .from("performance_levels")
-          .delete()
-          .eq("school_id", schoolId);
-        
-        if (deleteError) {
-          console.log("Delete error (may be ignored if no rows):", deleteError.message);
-        }
+        // Delete all existing levels for this school
+        await supabase.from("performance_levels").delete().eq("school_id", schoolId);
         
         // Insert new levels
         const levelsToInsert = data.levels.map((l: any, idx: number) => ({
           school_id: schoolId,
           name: l.name,
-          min_score: l.min_score ?? l.minScore ?? 0,
-          max_score: l.max_score ?? l.maxScore ?? 100,
-          color: l.color || "#3b82f6",
+          min_score: l.min_score,
+          max_score: l.max_score,
+          color: l.color || '#3b82f6',
           display_order: idx
         }));
         
-        console.log("Inserting levels:", levelsToInsert);
+        const { error } = await supabase.from("performance_levels").insert(levelsToInsert);
         
-        const { error: insertError } = await supabase.from("performance_levels").insert(levelsToInsert);
-        if (insertError) {
-          console.error("Insert error:", insertError);
-          throw insertError;
-        }
-        
-        console.log("Performance levels saved successfully");
+        if (error) throw error;
         return new Response(JSON.stringify({ success: true }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -744,13 +762,23 @@ serve(async (req) => {
           });
         }
 
-        // Verify password - plain text comparison
-        const isValid = verifyPassword(data.password, teacher.password_hash);
+        // Verify password using bcrypt (with legacy fallback)
+        const isValid = await verifyPassword(data.password, teacher.password_hash);
 
         if (!isValid) {
           return new Response(JSON.stringify({ success: false, error: "اسم المستخدم أو كلمة المرور غير صحيحة" }), {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
+        }
+
+        // Auto-migrate plain text password to bcrypt
+        if (!isBcryptHash(teacher.password_hash)) {
+          const hashedPassword = await hashPassword(data.password);
+          await supabase
+            .from("teachers")
+            .update({ password_hash: hashedPassword })
+            .eq("id", teacher.id);
+          console.log(`Auto-migrated password for teacher: ${teacher.username}`);
         }
 
         // SECURITY CHECK: Verify teacher's school matches the activated school on this device
@@ -922,7 +950,7 @@ serve(async (req) => {
 
         // Verify current password if not forced
         if (!data.isForced && data.currentPassword) {
-          const isValid = verifyPassword(data.currentPassword, teacher.password_hash);
+          const isValid = await verifyPassword(data.currentPassword, teacher.password_hash);
           if (!isValid) {
             return new Response(JSON.stringify({ success: false, error: "كلمة المرور الحالية غير صحيحة" }), {
               headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -930,11 +958,13 @@ serve(async (req) => {
           }
         }
 
-        // Update password - plain text
+        // Hash new password with bcrypt
+        const hashedPassword = await hashPassword(data.newPassword);
+        
         const { error: updateError } = await supabase
           .from("teachers")
           .update({ 
-            password_hash: data.newPassword,
+            password_hash: hashedPassword,
             must_change_password: false
           })
           .eq("id", data.teacherId);

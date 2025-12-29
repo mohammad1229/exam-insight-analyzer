@@ -533,6 +533,41 @@ export type Database = {
           },
         ]
       }
+      system_admin_sessions: {
+        Row: {
+          admin_id: string
+          created_at: string | null
+          expires_at: string
+          id: string
+          last_activity: string | null
+          token: string
+        }
+        Insert: {
+          admin_id: string
+          created_at?: string | null
+          expires_at: string
+          id?: string
+          last_activity?: string | null
+          token: string
+        }
+        Update: {
+          admin_id?: string
+          created_at?: string | null
+          expires_at?: string
+          id?: string
+          last_activity?: string | null
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "system_admin_sessions_admin_id_fkey"
+            columns: ["admin_id"]
+            isOneToOne: false
+            referencedRelation: "system_admins"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       system_admins: {
         Row: {
           created_at: string
