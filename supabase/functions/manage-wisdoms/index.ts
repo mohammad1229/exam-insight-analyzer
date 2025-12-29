@@ -3,8 +3,73 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-system-admin-token, x-school-admin-token",
 };
+
+// Verify system admin session token
+async function verifySystemAdminToken(
+  req: Request,
+  supabase: any
+): Promise<{ valid: boolean; adminId?: string; error?: string }> {
+  const token = req.headers.get('X-System-Admin-Token');
+  
+  if (!token) {
+    return { valid: false, error: 'Missing system admin token' };
+  }
+
+  const { data: session, error } = await supabase
+    .from('system_admin_sessions')
+    .select('admin_id, expires_at')
+    .eq('token', token)
+    .single();
+
+  if (error || !session) {
+    return { valid: false, error: 'Invalid session' };
+  }
+
+  if (new Date(session.expires_at) < new Date()) {
+    await supabase.from('system_admin_sessions').delete().eq('token', token);
+    return { valid: false, error: 'Session expired' };
+  }
+
+  await supabase
+    .from('system_admin_sessions')
+    .update({ last_activity: new Date().toISOString() })
+    .eq('token', token);
+
+  return { valid: true, adminId: session.admin_id };
+}
+
+// Check if request has valid school admin authentication (stored in body)
+async function verifySchoolAdminAuth(
+  body: any,
+  supabase: any
+): Promise<{ valid: boolean; schoolId?: string; error?: string }> {
+  const { adminId, schoolId } = body;
+  
+  if (!adminId || !schoolId) {
+    return { valid: false, error: 'Missing admin credentials' };
+  }
+
+  // Verify admin exists and is active
+  const { data: admin, error } = await supabase
+    .from('school_admins')
+    .select('id, school_id, is_active')
+    .eq('id', adminId)
+    .eq('is_active', true)
+    .single();
+
+  if (error || !admin) {
+    return { valid: false, error: 'Invalid admin credentials' };
+  }
+
+  // Verify admin belongs to the school they're trying to modify
+  if (admin.school_id !== schoolId) {
+    return { valid: false, error: 'Unauthorized for this school' };
+  }
+
+  return { valid: true, schoolId: admin.school_id };
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -17,11 +82,44 @@ serve(async (req) => {
     
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     
-    const { action, wisdom, wisdomId, schoolId } = await req.json();
+    const body = await req.json();
+    const { action, wisdom, wisdomId, schoolId } = body;
     
     console.log("Managing wisdom:", action);
 
-    // Get wisdoms
+    // Read-only actions (get, list) are public for displaying wisdoms on pages
+    const readOnlyActions = ["get", "list"];
+    
+    // Write actions require authentication
+    const writeActions = ["create", "update", "delete", "bulkCreate", "getAll"];
+    
+    if (writeActions.includes(action)) {
+      // First try system admin token
+      const systemAuth = await verifySystemAdminToken(req, supabase);
+      
+      if (!systemAuth.valid) {
+        // Fall back to school admin auth from body
+        const schoolAuth = await verifySchoolAdminAuth(body, supabase);
+        
+        if (!schoolAuth.valid) {
+          console.log("Authentication failed:", systemAuth.error || schoolAuth.error);
+          return new Response(
+            JSON.stringify({ success: false, error: "غير مصرح بالوصول" }),
+            { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        
+        // For school admin, they can only manage their school's wisdoms
+        if (action === "getAll" && schoolId !== schoolAuth.schoolId) {
+          return new Response(
+            JSON.stringify({ success: false, error: "غير مصرح بالوصول لبيانات هذه المدرسة" }),
+            { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+      }
+    }
+
+    // Get wisdoms (public)
     if (action === "get" || action === "list") {
       let query = supabase
         .from("wisdoms")
@@ -43,7 +141,7 @@ serve(async (req) => {
       );
     }
 
-    // Get all wisdoms (admin)
+    // Get all wisdoms (admin - protected)
     if (action === "getAll") {
       let query = supabase
         .from("wisdoms")
@@ -64,7 +162,7 @@ serve(async (req) => {
       );
     }
 
-    // Create wisdom
+    // Create wisdom (protected)
     if (action === "create") {
       // Validate input
       if (!wisdom?.content || wisdom.content.trim().length === 0) {
@@ -104,9 +202,9 @@ serve(async (req) => {
       );
     }
 
-    // Bulk create wisdoms
+    // Bulk create wisdoms (protected)
     if (action === "bulkCreate") {
-      const { wisdoms: wisdomsList } = await req.json();
+      const { wisdoms: wisdomsList } = body;
       
       if (!Array.isArray(wisdomsList) || wisdomsList.length === 0) {
         return new Response(
@@ -148,7 +246,7 @@ serve(async (req) => {
       );
     }
 
-    // Update wisdom
+    // Update wisdom (protected)
     if (action === "update") {
       if (!wisdomId) {
         return new Response(
@@ -180,7 +278,7 @@ serve(async (req) => {
       );
     }
 
-    // Delete wisdom
+    // Delete wisdom (protected)
     if (action === "delete") {
       if (!wisdomId) {
         return new Response(

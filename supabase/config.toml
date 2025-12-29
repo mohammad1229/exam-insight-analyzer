@@ -1,27 +1,44 @@
 project_id = "uqssjjkrudpbibawoaua"
 
-[functions.create-backup]
-verify_jwt = false
+[api]
+enabled = true
 
-[functions.create-license]
+[auth]
+enabled = true
+site_url = "https://uqssjjkrudpbibawoaua.lovableproject.com"
+
+[auth.email]
+enable_confirmations = false
+
+[functions.system-admin-auth]
 verify_jwt = false
 
 [functions.get-admin-data]
 verify_jwt = false
 
-[functions.get-all-schools-data]
+[functions.school-data]
 verify_jwt = false
 
-[functions.get-license-details]
-verify_jwt = false
-
-[functions.hash-password]
+[functions.create-license]
 verify_jwt = false
 
 [functions.manage-license]
 verify_jwt = false
 
+[functions.get-all-schools-data]
+verify_jwt = false
+
 [functions.manage-wisdoms]
+verify_jwt = false
+
+[functions.hash-password]
+verify_jwt = false
+
+[functions.get-license-details]
+verify_jwt = false
+
+[functions.create-backup]
+verify_jwt = false
 verify_jwt = false
 
 [functions.school-data]

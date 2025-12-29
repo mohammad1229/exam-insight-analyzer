@@ -27,6 +27,68 @@ async function hashPassword(password: string): Promise<string> {
   return await bcrypt.hash(password, 10);
 }
 
+// Verify school admin has access to the specified school
+async function verifySchoolAdminAuth(
+  body: any,
+  supabase: any
+): Promise<{ valid: boolean; schoolId?: string; error?: string }> {
+  const { adminId, schoolId } = body;
+  
+  if (!adminId || !schoolId) {
+    return { valid: false, error: 'Missing admin credentials' };
+  }
+
+  // Verify admin exists and is active
+  const { data: admin, error } = await supabase
+    .from('school_admins')
+    .select('id, school_id, is_active')
+    .eq('id', adminId)
+    .eq('is_active', true)
+    .single();
+
+  if (error || !admin) {
+    return { valid: false, error: 'Invalid admin credentials' };
+  }
+
+  // Verify admin belongs to the school they're trying to access
+  if (admin.school_id !== schoolId) {
+    return { valid: false, error: 'Unauthorized for this school' };
+  }
+
+  return { valid: true, schoolId: admin.school_id };
+}
+
+// Verify teacher has access to the specified school
+async function verifyTeacherAuth(
+  body: any,
+  supabase: any
+): Promise<{ valid: boolean; schoolId?: string; teacherId?: string; error?: string }> {
+  const { teacherId, schoolId } = body;
+  
+  if (!teacherId || !schoolId) {
+    return { valid: false, error: 'Missing teacher credentials' };
+  }
+
+  // Verify teacher exists and is active
+  const { data: teacher, error } = await supabase
+    .from('teachers')
+    .select('id, school_id, is_active')
+    .eq('id', teacherId)
+    .eq('is_active', true)
+    .single();
+
+  if (error || !teacher) {
+    return { valid: false, error: 'Invalid teacher credentials' };
+  }
+
+  // Verify teacher belongs to the school
+  if (teacher.school_id !== schoolId) {
+    return { valid: false, error: 'Unauthorized for this school' };
+  }
+
+  return { valid: true, schoolId: teacher.school_id, teacherId: teacher.id };
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -37,8 +99,63 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { action, schoolId, data } = await req.json();
+    const body = await req.json();
+    const { action, schoolId, data, adminId, teacherId } = body;
     console.log(`School data action: ${action} for school: ${schoolId}`);
+
+    // Actions that don't require authentication (login flows)
+    const publicActions = [
+      "verifyTeacherLogin", 
+      "verifyTeacherLoginByUsername",
+      "changeTeacherPassword" // Password change during forced change
+    ];
+
+    // Actions that can be done by teachers or admins
+    const teacherAllowedActions = [
+      "getClasses", "getSections", "getSubjects", "getStudents",
+      "getTests", "addTest", "updateTest", "deleteTest", "saveTestResults",
+      "getPerformanceLevels", "getSchool"
+    ];
+
+    // Actions that require school admin only
+    const adminOnlyActions = [
+      "addClass", "updateClass", "deleteClass",
+      "addSection", "deleteSection",
+      "addSubject", "updateSubject", "deleteSubject",
+      "addStudent", "updateStudent", "deleteStudent", "bulkAddStudents",
+      "getTeachers", "addTeacher", "updateTeacher", "deleteTeacher",
+      "addPerformanceLevel", "updatePerformanceLevel", "deletePerformanceLevel", "bulkSavePerformanceLevels",
+      "updateSchool", "initializeSchoolData"
+    ];
+
+    // Check authorization for protected actions
+    if (!publicActions.includes(action)) {
+      // First try admin auth
+      const adminAuth = await verifySchoolAdminAuth(body, supabase);
+      
+      if (adminAuth.valid) {
+        // Admin can do everything
+        console.log(`Admin ${adminId} authorized for action ${action}`);
+      } else if (teacherAllowedActions.includes(action)) {
+        // Try teacher auth for allowed actions
+        const teacherAuth = await verifyTeacherAuth(body, supabase);
+        if (!teacherAuth.valid) {
+          console.log("Authentication failed for action:", action);
+          return new Response(
+            JSON.stringify({ success: false, error: "غير مصرح بالوصول" }),
+            { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        console.log(`Teacher ${teacherId} authorized for action ${action}`);
+      } else if (adminOnlyActions.includes(action)) {
+        // Admin-only action failed admin auth
+        console.log("Admin authentication required for action:", action);
+        return new Response(
+          JSON.stringify({ success: false, error: "هذا الإجراء يتطلب صلاحيات المدير" }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
 
     switch (action) {
       // ========== CLASSES ==========
