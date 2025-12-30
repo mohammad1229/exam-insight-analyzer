@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useToast } from "@/hooks/use-toast";
 import { isElectron } from "@/services/electronService";
 import electronService from "@/services/electronService";
-import { Database, FileKey, Lock, Settings, User, Users, RefreshCw, BarChart3, Cloud, Download, Copy, Trash2, School, Sparkles } from "lucide-react";
+import { Database, FileKey, Lock, Settings, User, Users, RefreshCw, BarChart3, Cloud, Download, Copy, Trash2, School, Sparkles, Server, HardDrive } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { getLicenses, renewLicense, getSchools, generateLicense, deleteLicense, createLicenseWithSchool } from "@/services/licenseService";
@@ -24,6 +24,8 @@ import SystemBackupTab from "@/components/admin/SystemBackupTab";
 import SchoolsDataTab from "@/components/admin/SchoolsDataTab";
 import WisdomsTab from "@/components/admin/WisdomsTab";
 import CopyrightSettingsForm from "@/components/admin/CopyrightSettingsForm";
+import DatabaseConnectionTab from "@/components/admin/DatabaseConnectionTab";
+import StorageSettingsTab from "@/components/admin/StorageSettingsTab";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useSessionTimeout, clearSensitiveData } from "@/hooks/useSessionTimeout";
@@ -732,7 +734,7 @@ const SystemAdmin = () => {
         </div>
         
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid grid-cols-9 w-full max-w-6xl mx-auto mb-6 bg-gray-100 dark:bg-gray-800 p-1">
+          <TabsList className="grid grid-cols-11 w-full max-w-7xl mx-auto mb-6 bg-gray-100 dark:bg-gray-800 p-1">
             <TabsTrigger value="schools-data" className="flex items-center gap-2 data-[state=active]:bg-blue-600 data-[state=active]:text-white">
               <School className="h-4 w-4" />
               بيانات المدارس
@@ -761,7 +763,15 @@ const SystemAdmin = () => {
               <Cloud className="h-4 w-4" />
               النسخ الاحتياطي
             </TabsTrigger>
-            <TabsTrigger value="results" className="flex items-center gap-2 data-[state=active]:bg-teal-600 data-[state=active]:text-white">
+            <TabsTrigger value="database" className="flex items-center gap-2 data-[state=active]:bg-teal-600 data-[state=active]:text-white">
+              <Server className="h-4 w-4" />
+              قاعدة البيانات
+            </TabsTrigger>
+            <TabsTrigger value="storage" className="flex items-center gap-2 data-[state=active]:bg-pink-600 data-[state=active]:text-white">
+              <HardDrive className="h-4 w-4" />
+              التخزين
+            </TabsTrigger>
+            <TabsTrigger value="results" className="flex items-center gap-2 data-[state=active]:bg-rose-600 data-[state=active]:text-white">
               <Database className="h-4 w-4" />
               النتائج
             </TabsTrigger>
@@ -1185,6 +1195,36 @@ const SystemAdmin = () => {
                     </Card>
                   </div>
                 )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+          
+          {/* Database Connection Tab */}
+          <TabsContent value="database">
+            <Card className="border-2 border-teal-500">
+              <CardHeader className="bg-gradient-to-r from-teal-100 to-white border-b border-teal-500">
+                <CardTitle className="flex items-center gap-2">
+                  <Server className="h-5 w-5" />
+                  إعدادات قاعدة البيانات
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-6">
+                <DatabaseConnectionTab />
+              </CardContent>
+            </Card>
+          </TabsContent>
+          
+          {/* Storage Settings Tab */}
+          <TabsContent value="storage">
+            <Card className="border-2 border-pink-500">
+              <CardHeader className="bg-gradient-to-r from-pink-100 to-white border-b border-pink-500">
+                <CardTitle className="flex items-center gap-2">
+                  <HardDrive className="h-5 w-5" />
+                  إعدادات التخزين
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-6">
+                <StorageSettingsTab />
               </CardContent>
             </Card>
           </TabsContent>
