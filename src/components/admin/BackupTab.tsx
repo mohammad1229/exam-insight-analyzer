@@ -12,7 +12,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { Database, Cloud, Download, Upload, HardDrive, Trash2, RefreshCw } from "lucide-react";
+import { Database, Cloud, Download, Upload, HardDrive, Trash2, RefreshCw, Clock } from "lucide-react";
 import { 
   downloadBackup, 
   createCloudBackup, 
@@ -265,6 +265,20 @@ const BackupTab = ({ isSystemAdmin = false }: BackupTabProps) => {
               <p className="text-blue-600">{userContext.schoolName}</p>
             </div>
           )}
+
+          {/* Automatic Backup Schedule Info */}
+          <div className="p-4 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg border border-purple-200">
+            <div className="flex items-center gap-2 text-purple-700 mb-2">
+              <Clock className="h-5 w-5" />
+              <h4 className="font-medium">النسخ الاحتياطي التلقائي</h4>
+            </div>
+            <p className="text-sm text-purple-600">
+              يتم إنشاء نسخة احتياطية تلقائية كل يوم في الساعة 11:00 مساءً
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              النسخ الاحتياطي التلقائي يعمل فقط عندما يكون التطبيق مفتوحاً
+            </p>
+          </div>
 
           {/* Backup Options */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
