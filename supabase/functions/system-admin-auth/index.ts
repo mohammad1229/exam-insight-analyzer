@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import * as bcrypt from "https://deno.land/x/bcrypt@v0.4.1/mod.ts";
+import { hashSync, compareSync } from "https://deno.land/x/bcrypt@v0.4.1/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -13,13 +13,23 @@ function isBcryptHash(hash: string): boolean {
 }
 
 // Helper function to verify password (supports legacy plain text during migration)
-async function verifyPassword(password: string, storedHash: string): Promise<boolean> {
+function verifyPassword(password: string, storedHash: string): boolean {
   if (isBcryptHash(storedHash)) {
-    return await bcrypt.compare(password, storedHash);
+    try {
+      return compareSync(password, storedHash);
+    } catch (e) {
+      console.error("Error comparing bcrypt hash:", e);
+      return false;
+    }
   }
   // Legacy plain text comparison (will be removed after migration)
   console.warn('Legacy plain text password detected - migration needed');
   return password === storedHash;
+}
+
+// Helper function to hash password
+function hashPassword(password: string): string {
+  return hashSync(password);
 }
 
 serve(async (req) => {
@@ -65,7 +75,7 @@ serve(async (req) => {
         }
 
         // Verify password using bcrypt (with legacy fallback)
-        const isValid = await verifyPassword(password, admin.password_hash);
+        const isValid = verifyPassword(password, admin.password_hash);
         
         if (!isValid) {
           return new Response(
@@ -104,14 +114,19 @@ serve(async (req) => {
           .update({ last_login_at: new Date().toISOString() })
           .eq("id", admin.id);
 
-        // If password was plain text, hash it now (auto-migration)
+        // If password was plain text, hash it now (auto-migration) - do this in background
         if (!isBcryptHash(admin.password_hash)) {
-          const hashedPassword = await bcrypt.hash(password, 10);
-          await supabase
-            .from("system_admins")
-            .update({ password_hash: hashedPassword })
-            .eq("id", admin.id);
-          console.log(`Auto-migrated password for admin: ${admin.username}`);
+          try {
+            const hashedPassword = hashPassword(password);
+            await supabase
+              .from("system_admins")
+              .update({ password_hash: hashedPassword })
+              .eq("id", admin.id);
+            console.log(`Auto-migrated password for admin: ${admin.username}`);
+          } catch (hashError) {
+            console.error("Error hashing password for migration:", hashError);
+            // Don't fail login if migration fails
+          }
         }
 
         return new Response(
@@ -153,7 +168,7 @@ serve(async (req) => {
         }
 
         // Verify current password using bcrypt (with legacy fallback)
-        const isValid = await verifyPassword(password, admin.password_hash);
+        const isValid = verifyPassword(password, admin.password_hash);
         if (!isValid) {
           return new Response(
             JSON.stringify({ success: false, error: "كلمة المرور الحالية غير صحيحة" }),
@@ -162,7 +177,7 @@ serve(async (req) => {
         }
 
         // Hash new password with bcrypt
-        const hashedPassword = await bcrypt.hash(newPassword, 10);
+        const hashedPassword = hashPassword(newPassword);
 
         // Update password
         const { error: updateError } = await supabase
