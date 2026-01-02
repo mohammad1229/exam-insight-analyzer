@@ -130,6 +130,82 @@ export const getDeviceActivationData = (): any => {
   }
 };
 
+// محاولة استعادة بيانات الترخيص/المدرسة عند فقدان localStorage
+// (مثلاً بعد تنظيف المتصفح أو إعادة تثبيت التطبيق)
+export const recoverSessionFromDeviceActivation = async (): Promise<{
+  recovered: boolean;
+  offlineOnly?: boolean;
+  error?: string;
+}> => {
+  try {
+    const currentSchoolId = localStorage.getItem("currentSchoolId");
+    const storedLicense = getStoredLicense();
+
+    // إذا كانت البيانات موجودة بالفعل لا نلمسها
+    if (currentSchoolId && storedLicense?.licenseKey) {
+      return { recovered: false };
+    }
+
+    const activation = getDeviceActivationData();
+    if (!activation?.licenseKey && !activation?.schoolId) {
+      return { recovered: false };
+    }
+
+    // على الأقل نعيد ضبط schoolId حتى لا ترجع عمليات القراءة فارغة
+    if (!currentSchoolId && activation.schoolId) {
+      localStorage.setItem("currentSchoolId", activation.schoolId);
+    }
+
+    // إذا كنا Offline لا نستطيع جلب التفاصيل، لكن نترك schoolId مضبوطاً
+    if (!navigator.onLine) {
+      return { recovered: true, offlineOnly: true };
+    }
+
+    // جلب تفاصيل الترخيص/المدرسة من الخلفية (الجداول محمية)
+    if (activation.licenseKey) {
+      const detailsResp = await supabase.functions.invoke("get-license-details", {
+        body: { licenseKey: activation.licenseKey },
+      });
+
+      if (detailsResp.error) throw detailsResp.error;
+      if (!detailsResp.data?.success) {
+        throw new Error(detailsResp.data?.error || "تعذر استعادة بيانات الترخيص");
+      }
+
+      const license = detailsResp.data.data as any;
+      const recoveredLicenseInfo = {
+        licenseKey: activation.licenseKey,
+        licenseId: license?.id,
+        schoolId: license?.school_id || activation.schoolId,
+        schoolName: license?.schools?.name || "",
+        directorName: license?.schools?.director_name || "",
+        schoolLogo: license?.schools?.logo_url || "",
+        isTrial: license?.is_trial ?? false,
+        expiryDate: license?.expiry_date,
+      };
+
+      storeLicense(recoveredLicenseInfo);
+
+      localStorage.setItem("schoolName", recoveredLicenseInfo.schoolName || "");
+      localStorage.setItem("directorName", recoveredLicenseInfo.directorName || "");
+      localStorage.setItem("schoolLogo", recoveredLicenseInfo.schoolLogo || "");
+      localStorage.setItem("currentSchoolId", recoveredLicenseInfo.schoolId || "");
+      localStorage.setItem("currentLicenseId", recoveredLicenseInfo.licenseId || "");
+      localStorage.setItem("licenseSchoolName", recoveredLicenseInfo.schoolName || "");
+      localStorage.setItem("licenseDirectorName", recoveredLicenseInfo.directorName || "");
+      localStorage.setItem("lastLicenseValidation", Date.now().toString());
+
+      return { recovered: true };
+    }
+
+    return { recovered: true };
+  } catch (e: any) {
+    console.error("recoverSessionFromDeviceActivation failed:", e);
+    return { recovered: false, error: e?.message || String(e) };
+  }
+};
+
+
 // Get license info from local storage
 export const getStoredLicense = () => {
   const stored = localStorage.getItem("licenseInfo");
