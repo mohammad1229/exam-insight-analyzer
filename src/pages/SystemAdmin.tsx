@@ -340,7 +340,9 @@ const SystemAdmin = () => {
   };
   
   const handleLogin = async () => {
-    if (!username || !password) {
+    const cleanUsername = username.trim();
+
+    if (!cleanUsername || !password) {
       toast({
         title: "خطأ",
         description: "يرجى إدخال اسم المستخدم وكلمة المرور",
@@ -350,11 +352,11 @@ const SystemAdmin = () => {
     }
 
     setIsLoading(true);
-    
+
     try {
       // Use server-side authentication
       const { data, error } = await supabase.functions.invoke('system-admin-auth', {
-        body: { action: 'login', username, password }
+        body: { action: 'login', username: cleanUsername, password }
       });
 
       if (error || !data?.success) {
