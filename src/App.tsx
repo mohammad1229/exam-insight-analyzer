@@ -6,6 +6,7 @@ import { ThemeProvider } from "@/components/ThemeProvider";
 import { initializeBackupScheduler } from "@/services/backupService";
 import { setupAutoSync, syncPendingOperations, isOnline } from "@/services/offlineSyncService";
 import { initHybridStorage, syncPendingChanges } from "@/services/hybridStorageService";
+import { recoverSessionFromDeviceActivation } from "@/services/licenseService";
 import WisdomBanner from "@/components/WisdomBanner";
 import OfflineIndicator from "@/components/OfflineIndicator";
 import Welcome from "./pages/Welcome";
@@ -22,6 +23,14 @@ import { toast } from "sonner";
 
 function App() {
   useEffect(() => {
+    // Recover school/license context if localStorage was cleared
+    (async () => {
+      const res = await recoverSessionFromDeviceActivation();
+      if (res.recovered && !res.offlineOnly) {
+        toast.success("تم استعادة بيانات الترخيص تلقائياً");
+      }
+    })();
+
     // Initialize automatic backup scheduler
     initializeBackupScheduler();
     
