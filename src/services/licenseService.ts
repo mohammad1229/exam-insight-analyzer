@@ -147,13 +147,36 @@ export const recoverSessionFromDeviceActivation = async (): Promise<{
     }
 
     const activation = getDeviceActivationData();
-    if (!activation?.licenseKey && !activation?.schoolId) {
+
+    // إذا لم نجد بيانات تفعيل محفوظة، نحاول الاستعادة عبر deviceId (حتى لو تم مسح localStorage)
+    // هذا يعمل لأن deviceId مبني على بصمة الجهاز وعادةً يرجع نفس القيمة.
+    let recoveredLicenseKey = activation?.licenseKey as string | undefined;
+    let recoveredSchoolId = activation?.schoolId as string | undefined;
+
+    if ((!recoveredLicenseKey || !recoveredSchoolId) && navigator.onLine) {
+      const deviceId = getDeviceId();
+      const resp = await supabase.functions.invoke("recover-device-session", {
+        body: { deviceId },
+      });
+
+      if (!resp.error && resp.data?.success && resp.data?.data) {
+        recoveredLicenseKey = resp.data.data.licenseKey;
+        recoveredSchoolId = resp.data.data.schoolId;
+
+        // أعد حفظ حالة التفعيل محلياً لتعمل بقية الشاشات بدون مشاكل
+        if (recoveredLicenseKey && recoveredSchoolId) {
+          markDeviceActivated(recoveredLicenseKey, recoveredSchoolId);
+        }
+      }
+    }
+
+    if (!recoveredLicenseKey && !recoveredSchoolId) {
       return { recovered: false };
     }
 
     // على الأقل نعيد ضبط schoolId حتى لا ترجع عمليات القراءة فارغة
-    if (!currentSchoolId && activation.schoolId) {
-      localStorage.setItem("currentSchoolId", activation.schoolId);
+    if (!currentSchoolId && recoveredSchoolId) {
+      localStorage.setItem("currentSchoolId", recoveredSchoolId);
     }
 
     // إذا كنا Offline لا نستطيع جلب التفاصيل، لكن نترك schoolId مضبوطاً
@@ -162,9 +185,9 @@ export const recoverSessionFromDeviceActivation = async (): Promise<{
     }
 
     // جلب تفاصيل الترخيص/المدرسة من الخلفية (الجداول محمية)
-    if (activation.licenseKey) {
+    if (recoveredLicenseKey) {
       const detailsResp = await supabase.functions.invoke("get-license-details", {
-        body: { licenseKey: activation.licenseKey },
+        body: { licenseKey: recoveredLicenseKey },
       });
 
       if (detailsResp.error) throw detailsResp.error;
@@ -174,9 +197,9 @@ export const recoverSessionFromDeviceActivation = async (): Promise<{
 
       const license = detailsResp.data.data as any;
       const recoveredLicenseInfo = {
-        licenseKey: activation.licenseKey,
+        licenseKey: recoveredLicenseKey,
         licenseId: license?.id,
-        schoolId: license?.school_id || activation.schoolId,
+        schoolId: license?.school_id || recoveredSchoolId,
         schoolName: license?.schools?.name || "",
         directorName: license?.schools?.director_name || "",
         schoolLogo: license?.schools?.logo_url || "",
