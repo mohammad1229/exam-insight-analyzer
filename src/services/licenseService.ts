@@ -469,8 +469,18 @@ export const createLicenseWithSchool = async (
   address?: string
 ) => {
   try {
+    // Get the system admin token from session storage
+    const adminToken = sessionStorage.getItem('system_admin_token');
+    
+    if (!adminToken) {
+      throw new Error('يجب تسجيل الدخول كمدير نظام لإنشاء الترخيص');
+    }
+
     const { data, error } = await supabase.functions.invoke('create-license', {
-      body: { schoolName, directorName, validityMonths, maxDevices, email, phone, address }
+      body: { schoolName, directorName, validityMonths, maxDevices, email, phone, address },
+      headers: {
+        'X-System-Admin-Token': adminToken
+      }
     });
 
     if (error) throw error;
