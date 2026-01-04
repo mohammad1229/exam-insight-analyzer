@@ -39,10 +39,9 @@ verify_jwt = false
 
 [functions.create-backup]
 verify_jwt = false
+
+[functions.recover-device-session]
 verify_jwt = false
 
-[functions.school-data]
-verify_jwt = false
-
-[functions.system-admin-auth]
+[functions.mysql-proxy]
 verify_jwt = false
