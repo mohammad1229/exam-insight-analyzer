@@ -374,6 +374,9 @@ const SystemAdmin = () => {
         expiry: data.sessionExpiry,
         token: data.sessionToken
       }));
+      
+      // Store token separately for API calls
+      sessionStorage.setItem("system_admin_token", data.sessionToken);
 
       // Store system admin data for backup service
       localStorage.setItem("systemAdminData", JSON.stringify({
