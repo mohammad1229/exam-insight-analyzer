@@ -501,8 +501,10 @@ export const createLicenseWithSchool = async (
 // Get all schools - uses edge function to bypass RLS
 export const getSchools = async () => {
   try {
+    const adminToken = sessionStorage.getItem('system_admin_token');
     const { data, error } = await supabase.functions.invoke('get-admin-data', {
-      body: { action: 'getSchools' }
+      body: { action: 'getSchools' },
+      headers: adminToken ? { 'X-System-Admin-Token': adminToken } : undefined
     });
 
     if (error) throw error;
@@ -517,8 +519,10 @@ export const getSchools = async () => {
 // Get all licenses - uses edge function to bypass RLS
 export const getLicenses = async () => {
   try {
+    const adminToken = sessionStorage.getItem('system_admin_token');
     const { data, error } = await supabase.functions.invoke('get-admin-data', {
-      body: { action: 'getLicenses' }
+      body: { action: 'getLicenses' },
+      headers: adminToken ? { 'X-System-Admin-Token': adminToken } : undefined
     });
 
     if (error) throw error;
@@ -710,8 +714,10 @@ export interface SchoolAdmin {
 // Get all school admins - uses edge function to bypass RLS
 export const getSchoolAdmins = async () => {
   try {
+    const adminToken = sessionStorage.getItem('system_admin_token');
     const { data, error } = await supabase.functions.invoke('get-admin-data', {
-      body: { action: 'getSchoolAdmins' }
+      body: { action: 'getSchoolAdmins' },
+      headers: adminToken ? { 'X-System-Admin-Token': adminToken } : undefined
     });
 
     if (error) throw error;
@@ -735,6 +741,7 @@ export const createSchoolAdmin = async (adminData: {
 }) => {
   // Use plain text password (no encryption)
   const passwordHash = adminData.password;
+  const adminToken = sessionStorage.getItem('system_admin_token');
 
   // Use edge function to create admin
   const { data, error } = await supabase.functions.invoke('get-admin-data', {
@@ -742,7 +749,8 @@ export const createSchoolAdmin = async (adminData: {
       action: 'createSchoolAdmin',
       adminData,
       passwordHash
-    }
+    },
+    headers: adminToken ? { 'X-System-Admin-Token': adminToken } : undefined
   });
 
   if (error) throw error;
@@ -772,13 +780,16 @@ export const updateSchoolAdmin = async (
     delete updateData.password;
   }
 
+  const adminToken = sessionStorage.getItem('system_admin_token');
+
   // Use edge function to update admin
   const { data, error } = await supabase.functions.invoke('get-admin-data', {
     body: { 
       action: 'updateSchoolAdmin',
       adminId,
       updateData
-    }
+    },
+    headers: adminToken ? { 'X-System-Admin-Token': adminToken } : undefined
   });
 
   if (error) throw error;
@@ -788,11 +799,13 @@ export const updateSchoolAdmin = async (
 
 // Delete school admin - uses edge function
 export const deleteSchoolAdmin = async (adminId: string) => {
+  const adminToken = sessionStorage.getItem('system_admin_token');
   const { data, error } = await supabase.functions.invoke('get-admin-data', {
     body: { 
       action: 'deleteSchoolAdmin',
       adminId
-    }
+    },
+    headers: adminToken ? { 'X-System-Admin-Token': adminToken } : undefined
   });
 
   if (error) throw error;
